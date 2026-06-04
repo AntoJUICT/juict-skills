@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-marketplace.json",
+  "name": "juict-skills",
+  "owner": {
+    "name": "AntoJUICT",
+    "email": "anto@juict.nl"
+  },
+  "description": "JUICT Claude Code skills marketplace.",
+  "plugins": [
+    {
+      "name": "autotask-api",
+      "source": "./",
+      "description": "Werken met de Autotask REST API in JUICT-projecten — Key Vault-auth, geverifieerde endpoints, env vars, data structures en lessons learned."
+    }
+  ]
+}
