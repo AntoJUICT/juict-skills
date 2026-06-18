@@ -97,6 +97,7 @@ De client gebruikt Key Vault zodra `AZURE_KEYVAULT_URL` gezet is, anders env var
 
 ### Billing Codes / Work Types
 - `GET /BillingCodes/query` — filter op `isActive` (NIET `active`) en `billingCodeType`. Work types (labor) = `billingCodeType` 0.
+- Voor een Work Type-dropdown: filter óók op `useType` 1 (general allocation codes) — alleen die zijn geldig als `billingCodeID`. `billingCodeType: 0` alléén bevat ook material/contract-codes die 500 geven.
 
 ### Projects
 - `POST /Projects` — aanmaken project
