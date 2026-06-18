@@ -37,6 +37,9 @@ Verkeerde resource+role combinatie → "The specified AssignedResourceID and Ass
 - Guard altijd: `durationHours > 0 ? durationHours : 0.01`
 - Gebruik: `params.resourceId ?? Number(process.env.AUTOTASK_DEFAULT_RESOURCE_ID)`
 
+**`billingCodeID` accepteert alleen "general allocation codes".** Een code uit `/BillingCodes/query` met `billingCodeType: 0` is niet automatisch geldig — materiaal/contract-codes geven 500 "The given allocation code is not an active general allocation code". Alleen als general allocation code geconfigureerde labor-codes werken.
+- How to apply: filter de work-type-lijst hierop; test een onbekende code vóór gebruik.
+
 ---
 
 ## Tickets
@@ -44,6 +47,9 @@ Verkeerde resource+role combinatie → "The specified AssignedResourceID and Ass
 **Nooit `assignedResourceID` meegeven zonder `assignedResourceRoleID`.** Geeft 500 error.
 - Why: `assignedResourceID` werd automatisch ingevuld vanuit SSO-profiel en veroorzaakte validatiefout.
 - How to apply: Gebruik `ImpersonationResourceId` header voor creator-attribuering, zet `assignedResourceID` niet in de ticket POST payload.
+
+**Work type op een ticket heet `billingCodeID`, niet `workType`.** Het Ticket entity heeft een `billingCodeID`-veld; zet het op de ticket body om de "Work Type" in de ticketkop te vullen (geverifieerd: blijft staan). `workType` als veldnaam doet niets.
+- How to apply: zet de gekozen work type op BEIDE — de ticket body (`billingCodeID`) én de TimeEntry (`billingCodeID`).
 
 ---
 
@@ -54,6 +60,8 @@ Twee vereisten voor `ImpersonationResourceId` header:
 2. **API call** → header `ImpersonationResourceId: {resourceId}` meegeven
 
 Why: Eerste poging gaf 500 "does not have adequate permissions" omdat de API security level geen Add-rechten had.
+
+**Impersonatie is per entity — `POST /TimeEntries` kan falen terwijl `POST /Tickets` slaagt.** Zonder "Add" voor TimeEntries geeft de header 500 "does not have adequate permissions to create this entity", ook al werkt impersonatie op Tickets. Workaround: laat de `ImpersonationResourceId`-header weg bij `/TimeEntries` — `resourceID` in de body wijst de tijd al toe aan de medewerker.
 
 ---
 

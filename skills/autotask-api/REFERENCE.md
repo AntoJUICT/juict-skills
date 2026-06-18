@@ -95,6 +95,9 @@ De client gebruikt Key Vault zodra `AZURE_KEYVAULT_URL` gezet is, anders env var
 - `GET /ContractServices/query` — filter op `contractID`
 - `GET /Services/query`
 
+### Billing Codes / Work Types
+- `GET /BillingCodes/query` — filter op `isActive` (NIET `active`) en `billingCodeType`. Work types (labor) = `billingCodeType` 0.
+
 ### Projects
 - `POST /Projects` — aanmaken project
 - `GET /Projects/{id}/Phases` — fases ophalen (NIET `/ProjectPhases/query` — bestaat niet in zone 19)
@@ -143,6 +146,7 @@ interface AutotaskTicket {
   ticketType?: number;
   ticketCategory?: number;
   queueID?: number;
+  billingCodeID?: number;      // work type op het ticket (zelfde codes als TimeEntry.billingCodeID)
   assignedResourceID?: number;
   assignedResourceRoleID?: number;  // ALTIJD meegeven als assignedResourceID aanwezig is
   estimatedHours?: number;
