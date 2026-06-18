@@ -89,6 +89,7 @@ De client gebruikt Key Vault zodra `AZURE_KEYVAULT_URL` gezet is, anders env var
 
 ### Resources
 - `GET /Resources/query` — zoek op email
+- Filter op `isActive: true` voor actieve medewerkers. Let op: de lijst bevat ook API-integratieaccounts (Claude API, Rewst API, Xelion API, enz.). Die hebben `licenseType` 7 (API User); echte collega's hebben 1 of 3. Voor een "Toewijzen aan collega"-dropdown filter je ze weg met `{ field: "licenseType", op: "noteq", value: 7 }`.
 
 ### Contracts & Services
 - `GET /Contracts/query` — filter op `companyID`, `status`
