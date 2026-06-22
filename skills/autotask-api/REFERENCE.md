@@ -139,7 +139,7 @@ interface AutotaskTicket {
   title: string;
   description?: string;
   status: number;              // 1=New, 5=Complete
-  priority: number;            // 1=Critical, 2=High, 3=Normal, 4=Low
+  priority: number;            // ZONE 19: custom picklist — 1=Prio 2, 2=Prio 3, 4=Prio 1, 5=Spoed. GEEN waarde 3! De generieke 1=Critical/2=High/3=Normal/4=Low geldt NIET.
   companyID: number;
   contactID?: number;
   source?: number;             // 8=Portal, telefoon=eigen ID

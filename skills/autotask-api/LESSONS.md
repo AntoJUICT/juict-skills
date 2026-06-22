@@ -51,6 +51,14 @@ Verkeerde resource+role combinatie → "The specified AssignedResourceID and Ass
 **Work type op een ticket heet `billingCodeID`, niet `workType`.** Het Ticket entity heeft een `billingCodeID`-veld; zet het op de ticket body om de "Work Type" in de ticketkop te vullen (geverifieerd: blijft staan). `workType` als veldnaam doet niets.
 - How to apply: zet de gekozen work type op BEIDE — de ticket body (`billingCodeID`) én de TimeEntry (`billingCodeID`).
 
+**Priority-picklist in zone 19 is custom — er is GEEN value 3.** `priority: 3` geeft 500 "Picklist value [3] does not exist for priority". De value-IDs matchen niet met de labels: 1=Prio 2, 2=Prio 3, 4=Prio 1, 5=Spoed. Haal de echte waarden op via `GET /Tickets/entityInformation/fields` en map portal-prioriteit expliciet.
+
+**`queueID` wordt verplicht zodra `ticketCategory` = Incident (113).** Bij de default category "Standard" (3) is queueID niet nodig; bij Incident geeft een ontbrekende queueID 500 "queueID is required". Autotask maakt velden dynamisch verplicht op basis van ticketCategory.
+
+**`POST /Tickets/{id}/Attachments` vereist `attachmentType`, `publish`, `title` en `fullPath`.** Zet `attachmentType: "FILE_ATTACHMENT"`, `publish: 1` (All Autotask Users), `data` = base64. Het top-level `/AttachmentInfo` met `attachedObjectType`/`attachedObjectID` werkt NIET — die velden bestaan niet.
+
+**Tickets kunnen niet via `DELETE /Tickets/{id}` verwijderd worden — geeft 405.** Opruimen kan alleen door te sluiten: `PATCH /Tickets` met `status: 5` (Complete), of handmatig in de UI.
+
 ---
 
 ## Impersonation
