@@ -125,3 +125,5 @@ AUTOTASK_SECRET='abc#def'    # # binnen single quotes = literal hekje
 ## Notes
 
 Notes hebben een `Publish` veld: `1` = zichtbaar voor klant, `2` = intern. Filter bij weergave aan klanten.
+
+**Autotask (zone 19) rendert geen HTML via de API — niet in `description` en niet in Ticket Notes.** Losse tags (`<strong>`, `<ul><li>`) worden als platte tekst getoond; de API bewaart ze wel maar de UI rendert ze niet. Opmaak die je handmatig in de rich-text-editor typt is een ander mechanisme en is niet via de API te reproduceren. Gebruik voor API-aangemaakte tekst dus platte tekst (vraag op eigen regel, antwoord eronder, witregel tussen blokken).
