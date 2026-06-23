@@ -57,6 +57,10 @@ Verkeerde resource+role combinatie → "The specified AssignedResourceID and Ass
 
 **`POST /Tickets/{id}/Attachments` vereist `attachmentType`, `publish`, `title` en `fullPath`.** Zet `attachmentType: "FILE_ATTACHMENT"`, `publish: 1` (All Autotask Users), `data` = base64. Het top-level `/AttachmentInfo` met `attachedObjectType`/`attachedObjectID` werkt NIET — die velden bestaan niet.
 
+**Ticket-bijlagen ophalen = `GET /Tickets/{id}/Attachments` (nested GET, 200).** De top-level `POST /AttachmentInfo/query` met `attachedObjectID`/`attachedObjectType` geeft 500 "Unable to find attachedObjectID in the AttachmentInfo Entity" — die velden bestaan niet; de echte koppelvelden zijn `parentID`/`ticketID`/`parentType`. Nested `/query` (`POST /Tickets/{id}/Attachments/query`) geeft 404 — nested ondersteunt alleen GET.
+
+**De REST API geeft de bestandsinhoud (`data`) van een bijlage NIET terug.** `GET /AttachmentInfo/{id}`, de single nested GET én `?includeData=true` leveren allemaal geen `data` — het veld staat niet eens in `AttachmentInfo/entityInformation/fields`. Via REST is alleen metadata beschikbaar; voor de bytes is een ander mechanisme nodig (SOAP `GetAttachment` of sync). Geverifieerd in zone 19.
+
 **Tickets kunnen niet via `DELETE /Tickets/{id}` verwijderd worden — geeft 405.** Opruimen kan alleen door te sluiten: `PATCH /Tickets` met `status: 5` (Complete), of handmatig in de UI.
 
 ---
