@@ -88,7 +88,7 @@ De client gebruikt Key Vault zodra `AZURE_KEYVAULT_URL` gezet is, anders env var
 - `PATCH /Contacts/{id}`
 
 ### Resources
-- `GET /Resources/query` — zoek op email
+- `GET /Resources/query` — filter op `email` (het primaire e-mailveld). Let op: Resources gebruikt `email`, NIET `emailAddress` zoals Contacts — geverifieerd in zone 19.
 - Filter op `isActive: true` voor actieve medewerkers. Let op: de lijst bevat ook API-integratieaccounts (Claude API, Rewst API, Xelion API, enz.). Die hebben `licenseType` 7 (API User); echte collega's hebben 1 of 3. Voor een "Toewijzen aan collega"-dropdown filter je ze weg met `{ field: "licenseType", op: "noteq", value: 7 }`.
 
 ### Contracts & Services
@@ -106,6 +106,16 @@ De client gebruikt Key Vault zodra `AZURE_KEYVAULT_URL` gezet is, anders env var
 
 ### Metadata / picklists
 - `GET /Tickets/entityInformation/fields` — picklist-waarden voor status, priority, issueType, subIssueType, etc.
+
+Response-structuur (geverifieerd zone 19): top-level `{ fields: [...] }`, elk veld met `name` + `picklistValues`. Let op: `value` is een **string**, niet een number — cast naar `Number()` voordat je tegen een numeriek ticketveld (`status`, `priority`) mapt.
+
+```json
+{ "fields": [
+  { "name": "status", "isPickList": true, "picklistValues": [
+    { "value": "1", "label": "New", "isActive": true, "sortOrder": 1, "parentValue": "", "isSystem": true }
+  ]}
+]}
+```
 
 ## Response-formaten
 
@@ -153,6 +163,7 @@ interface AutotaskTicket {
   assignedResourceRoleID?: number;  // ALTIJD meegeven als assignedResourceID aanwezig is
   estimatedHours?: number;
   dueDateTime?: string;        // ISO-formaat
+  lastActivityDate?: string;   // ISO-formaat — handig om "mijn tickets" op te sorteren
 }
 
 interface AutotaskContact {
@@ -177,12 +188,17 @@ interface AutotaskCompany {
   isActive?: boolean;
 }
 
-interface PicklistField {
-  field: string;    // "status" | "priority" | "issueType" | ...
-  id: number;
-  name: string;
-  parentId?: number;  // Voor hiërarchische velden zoals subIssueType
-  isActive: boolean;
+// Eén veld uit GET /Tickets/entityInformation/fields. Picklist-waarden zitten genest;
+// `value` is een string (cast naar Number voor numerieke ticketvelden).
+interface EntityField {
+  name: string;       // "status" | "priority" | "issueType" | ...
+  isPickList: boolean;
+  picklistValues?: Array<{
+    value: string;    // STRING, niet number
+    label: string;
+    isActive: boolean;
+    parentValue?: string;  // voor hiërarchische velden zoals subIssueType
+  }>;
 }
 ```
 
