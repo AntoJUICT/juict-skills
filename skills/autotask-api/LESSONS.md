@@ -20,6 +20,12 @@ Bekende valkuilen, fouten en hard-geleerde lessen bij werken met de Autotask RES
 
 ---
 
+## Filters / query-operators
+
+**De `noteExist`-operator is onbetrouwbaar in zone 19.** `{ field: "rmmAlertID", op: "noteExist" }` gaf álle records terug i.p.v. alleen de tickets zónder rmmAlertID, terwijl `op: "exist"` wél correct de RMM-tickets (rmmAlertID gezet) teruggaf. Filter "veld is leeg"-condities client-side (in JS) i.p.v. op `noteExist` te vertrouwen — het is een stille datafout (200 met te véél records, geen foutmelding).
+
+---
+
 ## TimeEntries (meest foutgevoelig)
 
 POST /TimeEntries vereist altijd drie velden — ontbrekend = 500 error:
