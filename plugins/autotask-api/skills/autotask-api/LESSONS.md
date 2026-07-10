@@ -71,6 +71,40 @@ Verkeerde resource+role combinatie → "The specified AssignedResourceID and Ass
 
 **Tickets kunnen niet via `DELETE /Tickets/{id}` verwijderd worden — geeft 405.** Opruimen kan alleen door te sluiten: `PATCH /Tickets` met `status: 5` (Complete), of handmatig in de UI.
 
+**Zet altijd `ticketType` én `ticketCategory` bij het aanmaken van een ticket.** JUICT-conventie (zone 19): een change krijgt `ticketType: 4` (Change Request) met `ticketCategory: 117` (Minor Change) of `119` (Major Change); een incident `ticketType: 2` met `ticketCategory: 113`. De categorie bepaalt welke velden verplicht worden (zie de queueID-les hierboven) — laat je ze weg dan valt het ticket op "Standard" en klopt de layout in de UI niet.
+
+**Ticket-descriptions volgen een vaste template per type** (JUICT-conventie, patroon uit xelion-transcriptie `src/lib/openai.ts`). Change:
+
+```
+Wat betreft de change?
+• [antwoord]
+
+Bij hoeveel gebruikers is de change van toepassing?
+• [antwoord]
+
+Hoe hoog is de impact van de change?
+• [antwoord]
+
+Aandachtspunten van change?
+• [antwoord]
+```
+
+Incident:
+
+```
+Wat is het incident?
+• [antwoord]
+
+Hoeveel gebruikers worden getroffen?
+• [antwoord]
+
+Wat is de impact?
+• [antwoord]
+
+Troubleshooting stappen / aandachtspunten?
+• [antwoord]
+```
+
 ---
 
 ## Impersonation
@@ -80,6 +114,8 @@ Twee vereisten voor `ImpersonationResourceId` header:
 2. **API call** → header `ImpersonationResourceId: {resourceId}` meegeven
 
 Why: Eerste poging gaf 500 "does not have adequate permissions" omdat de API security level geen Add-rechten had.
+
+**Zet de `ImpersonationResourceId`-header NOOIT op query/GET-endpoints.** Op `*/query` geeft de header "The logged in Resource does not have the adequate permissions to query this entity type." Gebruik twee header-sets: één zonder impersonatie voor lezen, één mét voor creates (POST Tickets/Notes).
 
 **Impersonatie is per entity — `POST /TimeEntries` kan falen terwijl `POST /Tickets` slaagt.** Zonder "Add" voor TimeEntries geeft de header 500 "does not have adequate permissions to create this entity", ook al werkt impersonatie op Tickets. Workaround: laat de `ImpersonationResourceId`-header weg bij `/TimeEntries` — `resourceID` in de body wijst de tijd al toe aan de medewerker.
 
@@ -142,7 +178,7 @@ Notes hebben een `Publish` veld: `1` = zichtbaar voor klant, `2` = intern. Filte
 
 **Werknotities plaats je niet als losse Ticket Note maar op de TimeEntry.** Eén `POST /TimeEntries` met `summaryNotes` (klant-zichtbare samenvatting) én `internalNotes` (interne notitie, CATA-vorm) — zo staan notitie en tijdsregistratie altijd samen. Losse Ticket Notes alleen voor communicatie zonder bestede tijd (patroon uit xelion-transcriptie, `src/lib/autotask.ts`).
 
-**Notes zonder `ImpersonationResourceId`-header komen op naam van de API-user te staan.** Stuur de header altijd mee bij het plaatsen van notes. Corrigeren achteraf: DELETE op een note geeft 405; `PATCH /Tickets/{id}/Notes` werkt wél, maar alleen met `noteType` en `publish` in de body (anders 500).
+**Notes zonder impersonatie komen op naam van de API-user te staan.** Stuur bij het plaatsen van notes ALTIJD beide mee: de `ImpersonationResourceId`-header én `creatorResourceID` in de payload. Corrigeren achteraf: DELETE op een note geeft 405; `PATCH /Tickets/{id}/Notes` werkt wél, maar alleen met `noteType` en `publish` in de body (anders 500).
 
 **Ticketnotities schrijf je altijd als CATA: Concrete Aanzet Tot Actie.** Geen samenvatting achteraf, maar een actiegerichte notitie: korte context (1-2 zinnen), daarna genummerde concrete acties met wie, wat en wanneer. Afgeronde punten benoem je expliciet als afgerond ("niets meer mee doen") zodat een collega het ticket direct kan oppakken zonder de historie te lezen. Geldt voor interne notities (publish 2) én klant-zichtbare notities (publish 1, in de taal van de klant).
 
