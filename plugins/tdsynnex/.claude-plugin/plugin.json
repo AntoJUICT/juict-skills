@@ -1,0 +1,12 @@
+{
+  "name": "tdsynnex",
+  "version": "1.0.0",
+  "description": "Rewst-workflows bouwen tegen de TD Synnex StreamOne Ion API v3 — customer ID resolution, NCE-subscriptions aanmaken en seats bijwerken, catalog lookup en bekende API-quirks.",
+  "author": {
+    "name": "AntoJUICT",
+    "email": "anto@juict.nl"
+  },
+  "homepage": "https://github.com/AntoJUICT/juict-skills",
+  "repository": "https://github.com/AntoJUICT/juict-skills",
+  "keywords": ["tdsynnex", "streamone", "rewst", "nce", "api", "juict"]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "ticket-aanmaken",
+  "version": "1.0.0",
+  "description": "Maakt een Autotask-supportticket aan vanuit een vrije-tekstomschrijving. Claude leidt de velden af (klant, prioriteit, status, queue, work type), toont een voorstel ter goedkeuring en maakt het ticket pas na akkoord aan. Standalone, Key Vault via az.",
+  "author": {
+    "name": "AntoJUICT",
+    "email": "anto@juict.nl"
+  },
+  "homepage": "https://github.com/AntoJUICT/juict-skills",
+  "repository": "https://github.com/AntoJUICT/juict-skills",
+  "keywords": ["autotask", "ticket", "support", "juict"]
+}

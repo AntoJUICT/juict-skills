@@ -1,0 +1,12 @@
+{
+  "name": "ticket-reactie",
+  "version": "1.0.0",
+  "description": "Onderzoekt een Autotask-supportticket (PDF of live opgehaald) en levert een korte interne analyse plus een concept klantreactie in Anto's tone of voice.",
+  "author": {
+    "name": "AntoJUICT",
+    "email": "anto@juict.nl"
+  },
+  "homepage": "https://github.com/AntoJUICT/juict-skills",
+  "repository": "https://github.com/AntoJUICT/juict-skills",
+  "keywords": ["autotask", "ticket", "klantreactie", "juict"]
+}

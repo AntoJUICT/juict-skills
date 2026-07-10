@@ -1,37 +1,47 @@
-# autotask-api — Claude Code skill
+# juict-skills — Claude Code marketplace
 
-Deelbare Claude Code skill voor het werken met de **Autotask REST API** in JUICT-projecten. Bundelt authenticatie via Azure Key Vault (met lokale env-var fallback), de geverifieerde endpoints, env vars, data structures en de hard-geleerde valkuilen — zodat geen collega opnieuw het wiel hoeft uit te vinden.
+Deelbare Claude Code skills voor JUICT-projecten, gebundeld in één plugin-marketplace. Elke skill is een aparte plugin, zodat je ze los kunt in- en uitschakelen. Zo hoeft geen collega opnieuw het wiel uit te vinden.
+
+## Skills in deze marketplace
+
+| Plugin | Waarvoor |
+|--------|----------|
+| `autotask-api` | Werken met de Autotask REST API — Key Vault-auth, geverifieerde endpoints, data structures, lessons learned |
+| `tdsynnex` | Rewst-workflows tegen de TD Synnex StreamOne Ion API v3 (subscriptions, seats, catalog, quirks) |
+| `azure-saas-devops-deploy` | Klant-automation deployen naar een dedicated Azure subscription via Azure DevOps Pipelines en Bicep/AVM |
+| `ticket-aanmaken` | Autotask-supportticket aanmaken vanuit vrije tekst, met goedkeuring vooraf |
+| `ticket-reactie` | Autotask-ticket onderzoeken en een concept klantreactie opstellen |
+| `site-scraper` | Technische opbouw van een website in kaart brengen (framework, routes, API-endpoints), ook achter login |
 
 ## Installeren (Claude Code plugin)
 
-Deze repo is een Claude Code **plugin marketplace**. Voeg hem toe en installeer de plugin:
+Deze repo is een Claude Code **plugin marketplace**. Voeg hem toe en installeer de gewenste plugin(s):
 
 ```
-/plugin marketplace add AntoJUICT/autotask-api-skill
+/plugin marketplace add AntoJUICT/juict-skills
 /plugin install autotask-api@juict-skills
+/plugin install tdsynnex@juict-skills
 ```
 
-Claude pikt de skill daarna automatisch op. Roep aan met `/autotask-api` of laat Claude hem zelf laden bij Autotask-werk. Updaten van de marketplace: `/plugin marketplace update juict-skills`.
+Bij JUICT worden de marketplace en de plugins automatisch uitgerold via de organisatie-managed settings — dan hoef je niets handmatig te installeren. Updaten: `/plugin marketplace update juict-skills`.
 
 ## Structuur
 
 ```
 .claude-plugin/
-  marketplace.json     # marktplaats-catalogus (juict-skills) → verwijst naar deze plugin
-  plugin.json          # plugin-manifest (autotask-api)
-skills/autotask-api/
-  SKILL.md             # Instap: Key Vault-auth, quick start, debugchecklist
-  REFERENCE.md         # Base URL/zone, headers, env vars, Key Vault secret-namen, endpoints, data structures
-  LESSONS.md           # Valkuilen: nested endpoints, TimeEntries, dotenv-escaping, rate limiting
-  scripts/
-    azure-keyvault.ts  # getSecret() met DefaultAzureCredential + 1u-cache
-    autotask-client.ts # autotaskFetch / fetchAllAutotask / buildFilter, Key Vault + env fallback
+  marketplace.json          # catalogus (juict-skills) → verwijst naar elke plugin
+plugins/
+  <plugin>/
+    .claude-plugin/plugin.json
+    skills/<plugin>/
+      SKILL.md              # instappunt van de skill
+      ...                   # eventuele REFERENCE.md, LESSONS.md, scripts/, resources
 ```
 
 ## Bijwerken
 
-Nieuwe les of endpoint geleerd? Gebruik (als maintainer) de companion-skill `/autotask-api-update` — die extraheert de les uit je sessie, werkt het juiste bestand bij in `skills/autotask-api/` en pusht naar deze repo. Collega's halen de update op met `/plugin marketplace update juict-skills`.
+Nieuwe les of endpoint geleerd? De maintainer-companions (bv. `/autotask-api-update`) extraheren de les uit je sessie, werken het juiste bestand bij onder `plugins/<plugin>/skills/<plugin>/` en pushen via een feature branch + PR. Collega's halen de update op met `/plugin marketplace update juict-skills` (of automatisch via `autoUpdate`).
 
 ## Veiligheid
 
-Deze repo bevat **geen secrets** — alleen secret-*namen* (de waarden staan in Azure Key Vault of in een lokale `.env`). Houd de repo private: het betreft JUICT-interne API-kennis.
+Deze repo is **public** en bevat **geen secrets** — alleen secret-*namen* (de waarden staan in Azure Key Vault of in een lokale `.env`). Zet hier nooit een secret-waarde in. De inhoud betreft JUICT-interne API- en deploy-kennis; bewust gepubliceerd zodat de skills zonder repo-toegang bij elke medewerker uitrollen.

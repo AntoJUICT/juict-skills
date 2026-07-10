@@ -6,7 +6,7 @@
     "name": "AntoJUICT",
     "email": "anto@juict.nl"
   },
-  "homepage": "https://github.com/AntoJUICT/autotask-api-skill",
-  "repository": "https://github.com/AntoJUICT/autotask-api-skill",
+  "homepage": "https://github.com/AntoJUICT/juict-skills",
+  "repository": "https://github.com/AntoJUICT/juict-skills",
   "keywords": ["autotask", "api", "rest", "keyvault", "juict"]
 }

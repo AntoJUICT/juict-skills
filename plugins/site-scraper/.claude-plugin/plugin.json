@@ -1,0 +1,12 @@
+{
+  "name": "site-scraper",
+  "version": "1.0.0",
+  "description": "Brengt de technische opbouw van een website in kaart, ook achter een login — framework, volledige sitemap/routes en backend API-endpoints — en schrijft dit naar rapportbestanden.",
+  "author": {
+    "name": "AntoJUICT",
+    "email": "anto@juict.nl"
+  },
+  "homepage": "https://github.com/AntoJUICT/juict-skills",
+  "repository": "https://github.com/AntoJUICT/juict-skills",
+  "keywords": ["scraper", "site", "architectuur", "sitemap", "juict"]
+}
