@@ -1,0 +1,12 @@
+{
+  "name": "azure-saas-devops-deploy",
+  "version": "1.0.0",
+  "description": "Deployt een klant-automation naar een dedicated Azure subscription per automation via Azure DevOps Pipelines en Bicep/AVM. Broncode blijft in JUICT's private Azure DevOps; ACR bij JUICT (cross-tenant), overige infra in de automation-subscription. Types: web, split, service.",
+  "author": {
+    "name": "AntoJUICT",
+    "email": "anto@juict.nl"
+  },
+  "homepage": "https://github.com/AntoJUICT/juict-skills",
+  "repository": "https://github.com/AntoJUICT/juict-skills",
+  "keywords": ["azure", "devops", "bicep", "deploy", "saas", "juict"]
+}

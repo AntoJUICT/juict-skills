@@ -1,0 +1,55 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-08-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "mspOfferName": {
+      "type": "string",
+      "metadata": { "description": "Unieke naam voor de offer" },
+      "defaultValue": "JUICT - Azure Delegation"
+    },
+    "mspOfferDescription": {
+      "type": "string",
+      "metadata": { "description": "Omschrijving van de MSP-offer" },
+      "defaultValue": "Access for JUICT IT Technicians"
+    }
+  },
+  "variables": {
+    "mspRegistrationName": "[guid(parameters('mspOfferName'))]",
+    "mspAssignmentName": "[guid(parameters('mspOfferName'))]",
+    "managedByTenantId": "751a3a33-5e46-4ef1-ad28-6953162ec45f",
+    "authorizations": [
+      { "principalId": "0221e770-559f-4b4e-a7c8-fd05084a47f9", "roleDefinitionId": "b24988ac-6180-42a0-ab88-20f7382dd24c", "principalIdDisplayName": "GDAP Master Group" },
+      { "principalId": "67754b34-4b7d-4543-a918-4c4e7cf4871f", "roleDefinitionId": "434105ed-43f6-45c7-a02f-909b2ba83430", "principalIdDisplayName": "M365 GDAP Billing Administrator" },
+      { "principalId": "d1ad51ab-4e6d-4512-9250-f46b773a9903", "roleDefinitionId": "b24988ac-6180-42a0-ab88-20f7382dd24c", "principalIdDisplayName": "M365 GDAP Partner Tier2 Support" },
+      { "principalId": "b88982e7-8f81-4965-8437-7b1d0ec7f71b", "roleDefinitionId": "acdd72a7-3385-48ef-bd42-f606fba81ae7", "principalIdDisplayName": "M365 GDAP Partner Tier1 Support" }
+    ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ManagedServices/registrationDefinitions",
+      "apiVersion": "2020-02-01-preview",
+      "name": "[variables('mspRegistrationName')]",
+      "properties": {
+        "registrationDefinitionName": "[parameters('mspOfferName')]",
+        "description": "[parameters('mspOfferDescription')]",
+        "managedByTenantId": "[variables('managedByTenantId')]",
+        "authorizations": "[variables('authorizations')]"
+      }
+    },
+    {
+      "type": "Microsoft.ManagedServices/registrationAssignments",
+      "apiVersion": "2020-02-01-preview",
+      "name": "[variables('mspAssignmentName')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedServices/registrationDefinitions/', variables('mspRegistrationName'))]"
+      ],
+      "properties": {
+        "registrationDefinitionId": "[resourceId('Microsoft.ManagedServices/registrationDefinitions/', variables('mspRegistrationName'))]"
+      }
+    }
+  ],
+  "outputs": {
+    "mspOfferName": { "type": "string", "value": "[concat('Managed by', ' ', parameters('mspOfferName'))]" },
+    "authorizations": { "type": "array", "value": "[variables('authorizations')]" }
+  }
+}

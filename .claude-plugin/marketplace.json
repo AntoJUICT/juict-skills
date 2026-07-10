@@ -9,8 +9,33 @@
   "plugins": [
     {
       "name": "autotask-api",
-      "source": "./",
+      "source": "./plugins/autotask-api",
       "description": "Werken met de Autotask REST API in JUICT-projecten — Key Vault-auth, geverifieerde endpoints, env vars, data structures en lessons learned."
+    },
+    {
+      "name": "tdsynnex",
+      "source": "./plugins/tdsynnex",
+      "description": "Rewst-workflows bouwen tegen de TD Synnex StreamOne Ion API v3 — subscriptions, seats, catalog en API-quirks."
+    },
+    {
+      "name": "azure-saas-devops-deploy",
+      "source": "./plugins/azure-saas-devops-deploy",
+      "description": "Klant-automation deployen naar een dedicated Azure subscription via Azure DevOps Pipelines en Bicep/AVM (web/split/service)."
+    },
+    {
+      "name": "ticket-aanmaken",
+      "source": "./plugins/ticket-aanmaken",
+      "description": "Autotask-supportticket aanmaken vanuit vrije tekst; velden afgeleid, voorstel ter goedkeuring, aanmaken na akkoord."
+    },
+    {
+      "name": "ticket-reactie",
+      "source": "./plugins/ticket-reactie",
+      "description": "Autotask-ticket onderzoeken (PDF of live) en een concept klantreactie in Anto's tone of voice opstellen."
+    },
+    {
+      "name": "site-scraper",
+      "source": "./plugins/site-scraper",
+      "description": "Technische opbouw van een website in kaart brengen — framework, sitemap/routes en backend API-endpoints, ook achter login."
     }
   ]
 }
