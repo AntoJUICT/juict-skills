@@ -38,6 +38,8 @@ POST /TimeEntries vereist altijd drie velden — ontbrekend = 500 error:
 
 Verkeerde resource+role combinatie → "The specified AssignedResourceID and AssignedRoleID combination is not currently defined" (500).
 
+**Service tickets vereisen een expliciet start/stop-venster.** POST /TimeEntries met alleen `hoursWorked` geeft 500 "TimeEntries for Service tickets require a start and stop time." Geef altijd `startDateTime` en `endDateTime` mee (en optioneel `hoursWorked` erbij).
+
 **How to apply:**
 - Sla standaard IDs op in `AUTOTASK_DEFAULT_RESOURCE_ID` en `AUTOTASK_DEFAULT_ROLE_ID`
 - Guard altijd: `durationHours > 0 ? durationHours : 0.01`
@@ -109,6 +111,8 @@ AUTOTASK_SECRET='abc#def'    # # binnen single quotes = literal hekje
 3. Endpoint pad correct / bestaat het?
 4. Vereiste scopes/permissies aanwezig?
 
+**Plotselinge 401/S2S17001 bij het ophalen van Key Vault-secrets via `az`: check `az account show`.** Een andere sessie kan de default subscription naar een klanttenant hebben gezet, waardoor de JUICT-vault onbereikbaar is en de Autotask-headers leeg blijven. Fix: `az account set --subscription JUICTAzure`.
+
 ---
 
 ## Rate limiting
@@ -135,6 +139,10 @@ AUTOTASK_SECRET='abc#def'    # # binnen single quotes = literal hekje
 ## Notes
 
 Notes hebben een `Publish` veld: `1` = zichtbaar voor klant, `2` = intern. Filter bij weergave aan klanten.
+
+**Werknotities plaats je niet als losse Ticket Note maar op de TimeEntry.** Eén `POST /TimeEntries` met `summaryNotes` (klant-zichtbare samenvatting) én `internalNotes` (interne notitie, CATA-vorm) — zo staan notitie en tijdsregistratie altijd samen. Losse Ticket Notes alleen voor communicatie zonder bestede tijd (patroon uit xelion-transcriptie, `src/lib/autotask.ts`).
+
+**Notes zonder `ImpersonationResourceId`-header komen op naam van de API-user te staan.** Stuur de header altijd mee bij het plaatsen van notes. Corrigeren achteraf: DELETE op een note geeft 405; `PATCH /Tickets/{id}/Notes` werkt wél, maar alleen met `noteType` en `publish` in de body (anders 500).
 
 **Ticketnotities schrijf je altijd als CATA: Concrete Aanzet Tot Actie.** Geen samenvatting achteraf, maar een actiegerichte notitie: korte context (1-2 zinnen), daarna genummerde concrete acties met wie, wat en wanneer. Afgeronde punten benoem je expliciet als afgerond ("niets meer mee doen") zodat een collega het ticket direct kan oppakken zonder de historie te lezen. Geldt voor interne notities (publish 2) én klant-zichtbare notities (publish 1, in de taal van de klant).
 
