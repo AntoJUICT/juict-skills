@@ -16,6 +16,8 @@ Bekende valkuilen, fouten en hard-geleerde lessen bij werken met de Autotask RES
 - Why: Beide gaven 404 in productie. Swagger-verificatie toonde de correcte geneste structuur.
 - How to apply: Controleer bij elk nieuw endpoint of het een sub-resource is. Verifieer via `GET /Entity/entityInformation` of test in Swagger voor implementatie.
 
+**Company To-Dos zijn óók een geneste resource — `POST /Companies/{id}/ToDos`.** Zowel top-level `/CompanyToDos` als `/ToDos` geven 404; alleen de nested variant onder Companies werkt. Let op: `GET /CompanyToDos/entityInformation/fields` geeft wél 200 — dat een entity-metadata endpoint bestaat betekent dus niet dat het top-level CRUD-pad bestaat.
+
 **Verifieer altijd of een endpoint bestaat voor implementatie.** Test met een GET of check Swagger. Schrijf nooit een Autotask endpoint zonder verificatie als er geen werkend voorbeeld in de codebase staat.
 
 ---
@@ -175,6 +177,8 @@ AUTOTASK_SECRET='abc#def'    # # binnen single quotes = literal hekje
 ## Notes
 
 Notes hebben een `Publish` veld: `1` = zichtbaar voor klant, `2` = intern. Filter bij weergave aan klanten.
+
+**Vertrouw het `publish`-label uit de metadata NIET.** `GET /TicketNotes/entityInformation/fields` noemt `1 = All Autotask Users`, maar in zone 19 rendert `publish: 1` als een EXTERNE, klant-zichtbare note — gebruik `2` voor intern (leidend blijft: 1 = klant, 2 = intern). Een per ongeluk externe note corrigeer je met `PATCH /Tickets/{id}/Notes` en body `{ id, noteType, publish: 2 }` (DELETE geeft 405).
 
 **Werknotities plaats je niet als losse Ticket Note maar op de TimeEntry.** Eén `POST /TimeEntries` met `summaryNotes` (klant-zichtbare samenvatting) én `internalNotes` (interne notitie, CATA-vorm) — zo staan notitie en tijdsregistratie altijd samen. Losse Ticket Notes alleen voor communicatie zonder bestede tijd (patroon uit xelion-transcriptie, `src/lib/autotask.ts`).
 

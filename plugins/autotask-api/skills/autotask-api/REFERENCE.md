@@ -82,6 +82,12 @@ De client gebruikt Key Vault zodra `AZURE_KEYVAULT_URL` gezet is, anders env var
 - `GET /Companies/{id}`
 - `GET /Companies/query` — filter op `companyName`, `isActive`
 
+### Company To-Dos (NESTED — zie LESSONS.md)
+- `POST /Companies/{companyID}/ToDos` — CRM to-do aanmaken (top-level `/CompanyToDos` en `/ToDos` geven 404)
+- `GET /Companies/{companyID}/ToDos` en `GET /Companies/{companyID}/ToDos/{id}` — ophalen
+- Verplichte velden: `companyID`, `assignedToResourceID`, `actionType`, `startDateTime`, `endDateTime`. Optioneel o.a. `activityDescription`, `ticketID` (koppelt de to-do aan een ticket), `creatorResourceID`.
+- `actionType` is een picklist; zone 19 heeft o.a. `29682841 = Administratie` (handig voor facturatie-to-do's), naast standaardwaarden als `3 = Algemeen` en `1 = Telefoongesprek`.
+
 ### Contacts
 - `GET /Contacts/{id}`
 - `GET /Contacts/query` — filter op `firstName`, `lastName`, `phone`, `mobilePhone`, `companyID`, `isActive`
