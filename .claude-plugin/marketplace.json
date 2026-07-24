@@ -13,6 +13,11 @@
       "description": "Werken met de Autotask REST API in JUICT-projecten — Key Vault-auth, geverifieerde endpoints, env vars, data structures en lessons learned."
     },
     {
+      "name": "autotask-approve-post",
+      "source": "./plugins/autotask-approve-post",
+      "description": "Read-only pre-flight review vóór Autotask Approve & Post — nog-niet-geposte charges/labour, probleemmarkering, gegroepeerd per klant/contract/ticket."
+    },
+    {
       "name": "tdsynnex",
       "source": "./plugins/tdsynnex",
       "description": "Rewst-workflows bouwen tegen de TD Synnex StreamOne Ion API v3 — subscriptions, seats, catalog en API-quirks."
