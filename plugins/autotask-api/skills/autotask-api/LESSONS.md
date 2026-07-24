@@ -42,6 +42,8 @@ Verkeerde resource+role combinatie → "The specified AssignedResourceID and Ass
 
 **Service tickets vereisen een expliciet start/stop-venster.** POST /TimeEntries met alleen `hoursWorked` geeft 500 "TimeEntries for Service tickets require a start and stop time." Geef altijd `startDateTime` en `endDateTime` mee (en optioneel `hoursWorked` erbij).
 
+**Zonder start/stop-venster is `dateWorked` verplicht.** POST /TimeEntries met alleen `hoursWorked` (geen `startDateTime`) geeft 500 "dateWorked is required when no value is supplied for startDateTime". Geef `dateWorked` (ISO, bv. `2026-07-24T09:00:00`) altijd mee; voor Service tickets combineer je het met `startDateTime`/`endDateTime` (zie hierboven).
+
 **How to apply:**
 - Sla standaard IDs op in `AUTOTASK_DEFAULT_RESOURCE_ID` en `AUTOTASK_DEFAULT_ROLE_ID`
 - Guard altijd: `durationHours > 0 ? durationHours : 0.01`
@@ -180,7 +182,7 @@ Notes hebben een `Publish` veld: `1` = zichtbaar voor klant, `2` = intern. Filte
 
 **Vertrouw het `publish`-label uit de metadata NIET.** `GET /TicketNotes/entityInformation/fields` noemt `1 = All Autotask Users`, maar in zone 19 rendert `publish: 1` als een EXTERNE, klant-zichtbare note — gebruik `2` voor intern (leidend blijft: 1 = klant, 2 = intern). Een per ongeluk externe note corrigeer je met `PATCH /Tickets/{id}/Notes` en body `{ id, noteType, publish: 2 }` (DELETE geeft 405).
 
-**Werknotities plaats je niet als losse Ticket Note maar op de TimeEntry.** Eén `POST /TimeEntries` met `summaryNotes` (klant-zichtbare samenvatting) én `internalNotes` (interne notitie, CATA-vorm) — zo staan notitie en tijdsregistratie altijd samen. Losse Ticket Notes alleen voor communicatie zonder bestede tijd (patroon uit xelion-transcriptie, `src/lib/autotask.ts`).
+**Een ticketnotitie hoort ALTIJD op een TimeEntry, nooit als losse Ticket Note.** Elke `POST /TimeEntries` krijgt zowel `summaryNotes` (klant-zichtbare samenvatting) als `internalNotes` (interne notitie voor engineers, CATA-vorm) — zo staan notitie en bestede tijd altijd samen. Losse Ticket Notes alleen voor communicatie zonder bestede tijd (patroon uit xelion-transcriptie, `src/lib/autotask.ts`).
 
 **Notes zonder impersonatie komen op naam van de API-user te staan.** Stuur bij het plaatsen van notes ALTIJD beide mee: de `ImpersonationResourceId`-header én `creatorResourceID` in de payload. Corrigeren achteraf: DELETE op een note geeft 405; `PATCH /Tickets/{id}/Notes` werkt wél, maar alleen met `noteType` en `publish` in de body (anders 500).
 
