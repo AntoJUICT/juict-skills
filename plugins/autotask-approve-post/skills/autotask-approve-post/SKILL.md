@@ -56,6 +56,7 @@ entry heeft sowieso geen effect.
      work type of rol, lege summary.
    - **AI-checks** (zie hieronder), conservatief en op basis van
      titel/omschrijving/notities/summary die de review meelevert.
+   - **Contract-check** (zie hieronder), op basis van `availableContracts`.
 
 4. **Anto beslist** welke time entries non-billable moeten worden op basis
    van dat overzicht.
@@ -82,6 +83,27 @@ Bij twijfel niet flaggen: liever een gemiste suggestie dan een vals alarm.
   bijvoorbeeld installatie- of projectwerk dat als remote support is
   geboekt. Meld dit altijd als suggestie ("dit lijkt eerder X dan Y, wil je
   dit checken?"), wijzig nooit zelf iets.
+
+## Contract-check (per ticket)
+
+De review levert naast `contractInfo` per item ook `availableContracts` mee:
+de volledige actieve contractlijst (id/naam/type) van de klant. Per ticket
+vergelijk ik het onderwerp en de omschrijving van het werk met deze lijst,
+volgens de vaste mapping:
+
+- Telefonie -> Easyvoice of Teams Phone
+- Sim/mobiele data -> Mobiel
+- Internet/netwerk -> Connectivity
+- Algemene werkplek/support -> Easywork of Managed
+
+Als het werk op een ander contract geboekt staat dan waar het volgens deze
+mapping thuishoort, en de klant heeft dat betere contract wel in
+`availableContracts`, dan flag ik dat als suggestie om te herboeken. Blijft
+de klant zonder het passende contract, dan flag ik niets: er is dan geen
+beter alternatief. Belangrijk om hierbij te benoemen: herboeken tussen twee
+gedekte (Recurring-)contracten verandert de factuur niet, beide zijn al
+gedekt door hun vaste fee. Het gaat puur om de juiste toewijzing per
+productlijn, niet om extra of minder factureren.
 
 ## Overige commando's (secundair)
 

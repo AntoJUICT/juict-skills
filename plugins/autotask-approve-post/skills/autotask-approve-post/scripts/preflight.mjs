@@ -131,7 +131,7 @@ export function isInvoiced(contractID, billingCodeID, contractType, billedMap) {
   return INVOICED_CONTRACT_TYPES.has(contractType);
 }
 
-export function buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg, billedMap = new Map(), contractInfo = new Map()) {
+export function buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg, billedMap = new Map(), contractInfo = new Map(), availableContracts = []) {
   const byTicket = new Map(); // ticketID -> { timeEntries: [], charges: [] }
   const ensure = (ticketID) => {
     if (!byTicket.has(ticketID)) byTicket.set(ticketID, { timeEntries: [], charges: [] });
@@ -197,6 +197,7 @@ export function buildReview(company, tickets, timeEntries, charges, notesByTicke
     },
     tickets: reviewTickets,
     looseCharges,
+    availableContracts,
   };
 }
 
@@ -325,6 +326,12 @@ export async function fetchReview(companyInput, cfg) {
   const contracts = await atFetchAll("Contracts", [{ field: "companyID", op: "eq", value: company.id }]);
   const contractIds = contracts.map((c) => c.id);
   const contractInfo = new Map(contracts.map((c) => [c.id, { name: c.contractName ?? null, type: c.contractType ?? null }]));
+  // Volledige actieve contractlijst van de klant (status 1), meegegeven aan buildReview
+  // zodat Claude kan vergelijken of werk op het juiste (productlijn-specifieke) contract
+  // staat. Reuse van de al-opgehaalde Contracts hierboven, geen extra API-call.
+  const availableContracts = contracts
+    .filter((c) => c.status === 1)
+    .map((c) => ({ id: c.id, name: c.contractName ?? null, type: c.contractType ?? null }));
 
   const ticketsRaw = await atFetchAll("Tickets", [{ field: "companyID", op: "eq", value: company.id }]);
   const tickets = ticketsRaw.map((t) => ({ id: t.id, ticketNumber: t.ticketNumber ?? null, title: t.title ?? null, description: t.description ?? null }));
@@ -371,7 +378,7 @@ export async function fetchReview(companyInput, cfg) {
   // review toont ALLE nog-niet-geposte items ongeacht datum, dus labour.outsidePeriod
   // zou hier valse "problemen" opleveren op legitiem oude, nog niet geposte entries.
   const reviewCfg = { ...cfg, enabledRules: cfg.enabledRules.filter((r) => r !== "labour.outsidePeriod") };
-  const reviewOutput = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, reviewCfg, billedMap, contractInfo);
+  const reviewOutput = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, reviewCfg, billedMap, contractInfo, availableContracts);
 
   console.log(JSON.stringify(reviewOutput, null, 2));
   console.error(`Klant ${company.name} (${company.id}): ${reviewOutput.totals.ticketCount} tickets, ${reviewOutput.totals.timeEntryCount} time entries (${reviewOutput.totals.billableHours}u), ${reviewOutput.totals.chargeCount} charges (€${reviewOutput.totals.chargeAmountEUR.toFixed(2)}), ${reviewOutput.looseCharges.length} losse charges.`);

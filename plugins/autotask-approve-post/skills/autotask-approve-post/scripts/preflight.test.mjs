@@ -211,6 +211,22 @@ test("buildReview: billedMap + contractInfo bepalen invoiced per time entry en t
   assert.equal(out.totals.billableHours, 6); // bestaand veld blijft ongewijzigd
 });
 
+test("buildReview: availableContracts wordt ongewijzigd doorgegeven in de output", () => {
+  const { timeEntries, charges, notesByTicket } = reviewFixtures();
+  const availableContracts = [
+    { id: 5, name: "Acme BV - Easywork Basic", type: 7 },
+    { id: 6, name: "Acme BV - Easyvoice", type: 7 },
+  ];
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg, new Map(), new Map(), availableContracts);
+  assert.deepEqual(out.availableContracts, availableContracts);
+});
+
+test("buildReview: availableContracts default naar lege array als niet meegegeven", () => {
+  const { timeEntries, charges, notesByTicket } = reviewFixtures();
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg);
+  assert.deepEqual(out.availableContracts, []);
+});
+
 // ─── postedIdsFromRows (precieze posted-detectie, los van contract-brede historie) ──
 
 test("postedIdsFromRows: een BillingItem op timeEntryID sluit die entry uit, ongeacht (afwijkend/ontbrekend) contractID", () => {
