@@ -314,7 +314,10 @@ export async function fetchReview(companyInput, cfg) {
   const notesByTicket = await fetchNotesByTicket(ticketsWithItems);
   const workTypeNames = await fetchWorkTypeNames();
 
-  const reviewOutput = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg);
+  // review toont ALLE nog-niet-geposte items ongeacht datum, dus labour.outsidePeriod
+  // zou hier valse "problemen" opleveren op legitiem oude, nog niet geposte entries.
+  const reviewCfg = { ...cfg, enabledRules: cfg.enabledRules.filter((r) => r !== "labour.outsidePeriod") };
+  const reviewOutput = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, reviewCfg);
 
   console.log(JSON.stringify(reviewOutput, null, 2));
   console.error(`Klant ${company.name} (${company.id}): ${reviewOutput.totals.ticketCount} tickets, ${reviewOutput.totals.timeEntryCount} time entries (${reviewOutput.totals.billableHours}u), ${reviewOutput.totals.chargeCount} charges (€${reviewOutput.totals.chargeAmountEUR.toFixed(2)}), ${reviewOutput.looseCharges.length} losse charges.`);
@@ -324,6 +327,10 @@ export async function fetchReview(companyInput, cfg) {
 // ─────────────────────────────────────────────────────────────────────
 // TASK 3: set-nonbillable: gated write (enige toegestane mutatie)
 // ─────────────────────────────────────────────────────────────────────
+
+export function shouldConfirm(args) {
+  return args.includes("--confirm") && !args.includes("--dry-run");
+}
 
 export function buildNonBillablePatches(ids) {
   return ids.map((id) => ({ id, isNonBillable: true }));
@@ -408,7 +415,7 @@ async function main() {
     await fetchReview(arg, cfg);
   }
   else if (cmd === "set-nonbillable") {
-    const confirm = rest.includes("--confirm");
+    const confirm = shouldConfirm(rest);
     const ids = rest.filter((a) => /^\d+$/.test(a)).map(Number);
     if (ids.length === 0) { console.error("Gebruik: preflight.mjs set-nonbillable <id...> [--dry-run|--confirm]"); process.exit(1); return; }
     await setNonBillable(ids, { confirm });

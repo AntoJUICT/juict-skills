@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview, buildNonBillablePatches, setNonBillable } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -177,4 +177,11 @@ test("setNonBillable: met confirm roept patchFn per id aan met het juiste payloa
   ]);
   assert.equal(result.dryRun, false);
   assert.equal(result.results.length, 2);
+});
+
+test("shouldConfirm: --confirm wint alleen zonder --dry-run", () => {
+  assert.equal(shouldConfirm(["--confirm"]), true);
+  assert.equal(shouldConfirm(["--dry-run"]), false);
+  assert.equal(shouldConfirm([]), false);
+  assert.equal(shouldConfirm(["--dry-run", "--confirm"]), false);
 });

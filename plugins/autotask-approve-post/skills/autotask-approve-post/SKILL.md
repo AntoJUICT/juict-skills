@@ -46,6 +46,10 @@ entry heeft sowieso geen effect.
      verzonnen zijn.
    - **Euro's tonen we alleen bij charges** (`amountEUR` per charge, en het
      totaal in `totals.chargeAmountEUR`).
+   - De totale billable uren in `totals.billableHours` kunnen ook labour
+     bevatten die niet aan een getoond ticket hangt (bijvoorbeeld
+     projecttaak-uren zonder ticket), dus controleer bij twijfel of het
+     totaal en de som van de getoonde tickets overeenkomen.
 
 3. **Ik draai de checks** op wat de review teruggeeft:
    - **Data-issues** uit `issues`/`problems` per item: 0 uur, ontbrekende

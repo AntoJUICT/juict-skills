@@ -15,7 +15,7 @@
     {
       "name": "autotask-approve-post",
       "source": "./plugins/autotask-approve-post",
-      "description": "Read-only pre-flight review vóór Autotask Approve & Post — nog-niet-geposte charges/labour, probleemmarkering, gegroepeerd per klant/contract/ticket."
+      "description": "Read-only pre-flight review vóór Autotask Approve & Post: nog-niet-geposte charges/labour, probleemmarkering, gegroepeerd per klant/contract/ticket."
     },
     {
       "name": "tdsynnex",
