@@ -56,7 +56,8 @@ export function groupItems(items, names) {
   for (const [companyID, contracts] of companies) {
     const list = [...contracts.values()].sort((a, b) => (a.contractID ?? Infinity) - (b.contractID ?? Infinity));
     for (const c of list) c.tickets.sort((a, b) => a.ticketID - b.ticketID);
-    result.push({ companyID, companyName: names.get(companyID) ?? `Company ${companyID}`, contracts: list });
+    const companyName = companyID === 0 ? "⚠️ Niet toegewezen (controleer handmatig)" : names.get(companyID) ?? `Company ${companyID}`;
+    result.push({ companyID, companyName, contracts: list });
   }
   return result.sort((a, b) => a.companyName.localeCompare(b.companyName));
 }

@@ -45,6 +45,12 @@ test("groupItems: ticket-items onder ticket, losse charges onder contract", () =
   assert.deepEqual(groups[0].contracts[0].tickets[0].items.map(i => i.id), [1, 2]);
   assert.deepEqual(groups[0].contracts[0].looseItems.map(i => i.id), [3]);
 });
+test("groupItems: companyID 0 krijgt de niet-toegewezen bucket-naam, andere ID's onaangetast", () => {
+  const unresolved = groupItems([checkLabour(te({ companyID: 0 }), cfg)], new Map());
+  assert.equal(unresolved[0].companyName, "⚠️ Niet toegewezen (controleer handmatig)");
+  const resolved = groupItems([checkLabour(te({ companyID: 1 }), cfg)], new Map());
+  assert.equal(resolved[0].companyName, "Company 1");
+});
 test("renderReport toont klant/ticket/schoon/te-fixen + samenvatting", () => {
   const groups = groupItems([checkCharge(ch({ billingCodeID: null, productID: null }), "ticketCharge", cfg)], new Map([[999, "Acme BV"]]));
   const md = renderReport(groups, "juni 2026");

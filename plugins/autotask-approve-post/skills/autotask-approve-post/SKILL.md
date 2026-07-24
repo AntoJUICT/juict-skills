@@ -78,6 +78,28 @@ in de Autotask UI, per klant/contract, op basis van het rapport dat deze skill m
 - `neverBillCode`: work type staat in `neverBillBillingCodeIDs` (altijd actief,
   onafhankelijk van `enabledRules`)
 
+## Niet-toegewezen klant
+
+In het rapport kan een groep "⚠️ Niet toegewezen (controleer handmatig)" verschijnen.
+Daar vallen items in waarvan de klant niet te bepalen was: labour op een
+projecttaak (alleen een `taskID`, geen ticket of contract) en items waarvan de
+ticket-, contract- of project-lookup niets opleverde. Loop deze groep altijd
+handmatig na voor je iets post, want de gewone klant/contract/ticket-indeling
+zegt hier niets over de juiste factuurbestemming.
+
+## Vangnet-checks (sluimerend op live data)
+
+Twee checks zijn in de praktijk sluimerend omdat de fetch al server-side filtert:
+
+- `labour.outsidePeriod`: de fetch selecteert al time entries met `dateWorked`
+  binnen de gekozen periode.
+- `charge.notBillableFlag`: de fetch selecteert al charges met
+  `isBillableToCompany == true`.
+
+Ze blijven als vangnet in de checks staan (bijvoorbeeld voor handmatig
+samengestelde input of toekomstig hergebruik), maar vuren op live data zelden
+tot nooit.
+
 ## Read-only garantie
 
 Het script doet uitsluitend `*/query`-calls (GET/POST-query, nooit een echte create,
