@@ -104,8 +104,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getSecret(name) {
   return execFileSync("az", ["keyvault", "secret", "show", "--vault-name", VAULT, "--name", name, "--query", "value", "-o", "tsv"], { encoding: "utf8" }).trim();
 }
+let _headers = null;
 function authHeaders() {
-  return { UserName: getSecret("AUTOTASK-USERNAME"), Secret: getSecret("AUTOTASK-API-KEY"), ApiIntegrationCode: getSecret("AUTOTASK-INTEGRATION-CODE"), "Content-Type": "application/json", Accept: "application/json" };
+  if (!_headers) _headers = { UserName: getSecret("AUTOTASK-USERNAME"), Secret: getSecret("AUTOTASK-API-KEY"), ApiIntegrationCode: getSecret("AUTOTASK-INTEGRATION-CODE"), "Content-Type": "application/json", Accept: "application/json" };
+  return _headers;
 }
 async function atFetchAll(entity, filterItems) {
   const headers = authHeaders();
@@ -148,3 +150,55 @@ async function verify(contractID) {
   const labour = (await atFetchAll("TimeEntries", [{ field: "contractID", op: "eq", value: Number(contractID) }, { field: "isNonBillable", op: "eq", value: false }])).filter((t) => t.billingApprovalDateTime == null);
   console.log(`Contract ${contractID}: ${charges.length} pending ContractCharges, ${labour.length} nog-te-approven time entries. Vergelijk met het Approve & Post-scherm.`);
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// TASK 4: run-orchestratie + company-verrijking + main()/CLI-dispatch
+// ─────────────────────────────────────────────────────────────────────
+
+async function idToCompany(entity, ids) {
+  const map = new Map();
+  for (const id of [...new Set(ids)].filter((x) => x > 0)) {
+    const rows = await atFetchAll(entity, [{ field: "id", op: "eq", value: id }]);
+    if (rows[0]) map.set(id, rows[0].companyID);
+  }
+  return map;
+}
+async function enrichCompanyIDs(labour, charges) {
+  const ticketIDs = [...labour, ...charges.ticket].map((x) => x.ticketID).filter(Boolean);
+  const contractIDs = charges.contract.map((c) => c.contractID).filter(Boolean).concat(labour.map((t) => t.contractID).filter(Boolean));
+  const projectIDs = charges.project.map((c) => c.projectID).filter(Boolean);
+  const tC = await idToCompany("Tickets", ticketIDs), cC = await idToCompany("Contracts", contractIDs), pC = await idToCompany("Projects", projectIDs);
+  for (const t of labour) t.companyID = (t.ticketID && tC.get(t.ticketID)) || (t.contractID && cC.get(t.contractID)) || 0;
+  for (const c of charges.ticket) c.companyID = (c.ticketID && tC.get(c.ticketID)) || 0;
+  for (const c of charges.contract) c.companyID = (c.contractID && cC.get(c.contractID)) || 0;
+  for (const c of charges.project) c.companyID = (c.projectID && pC.get(c.projectID)) || 0;
+}
+async function companyNames(ids) {
+  const map = new Map();
+  for (const id of [...new Set(ids)].filter((x) => x > 0)) {
+    const rows = await atFetchAll("Companies", [{ field: "id", op: "eq", value: id }]);
+    if (rows[0]) map.set(id, rows[0].companyName);
+  }
+  return map;
+}
+async function run() {
+  const fs = await import("node:fs");
+  const raw = fs.existsSync("config.json") ? JSON.parse(fs.readFileSync("config.json", "utf8")) : {};
+  const cfg = loadConfig(raw, new Date());
+  const labour = await fetchPendingLabour(cfg);
+  const charges = await fetchPendingCharges(cfg);
+  await enrichCompanyIDs(labour, charges);
+  const checked = [...labour.map((t) => checkLabour(t, cfg)), ...charges.ticket.map((c) => checkCharge(c, "ticketCharge", cfg)), ...charges.contract.map((c) => checkCharge(c, "contractCharge", cfg)), ...charges.project.map((c) => checkCharge(c, "projectCharge", cfg))];
+  const names = await companyNames(checked.map((i) => i.companyID));
+  const md = renderReport(groupItems(checked, names), `${cfg.periodStart} t/m ${cfg.periodEnd}`);
+  const out = `report-${cfg.periodStart}_${cfg.periodEnd}.md`;
+  fs.writeFileSync(out, md, "utf8");
+  console.log(`Rapport: ${out} (${checked.length} items)`);
+}
+async function main() {
+  const [cmd, arg] = process.argv.slice(2);
+  if (cmd === "verify") await verify(arg);
+  else await run();
+}
+// Alleen draaien als direct aangeroepen (niet bij import in de test):
+if (process.argv[1] && process.argv[1].endsWith("preflight.mjs")) main().catch((e) => { console.error(String(e)); process.exit(1); });
