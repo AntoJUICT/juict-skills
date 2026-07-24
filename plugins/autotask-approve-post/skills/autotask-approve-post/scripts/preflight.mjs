@@ -113,19 +113,19 @@ function authHeaders() {
 async function atFetchAll(entity, filterItems) {
   const headers = authHeaders();
   const body = JSON.stringify({ filter: [{ op: "and", items: filterItems }], maxRecords: 500 });
-  let url = `${BASE}/${entity}/query`, method = "POST", out = [];
+  let url = `${BASE}/${entity}/query`, out = [];
   while (url) {
     let res, ok = false;
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) await sleep(Math.pow(2, attempt) * 500);
-      res = await fetch(url, { method, headers, body: method === "POST" ? body : undefined });
+      res = await fetch(url, { method: "POST", headers, body });
       if (res.status === 429 || res.status >= 500) continue;
       ok = true; break;
     }
     if (!ok || !res.ok) throw new Error(`${entity} query ${res?.status}`);
     const json = await res.json();
     out.push(...(json.items ?? []));
-    url = json.pageDetails?.nextPageUrl ?? null; method = "GET";
+    url = json.pageDetails?.nextPageUrl ?? null;
   }
   return out;
 }
