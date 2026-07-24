@@ -171,6 +171,7 @@ export function buildReview(company, tickets, timeEntries, charges, notesByTicke
 // ─────────────────────────────────────────────────────────────────────
 
 import { execSync } from "node:child_process";
+import fs from "node:fs";
 
 const VAULT = "juict-kv-g4fhuo35";
 const BASE = "https://webservices19.autotask.net/ATServicesRest/V1.0";
@@ -283,15 +284,18 @@ export async function fetchReview(companyInput, cfg) {
   const tickets = ticketsRaw.map((t) => ({ id: t.id, ticketNumber: t.ticketNumber ?? null, title: t.title ?? null, description: t.description ?? null }));
   const ticketIds = tickets.map((t) => t.id);
 
+  const projects = await atFetchAll("Projects", [{ field: "companyID", op: "eq", value: company.id }]);
+  const projectIds = projects.map((p) => p.id);
+
   const labourRaw = contractIds.length ? await atFetchAll("TimeEntries", [{ field: "contractID", op: "in", value: contractIds }, { field: "isNonBillable", op: "eq", value: false }]) : [];
   const ticketChargesRaw = ticketIds.length ? await atFetchAll("TicketCharges", [{ field: "ticketID", op: "in", value: ticketIds }, { field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]) : [];
   const contractChargesRaw = contractIds.length ? await atFetchAll("ContractCharges", [{ field: "contractID", op: "in", value: contractIds }, { field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]) : [];
-  // ProjectCharges bewust overgeslagen voor v1 van deze taak (zie brief): company heeft
-  // hier geen makkelijk bereikbare projecten; toe te voegen zodra nodig.
+  const projectChargesRaw = projectIds.length ? await atFetchAll("ProjectCharges", [{ field: "projectID", op: "in", value: projectIds }, { field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]) : [];
 
   const postedTimeEntryIds = await postedIds("timeEntryID", labourRaw.map((t) => t.id));
   const postedTicketChargeIds = await postedIds("ticketChargeID", ticketChargesRaw.map((c) => c.id));
   const postedContractChargeIds = await postedIds("contractChargeID", contractChargesRaw.map((c) => c.id));
+  const postedProjectChargeIds = await postedIds("projectChargeID", projectChargesRaw.map((c) => c.id));
 
   const timeEntries = labourRaw
     .filter((t) => !postedTimeEntryIds.has(t.id))
@@ -300,6 +304,10 @@ export async function fetchReview(companyInput, cfg) {
   const charges = [
     ...ticketChargesRaw.filter((c) => !postedTicketChargeIds.has(c.id)).map((c) => ({ ...mapCharge(c), kind: "ticketCharge" })),
     ...contractChargesRaw.filter((c) => !postedContractChargeIds.has(c.id)).map((c) => ({ ...mapCharge(c), kind: "contractCharge" })),
+    // ProjectCharges hangen niet aan een ticket (ticketID blijft null via mapCharge), dus
+    // deze landen via buildReview altijd in looseCharges, ook al is de klant zonder
+    // projecten gewoon een lege lijst hier.
+    ...projectChargesRaw.filter((c) => !postedProjectChargeIds.has(c.id)).map((c) => ({ ...mapCharge(c), kind: "projectCharge" })),
   ];
 
   const ticketsWithItems = [...new Set([...timeEntries.map((t) => t.ticketID), ...charges.map((c) => c.ticketID)].filter((x) => x != null))];
@@ -344,7 +352,6 @@ async function companyNames(ids) {
   return map;
 }
 async function readCfg() {
-  const fs = await import("node:fs");
   const raw = fs.existsSync("config.json") ? JSON.parse(fs.readFileSync("config.json", "utf8")) : {};
   return loadConfig(raw, new Date());
 }

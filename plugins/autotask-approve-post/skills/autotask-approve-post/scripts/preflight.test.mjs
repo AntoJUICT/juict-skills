@@ -132,3 +132,15 @@ test("buildReview: data-issue (ontbrekend work type) landt in ticket.issues", ()
   assert.ok(te3.problems.some((p) => p.code === "labour.missingWorkType"));
   assert.ok(t100.issues.some((iss) => iss.code === "labour.missingWorkType" && iss.source === "timeEntry:3"));
 });
+
+test("buildReview: projectCharge (geen ticket) landt in looseCharges met kind projectCharge", () => {
+  const { timeEntries, notesByTicket } = reviewFixtures();
+  const charges = [
+    { ...ch({ id: 60, ticketID: null, contractID: null, billableAmount: 40 }), kind: "projectCharge" },
+  ];
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg);
+  assert.equal(out.looseCharges.length, 1);
+  assert.equal(out.looseCharges[0].id, 60);
+  assert.equal(out.looseCharges[0].kind, "projectCharge");
+  assert.equal(out.totals.chargeAmountEUR, 40);
+});
