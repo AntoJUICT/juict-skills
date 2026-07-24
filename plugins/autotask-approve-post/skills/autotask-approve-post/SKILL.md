@@ -105,6 +105,37 @@ gedekte (Recurring-)contracten verandert de factuur niet, beide zijn al
 gedekt door hun vaste fee. Het gaat puur om de juiste toewijzing per
 productlijn, niet om extra of minder factureren.
 
+## Remote Support work-type-review (na `summary`)
+
+Remote Support op gedekte (recurring) contracten wordt niet apart
+gefactureerd, dus die uren komen niet in de gewone triage-tabel terecht. Het
+work type zelf kan alsnog fout gekozen zijn: iemand boekt bijvoorbeeld
+Onsite- of projectwerk per ongeluk (of uit gewoonte) als Remote Support. Dat
+is een AI-beoordeling, geen script-regel, dus `summary` levert de ruwe data
+en ik beoordeel.
+
+- `summary` print naast de triage-tabel ook `remoteSupportReview`: per klant
+  het aantal gedekte Remote Support-entries in de periode, de totale uren, en
+  per entry de summary-tekst. Dit staat ook in het geretourneerde object onder
+  `remoteSupportReview`.
+- Ik loop per entry de summary-tekst langs tegen de labour-work-type-lijst:
+  Remote Support, Onsite Support, Meerwerk, Project, Projectmanagement, Azure
+  consultancy, Minor Change, Major Change, Spoed incident/change, Support
+  Buiten Kantooruren 150%/200%.
+- **Conservatief flaggen**, alleen bij duidelijke signalen:
+  - op locatie/ter plaatse/onsite geweest -> vermoedelijk Onsite Support
+  - installatie, migratie, groter traject -> vermoedelijk Project of Meerwerk
+  - Azure/cloud-advies of -architectuur -> vermoedelijk Azure consultancy
+  - wijziging/change/aanpassing infrastructuur -> vermoedelijk Minor/Major
+    Change
+  - avond, weekend, buiten kantooruren genoemd -> vermoedelijk Support Buiten
+    Kantooruren
+  - bij twijfel niet flaggen: liever een gemiste suggestie dan een vals alarm.
+- Klanten met geflagde entries zet ik alsnog op de actielijst, met het
+  vermoedelijke juiste work type als suggestie erbij. Ik wijzig hier nooit
+  automatisch iets: het work type aanpassen is (net als approve & post) iets
+  wat Anto zelf in de Autotask UI doet.
+
 ## Overige commando's (secundair)
 
 - `node scripts/preflight.mjs verify <contractID>` : sanity-check tegen het

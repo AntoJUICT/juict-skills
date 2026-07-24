@@ -227,6 +227,28 @@ export function buildSummary(items) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// summary-subcommand: Remote Support work-type-review digest (Task 9).
+// Gedekte Remote Support-uren op recurring contracten worden niet gefactureerd
+// en dus niet gesignaleerd door de gewone triage, maar het work type zelf kan
+// fout gekozen zijn (bv. eigenlijk Onsite/Meerwerk/Project/Change/buiten
+// kantooruren). Die beoordeling is AI-werk (Claude leest de summary-tekst),
+// dus buildRemoteSupportReview groepeert alleen de data per klant; er wordt
+// hier niets automatisch geclassificeerd of gewijzigd.
+export function buildRemoteSupportReview(items) {
+  const byCompany = new Map();
+  for (const item of items) {
+    if (!byCompany.has(item.companyId)) {
+      byCompany.set(item.companyId, { companyId: item.companyId, companyName: item.companyName, count: 0, hours: 0, entries: [] });
+    }
+    const agg = byCompany.get(item.companyId);
+    agg.count += 1;
+    agg.hours += item.hours ?? 0;
+    agg.entries.push({ id: item.id, hours: item.hours, dateWorked: item.dateWorked, summary: item.summary });
+  }
+  return [...byCompany.values()].sort((a, b) => b.count - a.count);
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // TASK 3: I/O-laag + verify-subcommand (read-only)
 // ─────────────────────────────────────────────────────────────────────
 
@@ -470,6 +492,16 @@ async function postedIdsBatched(field, ids, batchSize = 300) {
 
 const unassignedName = (companyId, names) => companyId === 0 ? "⚠️ Niet toegewezen (controleer handmatig)" : names.get(companyId) ?? `Company ${companyId}`;
 
+// Resolveert de "Remote Support"-billingCode op naam (id 29682801 op zone 19,
+// maar hier op naam opgelost voor robuustheid tegen id-drift tussen zones).
+// Levert de code geen match op dan degradeert de digest gracieus naar leeg
+// (geen harde fout), zodat summary altijd blijft draaien.
+async function resolveRemoteSupportCodeId() {
+  const rows = await atFetchAll("BillingCodes", [{ field: "isActive", op: "eq", value: true }, { field: "billingCodeType", op: "eq", value: 0 }]);
+  const match = rows.find((r) => r.name === "Remote Support");
+  return match ? match.id : null;
+}
+
 export async function fetchSummary(cfg) {
   // labour.outsidePeriod zou hier valse signalen geven: summary kijkt (net als
   // review) naar ALLE nog-niet-geposte items, ongeacht datum.
@@ -521,6 +553,36 @@ export async function fetchSummary(cfg) {
   const contractCharges = contractChargesRaw.filter((c) => !postedContractChargeIds.has(c.id)).map(mapCharge);
   const projectCharges = projectChargesRaw.filter((c) => !postedProjectChargeIds.has(c.id)).map(mapCharge);
 
+  // Remote Support work-type-review digest (Task 9): Remote Support op gedekte
+  // (niet-facturabele) contracten wordt door de triage hierboven genegeerd,
+  // want die kijkt alleen naar billableContractIds. Toch kan het work type zelf
+  // fout gekozen zijn (bv. eigenlijk Onsite/Meerwerk/Project/Change/buiten
+  // kantooruren). Dat is AI-werk (Claude beoordeelt de summary-tekst later),
+  // dus hier alleen bounded ophalen + groeperen per klant, geen classificatie.
+  // Bounded: alleen de Remote Support-billingCode, binnen de periode, niet
+  // non-billable; posted-exclusie via dezelfde gebatchte BillingItem-lookup.
+  const remoteSupportCodeId = await resolveRemoteSupportCodeId();
+  let remoteSupportReview = [];
+  if (remoteSupportCodeId != null) {
+    const rsRaw = await atFetchAll("TimeEntries", [
+      { field: "billingCodeID", op: "eq", value: remoteSupportCodeId },
+      { field: "isNonBillable", op: "eq", value: false },
+      { field: "dateWorked", op: "gte", value: `${cfg.periodStart}T00:00:00` },
+      { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` },
+    ]);
+    const postedRsIds = await postedIdsBatched("timeEntryID", rsRaw.map((t) => t.id));
+    const rsItems = rsRaw
+      .filter((t) => !postedRsIds.has(t.id))
+      // Alleen gedekte contracten (niet al facturabel meegeteld hierboven):
+      // dezelfde INVOICED_CONTRACT_TYPES-classificatie als de rest van summary.
+      .filter((t) => !INVOICED_CONTRACT_TYPES.has(contractInfo.get(t.contractID)?.type))
+      .map((t) => {
+        const companyId = contractInfo.get(t.contractID)?.companyID ?? 0;
+        return { companyId, companyName: unassignedName(companyId, names), id: t.id, hours: t.hoursToBill ?? t.hoursWorked ?? 0, dateWorked: t.dateWorked ?? null, summary: t.summaryNotes ?? null };
+      });
+    remoteSupportReview = buildRemoteSupportReview(rsItems);
+  }
+
   // Company-attributie zonder per-id lookups: labour/contractCharges via de al
   // opgehaalde bulk-Contracts; ticketCharges/projectCharges via gebatchte
   // Tickets/Projects id op:in-fetches (alleen de betrokken ids, niet de hele klantenbasis).
@@ -565,7 +627,16 @@ export async function fetchSummary(cfg) {
   }
   console.log(`(${hidden} klanten zonder te factureren verborgen)`);
 
-  return { rows, hidden };
+  if (remoteSupportReview.length) {
+    console.log("");
+    console.log("Remote Support te AI-checken:");
+    for (const r of remoteSupportReview) {
+      console.log(`${r.companyName} (${r.count} entries, ${r.hours}u)`);
+      for (const e of r.entries) console.log(`  - #${e.id} ${(e.dateWorked ?? "").slice(0, 10)} ${e.hours}u: ${e.summary ?? "(geen summary)"}`);
+    }
+  }
+
+  return { rows, hidden, remoteSupportReview };
 }
 
 // ─────────────────────────────────────────────────────────────────────

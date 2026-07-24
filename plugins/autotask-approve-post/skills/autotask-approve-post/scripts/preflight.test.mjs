@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -378,4 +378,42 @@ test("buildSummary: lege input geeft lege rows en hidden 0", () => {
   const { rows, hidden } = buildSummary([]);
   assert.deepEqual(rows, []);
   assert.equal(hidden, 0);
+});
+
+// ─── buildRemoteSupportReview (gedekte Remote Support, AI-work-type-review) ──
+
+const rs = (o = {}) => ({ companyId: 1, companyName: "Acme BV", id: 1, hours: 1, dateWorked: "2026-06-01T09:00:00", summary: "werk", ...o });
+
+test("buildRemoteSupportReview: groepeert per klant met count/hours/entries", () => {
+  const items = [
+    rs({ companyId: 1, companyName: "Acme BV", id: 10, hours: 2, dateWorked: "2026-06-01T09:00:00", summary: "Onsite geweest bij klant" }),
+    rs({ companyId: 1, companyName: "Acme BV", id: 11, hours: 1.5, dateWorked: "2026-06-03T09:00:00", summary: "Telefonisch geholpen" }),
+    rs({ companyId: 2, companyName: "Contoso", id: 20, hours: 3, dateWorked: "2026-06-05T09:00:00", summary: "Remote reboot" }),
+  ];
+  const out = buildRemoteSupportReview(items);
+  assert.equal(out.length, 2);
+  const acme = out.find((r) => r.companyId === 1);
+  assert.equal(acme.companyName, "Acme BV");
+  assert.equal(acme.count, 2);
+  assert.equal(acme.hours, 3.5);
+  assert.deepEqual(acme.entries.map((e) => e.id).sort(), [10, 11]);
+  assert.deepEqual(acme.entries.find((e) => e.id === 10), { id: 10, hours: 2, dateWorked: "2026-06-01T09:00:00", summary: "Onsite geweest bij klant" });
+  const contoso = out.find((r) => r.companyId === 2);
+  assert.equal(contoso.count, 1);
+  assert.equal(contoso.hours, 3);
+});
+
+test("buildRemoteSupportReview: sorteert op count desc", () => {
+  const items = [
+    rs({ companyId: 1, companyName: "Weinig", id: 1 }),
+    rs({ companyId: 2, companyName: "Veel", id: 2 }),
+    rs({ companyId: 2, companyName: "Veel", id: 3 }),
+    rs({ companyId: 2, companyName: "Veel", id: 4 }),
+  ];
+  const out = buildRemoteSupportReview(items);
+  assert.deepEqual(out.map((r) => r.companyId), [2, 1]);
+});
+
+test("buildRemoteSupportReview: lege input geeft lege array", () => {
+  assert.deepEqual(buildRemoteSupportReview([]), []);
 });
