@@ -90,3 +90,61 @@ export function renderReport(groups, periodLabel) {
   }
   return lines.join("\n");
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// TASK 3: I/O-laag + verify-subcommand (read-only)
+// ─────────────────────────────────────────────────────────────────────
+
+import { execFileSync } from "node:child_process";
+
+const VAULT = "juict-kv-g4fhuo35";
+const BASE = "https://webservices19.autotask.net/ATServicesRest/V1.0";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function getSecret(name) {
+  return execFileSync("az", ["keyvault", "secret", "show", "--vault-name", VAULT, "--name", name, "--query", "value", "-o", "tsv"], { encoding: "utf8" }).trim();
+}
+function authHeaders() {
+  return { UserName: getSecret("AUTOTASK-USERNAME"), Secret: getSecret("AUTOTASK-API-KEY"), ApiIntegrationCode: getSecret("AUTOTASK-INTEGRATION-CODE"), "Content-Type": "application/json", Accept: "application/json" };
+}
+async function atFetchAll(entity, filterItems) {
+  const headers = authHeaders();
+  const body = JSON.stringify({ filter: [{ op: "and", items: filterItems }], maxRecords: 500 });
+  let url = `${BASE}/${entity}/query`, method = "POST", out = [];
+  while (url) {
+    let res, ok = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await sleep(Math.pow(2, attempt) * 500);
+      res = await fetch(url, { method, headers, body: method === "POST" ? body : undefined });
+      if (res.status === 429 || res.status >= 500) continue;
+      ok = true; break;
+    }
+    if (!ok || !res.ok) throw new Error(`${entity} query ${res?.status}`);
+    const json = await res.json();
+    out.push(...(json.items ?? []));
+    url = json.pageDetails?.nextPageUrl ?? null; method = "GET";
+  }
+  return out;
+}
+
+function mapCharge(c) {
+  return { id: c.id, billingCodeID: c.billingCodeID ?? null, status: c.status ?? null, isBillableToCompany: !!c.isBillableToCompany, isBilled: !!c.isBilled, name: c.name ?? null, description: c.description ?? null, productID: c.productID ?? null, unitPrice: c.unitPrice ?? null, unitQuantity: c.unitQuantity ?? null, billableAmount: c.billableAmount ?? null, datePurchased: c.datePurchased ?? null, createDate: c.createDate ?? null, companyID: 0, contractID: c.contractID ?? null, ticketID: c.ticketID ?? null, projectID: c.projectID ?? null };
+}
+async function fetchChargeEntity(entity, cfg) {
+  const rows = await atFetchAll(entity, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
+  return rows.map(mapCharge).filter((c) => { const d = (c.datePurchased ?? c.createDate ?? "").slice(0, 10); return d === "" || (d >= cfg.periodStart && d <= cfg.periodEnd); });
+}
+export async function fetchPendingCharges(cfg) {
+  return { ticket: await fetchChargeEntity("TicketCharges", cfg), contract: await fetchChargeEntity("ContractCharges", cfg), project: await fetchChargeEntity("ProjectCharges", cfg) };
+}
+export async function fetchPendingLabour(cfg) {
+  const rows = await atFetchAll("TimeEntries", [{ field: "isNonBillable", op: "eq", value: false }, { field: "dateWorked", op: "gte", value: `${cfg.periodStart}T00:00:00` }, { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` }]);
+  return rows.filter((t) => t.billingApprovalDateTime == null).map((t) => ({ id: t.id, ticketID: t.ticketID ?? null, taskID: t.taskID ?? null, contractID: t.contractID ?? null, resourceID: t.resourceID ?? null, roleID: t.roleID ?? null, billingCodeID: t.billingCodeID ?? null, hoursWorked: t.hoursWorked ?? null, hoursToBill: t.hoursToBill ?? null, isNonBillable: !!t.isNonBillable, billingApprovalDateTime: t.billingApprovalDateTime ?? null, dateWorked: t.dateWorked ?? null, summaryNotes: t.summaryNotes ?? null, companyID: 0 }));
+}
+
+async function verify(contractID) {
+  const cfg = loadConfig({}, new Date());
+  const charges = await atFetchAll("ContractCharges", [{ field: "contractID", op: "eq", value: Number(contractID) }, { field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
+  const labour = (await atFetchAll("TimeEntries", [{ field: "contractID", op: "eq", value: Number(contractID) }, { field: "isNonBillable", op: "eq", value: false }])).filter((t) => t.billingApprovalDateTime == null);
+  console.log(`Contract ${contractID}: ${charges.length} pending ContractCharges, ${labour.length} nog-te-approven time entries. Vergelijk met het Approve & Post-scherm.`);
+}
