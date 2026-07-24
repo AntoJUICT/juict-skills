@@ -279,13 +279,24 @@ export async function resolveCompany(input) {
   return { id: rows[0].id, name: rows[0].companyName };
 }
 
+// PURE: zet BillingItem-rijen om naar de set geposte bron-ids op het gevraagde veld.
+// Matcht uitsluitend op billingItemField (bv. timeEntryID); andere velden op de rij
+// (zoals contractID) spelen bewust geen rol, precies om de posted-exclusie exact op
+// de kandidaat-ids te houden en niet afhankelijk te maken van bredere/afwijkende data.
+export function postedIdsFromRows(rows, billingItemField) {
+  return new Set(rows.map((r) => r[billingItemField]).filter((x) => x != null));
+}
+
 // Levert de set opgehaalde-id's die al een BillingItem hebben (dus al gepost zijn).
 // billingApprovalDateTime is NIET betrouwbaar als pending-indicator (24/31 bleek al
 // gepost bij testklant 251), de BillingItem-kruisverwijzing is de autoritatieve check.
+// Precieze id-query (timeEntryID/ticketChargeID/... op:in de kandidaat-ids), niet via
+// een bredere contract-brede fetch, om dubbel factureren door mismatchende contractID's
+// op legacy/afwijkende BillingItem-rijen te voorkomen.
 async function postedIds(billingItemField, ids) {
   if (ids.length === 0) return new Set();
   const rows = await atFetchAll("BillingItems", [{ field: billingItemField, op: "in", value: ids }]);
-  return new Set(rows.map((r) => r[billingItemField]).filter((x) => x != null));
+  return postedIdsFromRows(rows, billingItemField);
 }
 
 async function fetchWorkTypeNames() {
@@ -327,12 +338,14 @@ export async function fetchReview(companyInput, cfg) {
   const contractChargesRaw = contractIds.length ? await atFetchAll("ContractCharges", [{ field: "contractID", op: "in", value: contractIds }, { field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]) : [];
   const projectChargesRaw = projectIds.length ? await atFetchAll("ProjectCharges", [{ field: "projectID", op: "in", value: projectIds }, { field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]) : [];
 
-  // Eén BillingItems-fetch op contractID dekt zowel de posted-check op labour (was een
-  // aparte postedIds-call op timeEntryID: elke BillingItem met een timeEntryID hier is
-  // sowieso al gepost) als de historie voor de gedekt-vs-gefactureerd classificatie
-  // (buildBilledMap), dus geen dubbele round-trip naar BillingItems voor labour.
+  // Precieze posted-detectie op labour: BillingItems met timeEntryID in de kandidaat-ids
+  // zelf, niet via de bredere contract-fetch. Als BillingItem.contractID bij afwijkende/
+  // legacy data niet exact matcht met de bron-time-entry, zou een al-geposte entry anders
+  // ten onrechte als "pending" kunnen terugkomen -> risico op dubbel factureren.
+  const postedTimeEntryIds = await postedIds("timeEntryID", labourRaw.map((t) => t.id));
+  // Aparte, bredere BillingItems-fetch op contractID: uitsluitend input voor buildBilledMap
+  // (historische gefactureerd/gedekt-classificatie), niet voor de posted-exclusie hierboven.
   const billingItemsRaw = contractIds.length ? await atFetchAll("BillingItems", [{ field: "contractID", op: "in", value: contractIds }]) : [];
-  const postedTimeEntryIds = new Set(billingItemsRaw.filter((b) => b.timeEntryID != null).map((b) => b.timeEntryID));
   const billedMap = buildBilledMap(billingItemsRaw);
   const postedTicketChargeIds = await postedIds("ticketChargeID", ticketChargesRaw.map((c) => c.id));
   const postedContractChargeIds = await postedIds("contractChargeID", contractChargesRaw.map((c) => c.id));

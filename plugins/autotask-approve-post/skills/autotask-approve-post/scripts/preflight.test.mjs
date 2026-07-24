@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -209,6 +209,20 @@ test("buildReview: billedMap + contractInfo bepalen invoiced per time entry en t
   assert.equal(out.totals.invoicedHours, 2); // alleen te1 (2u)
   assert.equal(out.totals.coveredHours, 4); // te2 (3u) + te3 (1u)
   assert.equal(out.totals.billableHours, 6); // bestaand veld blijft ongewijzigd
+});
+
+// ─── postedIdsFromRows (precieze posted-detectie, los van contract-brede historie) ──
+
+test("postedIdsFromRows: een BillingItem op timeEntryID sluit die entry uit, ongeacht (afwijkend/ontbrekend) contractID", () => {
+  const rows = [
+    { timeEntryID: 111, contractID: 999 }, // contractID wijkt af van de bron-contract, mag geen rol spelen
+    { timeEntryID: 112, contractID: null }, // contractID zelfs afwezig
+    { timeEntryID: null, contractID: 5 }, // geen timeEntryID -> genegeerd
+  ];
+  const posted = postedIdsFromRows(rows, "timeEntryID");
+  assert.ok(posted.has(111));
+  assert.ok(posted.has(112));
+  assert.equal(posted.size, 2);
 });
 
 // ─── set-nonbillable (gated write) ──────────────────────────────────────
