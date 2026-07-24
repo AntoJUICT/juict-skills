@@ -1,4 +1,4 @@
-// preflight.mjs — pure logica bovenaan; I/O + main() onderaan (Task 3/4).
+// preflight.mjs: pure logica bovenaan; I/O + main() onderaan (Task 3/4).
 export const ALL_RULES = ["labour.missingWorkType","labour.zeroHours","labour.missingRole","labour.emptySummary","labour.outsidePeriod","charge.missingWorkType","charge.zeroAmount","charge.negativeAmount","charge.notBillableFlag"];
 
 const iso = (d) => d.toISOString().slice(0, 10);
@@ -26,7 +26,7 @@ export function checkLabour(t, cfg) {
   if (on("labour.missingRole") && !t.roleID) problems.push({ code: "labour.missingRole", message: "geen roleID" });
   if (on("labour.emptySummary") && (!t.summaryNotes || t.summaryNotes.trim() === "")) problems.push({ code: "labour.emptySummary", message: "lege summary (wordt factuurregel)" });
   if (on("labour.outsidePeriod") && !inPeriod(t.dateWorked, cfg)) problems.push({ code: "labour.outsidePeriod", message: `dateWorked buiten periode (${t.dateWorked ?? "leeg"})` });
-  return { kind: "labour", id: t.id, companyID: t.companyID, contractID: t.contractID, ticketID: t.ticketID, label: `TimeEntry ${t.id} — ${hours}u`, amountEUR: null, hours, problems };
+  return { kind: "labour", id: t.id, companyID: t.companyID, contractID: t.contractID, ticketID: t.ticketID, label: `TimeEntry ${t.id} - ${hours}u`, amountEUR: null, hours, problems };
 }
 
 export function checkCharge(c, kind, cfg) {
@@ -38,7 +38,7 @@ export function checkCharge(c, kind, cfg) {
   if (on("charge.notBillableFlag") && !c.isBillableToCompany) problems.push({ code: "charge.notBillableFlag", message: "niet-facturabel gemarkeerd" });
   if (cfg.neverBillBillingCodeIDs.includes(c.billingCodeID ?? -1)) problems.push({ code: "charge.neverBillCode", message: "work type staat op nooit-factureren" });
   const kindLabel = kind === "ticketCharge" ? "TicketCharge" : kind === "contractCharge" ? "ContractCharge" : "ProjectCharge";
-  return { kind, id: c.id, companyID: c.companyID, contractID: c.contractID, ticketID: c.ticketID, label: `${kindLabel} ${c.id} — ${c.name ?? "(geen naam)"}`, amountEUR: amount, hours: null, problems };
+  return { kind, id: c.id, companyID: c.companyID, contractID: c.contractID, ticketID: c.ticketID, label: `${kindLabel} ${c.id} - ${c.name ?? "(geen naam)"}`, amountEUR: amount, hours: null, problems };
 }
 
 export function groupItems(items, names) {
@@ -65,14 +65,14 @@ export function groupItems(items, names) {
 const money = (n) => n === null ? "" : `€${n.toFixed(2)}`;
 function itemLine(i) {
   if (i.problems.length === 0) return `  - ${i.label} ${money(i.amountEUR)}`.trimEnd();
-  return `  - ⚠️ ${i.label} — ${i.problems.map((p) => p.message).join("; ")}`;
+  return `  - ⚠️ ${i.label} - ${i.problems.map((p) => p.message).join("; ")}`;
 }
 export function renderReport(groups, periodLabel) {
   const all = [];
   for (const g of groups) for (const c of g.contracts) { for (const t of c.tickets) all.push(...t.items); all.push(...c.looseItems); }
   const withProblems = all.filter((i) => i.problems.length > 0);
   const totalEUR = all.reduce((s, i) => s + (i.amountEUR ?? 0), 0);
-  const lines = [`# Approve & Post pre-flight — ${periodLabel}`, ""];
+  const lines = [`# Approve & Post pre-flight - ${periodLabel}`, ""];
   lines.push(`**${groups.length} klant${groups.length === 1 ? "" : "en"}**, ${all.length} pending items, ${withProblems.length} item${withProblems.length === 1 ? "" : "s"} met problemen, totaal ${money(totalEUR)}.`, "");
   const renderItems = (items) => {
     const clean = items.filter((i) => i.problems.length === 0), bad = items.filter((i) => i.problems.length > 0);
@@ -322,7 +322,7 @@ export async function fetchReview(companyInput, cfg) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// TASK 3: set-nonbillable — gated write (enige toegestane mutatie)
+// TASK 3: set-nonbillable: gated write (enige toegestane mutatie)
 // ─────────────────────────────────────────────────────────────────────
 
 export function buildNonBillablePatches(ids) {
