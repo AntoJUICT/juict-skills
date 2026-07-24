@@ -26,6 +26,15 @@ test("checkCharge markeert work type/0-bedrag/negatief", () => {
   const neg = checkCharge(ch({ billableAmount: -5, unitPrice: -5 }), "ticketCharge", cfg).problems.map(p => p.code);
   assert.ok(neg.includes("charge.negativeAmount"));
 });
+test("checkCharge flags notBillableFlag", () => {
+  const notBillable = checkCharge(ch({ isBillableToCompany: false }), "ticketCharge", cfg).problems.map(p => p.code);
+  assert.ok(notBillable.includes("charge.notBillableFlag"));
+});
+test("checkCharge flags neverBillCode", () => {
+  const cfg2 = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30", neverBillBillingCodeIDs: [30] }, new Date("2026-07-24T00:00:00Z"));
+  const neverBill = checkCharge(ch(), "ticketCharge", cfg2).problems.map(p => p.code);
+  assert.ok(neverBill.includes("charge.neverBillCode"));
+});
 test("groupItems: ticket-items onder ticket, losse charges onder contract", () => {
   const groups = groupItems([
     checkLabour(te({ id: 1, ticketID: 100 }), cfg),
