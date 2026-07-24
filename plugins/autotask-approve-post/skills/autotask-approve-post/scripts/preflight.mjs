@@ -322,6 +322,37 @@ export async function fetchReview(companyInput, cfg) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// TASK 3: set-nonbillable — gated write (enige toegestane mutatie)
+// ─────────────────────────────────────────────────────────────────────
+
+export function buildNonBillablePatches(ids) {
+  return ids.map((id) => ({ id, isNonBillable: true }));
+}
+
+async function realPatchTimeEntry(patch) {
+  const res = await fetch(`${BASE}/TimeEntries`, { method: "PATCH", headers: authHeaders(), body: JSON.stringify(patch) });
+  if (res.ok) return { id: patch.id, status: res.status, ok: true };
+  let error;
+  try { const body = await res.json(); error = body?.errors?.[0] ?? JSON.stringify(body); } catch { error = await res.text().catch(() => String(res.status)); }
+  return { id: patch.id, status: res.status, ok: false, error };
+}
+
+export async function setNonBillable(ids, { confirm } = {}, patchFn = realPatchTimeEntry) {
+  const patches = buildNonBillablePatches(ids);
+  if (!confirm) {
+    for (const patch of patches) console.log("[dry-run] PATCH TimeEntries", JSON.stringify(patch));
+    return { dryRun: true, patches };
+  }
+  const results = [];
+  for (const patch of patches) {
+    const result = await patchFn(patch);
+    console.log(`TimeEntry ${patch.id}: ${result.ok ? "OK" : `FOUT (${result.status}) ${result.error ?? ""}`}`);
+    results.push(result);
+  }
+  return { dryRun: false, results };
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // TASK 4: run-orchestratie + company-verrijking + main()/CLI-dispatch
 // ─────────────────────────────────────────────────────────────────────
 
@@ -368,12 +399,19 @@ async function run() {
   console.log(`Rapport: ${out} (${checked.length} items)`);
 }
 async function main() {
-  const [cmd, arg] = process.argv.slice(2);
-  if (cmd === "verify") await verify(arg);
+  const [cmd, ...rest] = process.argv.slice(2);
+  if (cmd === "verify") await verify(rest[0]);
   else if (cmd === "review") {
+    const arg = rest[0];
     if (!arg) { console.error("Gebruik: preflight.mjs review <companyID of klantnaam>"); process.exit(1); return; }
     const cfg = await readCfg();
     await fetchReview(arg, cfg);
+  }
+  else if (cmd === "set-nonbillable") {
+    const confirm = rest.includes("--confirm");
+    const ids = rest.filter((a) => /^\d+$/.test(a)).map(Number);
+    if (ids.length === 0) { console.error("Gebruik: preflight.mjs set-nonbillable <id...> [--dry-run|--confirm]"); process.exit(1); return; }
+    await setNonBillable(ids, { confirm });
   }
   else await run();
 }

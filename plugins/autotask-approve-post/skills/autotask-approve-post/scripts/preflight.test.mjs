@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview, buildNonBillablePatches, setNonBillable } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -143,4 +143,38 @@ test("buildReview: projectCharge (geen ticket) landt in looseCharges met kind pr
   assert.equal(out.looseCharges[0].id, 60);
   assert.equal(out.looseCharges[0].kind, "projectCharge");
   assert.equal(out.totals.chargeAmountEUR, 40);
+});
+
+// ─── set-nonbillable (gated write) ──────────────────────────────────────
+
+test("buildNonBillablePatches: mapt ids naar PATCH-payloads", () => {
+  assert.deepEqual(buildNonBillablePatches([1, 2]), [
+    { id: 1, isNonBillable: true },
+    { id: 2, isNonBillable: true },
+  ]);
+});
+
+test("setNonBillable: default (geen confirm) is dry-run en roept patchFn nooit aan", async () => {
+  const calls = [];
+  const spyPatch = async (patch) => { calls.push(patch); return { id: patch.id, status: 200, ok: true }; };
+  const result = await setNonBillable([1, 2], {}, spyPatch);
+  assert.equal(calls.length, 0);
+  assert.equal(result.dryRun, true);
+  assert.deepEqual(result.patches, [
+    { id: 1, isNonBillable: true },
+    { id: 2, isNonBillable: true },
+  ]);
+});
+
+test("setNonBillable: met confirm roept patchFn per id aan met het juiste payload", async () => {
+  const calls = [];
+  const spyPatch = async (patch) => { calls.push(patch); return { id: patch.id, status: 200, ok: true }; };
+  const result = await setNonBillable([1, 2], { confirm: true }, spyPatch);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls, [
+    { id: 1, isNonBillable: true },
+    { id: 2, isNonBillable: true },
+  ]);
+  assert.equal(result.dryRun, false);
+  assert.equal(result.results.length, 2);
 });
