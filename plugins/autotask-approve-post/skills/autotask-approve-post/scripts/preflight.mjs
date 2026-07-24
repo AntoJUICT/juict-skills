@@ -2,6 +2,19 @@
 // charge.neverBillCode is intentionally NOT in ALL_RULES: it fires independently whenever billingCodeID is in neverBillBillingCodeIDs, irrespective of enabledRules.
 export const ALL_RULES = ["labour.missingWorkType","labour.zeroHours","labour.missingRole","labour.emptySummary","labour.outsidePeriod","charge.missingWorkType","charge.zeroAmount","charge.negativeAmount","charge.notBillableFlag"];
 
+// Task 10: werk op nog lopende tickets hoort nog niet in approve & post. Een
+// ticket is "afgerond" bij status 5 (Complete) of 16 (Autocomplete RMM).
+export const COMPLETE_TICKET_STATUSES = new Set([5, 16]);
+
+// PURE: hou een item als het GEEN ticketID heeft (niet ticket-gebonden, dus
+// deze regel raakt het niet: contract-/project-charges, taak-uren zonder
+// ticket) OF als completeTicketIds.has(item.ticketID) (ticket-gebonden en het
+// ticket is afgerond). Ticket-gebonden items op een niet-afgerond ticket
+// vallen weg.
+export function keepIfTicketComplete(items, completeTicketIds) {
+  return items.filter((item) => item.ticketID == null || completeTicketIds.has(item.ticketID));
+}
+
 const iso = (d) => d.toISOString().slice(0, 10);
 function prevMonth(now) {
   const y = now.getUTCFullYear(), m = now.getUTCMonth();
@@ -393,8 +406,12 @@ export async function fetchReview(companyInput, cfg) {
     .map((c) => ({ id: c.id, name: c.contractName ?? null, type: c.contractType ?? null }));
 
   const ticketsRaw = await atFetchAll("Tickets", [{ field: "companyID", op: "eq", value: company.id }]);
-  const tickets = ticketsRaw.map((t) => ({ id: t.id, ticketNumber: t.ticketNumber ?? null, title: t.title ?? null, description: t.description ?? null }));
+  const tickets = ticketsRaw.map((t) => ({ id: t.id, ticketNumber: t.ticketNumber ?? null, title: t.title ?? null, description: t.description ?? null, status: t.status ?? null }));
   const ticketIds = tickets.map((t) => t.id);
+  // Task 10: alleen afgeronde tickets (status 5/16) horen in het overzicht.
+  // De company-tickets zijn hierboven al opgehaald incl. status, dus geen
+  // extra fetch nodig.
+  const completeTicketIds = new Set(tickets.filter((t) => COMPLETE_TICKET_STATUSES.has(t.status)).map((t) => t.id));
 
   const projects = await atFetchAll("Projects", [{ field: "companyID", op: "eq", value: company.id }]);
   const projectIds = projects.map((p) => p.id);
@@ -417,11 +434,11 @@ export async function fetchReview(companyInput, cfg) {
   const postedContractChargeIds = await postedIds("contractChargeID", contractChargesRaw.map((c) => c.id));
   const postedProjectChargeIds = await postedIds("projectChargeID", projectChargesRaw.map((c) => c.id));
 
-  const timeEntries = labourRaw
+  const timeEntriesAll = labourRaw
     .filter((t) => !postedTimeEntryIds.has(t.id))
     .map((t) => ({ id: t.id, ticketID: t.ticketID ?? null, taskID: t.taskID ?? null, contractID: t.contractID ?? null, roleID: t.roleID ?? null, billingCodeID: t.billingCodeID ?? null, hoursWorked: t.hoursWorked ?? null, hoursToBill: t.hoursToBill ?? null, dateWorked: t.dateWorked ?? null, summaryNotes: t.summaryNotes ?? null }));
 
-  const charges = [
+  const chargesAll = [
     ...ticketChargesRaw.filter((c) => !postedTicketChargeIds.has(c.id)).map((c) => ({ ...mapCharge(c), kind: "ticketCharge" })),
     ...contractChargesRaw.filter((c) => !postedContractChargeIds.has(c.id)).map((c) => ({ ...mapCharge(c), kind: "contractCharge" })),
     // ProjectCharges hangen niet aan een ticket (ticketID blijft null via mapCharge), dus
@@ -430,6 +447,14 @@ export async function fetchReview(companyInput, cfg) {
     ...projectChargesRaw.filter((c) => !postedProjectChargeIds.has(c.id)).map((c) => ({ ...mapCharge(c), kind: "projectCharge" })),
   ];
 
+  // Task 10: alleen afgeronde tickets (status 5/16) mogen in het overzicht.
+  // Raakt uitsluitend ticket-gebonden items (labour met ticketID, ticket-charges);
+  // contract-/project-charges en labour zonder ticketID hebben ticketID == null
+  // en blijven dus altijd staan via keepIfTicketComplete.
+  const timeEntries = keepIfTicketComplete(timeEntriesAll, completeTicketIds);
+  const charges = keepIfTicketComplete(chargesAll, completeTicketIds);
+  const reviewTicketsList = tickets.filter((t) => completeTicketIds.has(t.id));
+
   const ticketsWithItems = [...new Set([...timeEntries.map((t) => t.ticketID), ...charges.map((c) => c.ticketID)].filter((x) => x != null))];
   const notesByTicket = await fetchNotesByTicket(ticketsWithItems);
   const workTypeNames = await fetchWorkTypeNames();
@@ -437,7 +462,7 @@ export async function fetchReview(companyInput, cfg) {
   // review toont ALLE nog-niet-geposte items ongeacht datum, dus labour.outsidePeriod
   // zou hier valse "problemen" opleveren op legitiem oude, nog niet geposte entries.
   const reviewCfg = { ...cfg, enabledRules: cfg.enabledRules.filter((r) => r !== "labour.outsidePeriod") };
-  const reviewOutput = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, reviewCfg, billedMap, contractInfo, availableContracts);
+  const reviewOutput = buildReview(company, reviewTicketsList, timeEntries, charges, notesByTicket, workTypeNames, reviewCfg, billedMap, contractInfo, availableContracts);
 
   console.log(JSON.stringify(reviewOutput, null, 2));
   console.error(`Klant ${company.name} (${company.id}): ${reviewOutput.totals.ticketCount} tickets, ${reviewOutput.totals.timeEntryCount} time entries (${reviewOutput.totals.billableHours}u), ${reviewOutput.totals.chargeCount} charges (€${reviewOutput.totals.chargeAmountEUR.toFixed(2)}), ${reviewOutput.looseCharges.length} losse charges.`);
@@ -574,41 +599,61 @@ export async function fetchSummary(cfg) {
   // dus hier alleen bounded ophalen + groeperen per klant, geen classificatie.
   // Bounded: alleen de Remote Support-billingCode, binnen de periode, niet
   // non-billable; posted-exclusie via dezelfde gebatchte BillingItem-lookup.
+  // rsRaw wordt hier alvast opgehaald (ongefilterd) zodat de ticket-ids ervan
+  // meekunnen in de EEN gebatchte Tickets-fetch hieronder; de eigenlijke
+  // rsItems-classificatie/filtering gebeurt verderop, na completeTicketIds.
   const remoteSupportCodeId = await resolveRemoteSupportCodeId();
-  let remoteSupportReview = [];
-  if (remoteSupportCodeId != null) {
-    const rsRaw = await atFetchAll("TimeEntries", [
-      { field: "billingCodeID", op: "eq", value: remoteSupportCodeId },
-      { field: "isNonBillable", op: "eq", value: false },
-      { field: "dateWorked", op: "gte", value: `${cfg.periodStart}T00:00:00` },
-      { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` },
-    ]);
-    const postedRsIds = await postedIdsBatched("timeEntryID", rsRaw.map((t) => t.id));
-    const rsItems = rsRaw
-      .filter((t) => !postedRsIds.has(t.id))
-      // Alleen gedekte contracten (niet al facturabel meegeteld hierboven):
-      // dezelfde INVOICED_CONTRACT_TYPES-classificatie als de rest van summary.
-      .filter((t) => !INVOICED_CONTRACT_TYPES.has(contractInfo.get(t.contractID)?.type))
-      .map((t) => {
-        const companyId = contractInfo.get(t.contractID)?.companyID ?? 0;
-        return { companyId, companyName: unassignedName(companyId, names), id: t.id, hours: t.hoursToBill ?? t.hoursWorked ?? 0, dateWorked: t.dateWorked ?? null, summary: t.summaryNotes ?? null };
-      });
-    remoteSupportReview = buildRemoteSupportReview(rsItems);
-  }
+  const rsRaw = remoteSupportCodeId != null ? await atFetchAll("TimeEntries", [
+    { field: "billingCodeID", op: "eq", value: remoteSupportCodeId },
+    { field: "isNonBillable", op: "eq", value: false },
+    { field: "dateWorked", op: "gte", value: `${cfg.periodStart}T00:00:00` },
+    { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` },
+  ]) : [];
 
-  // Company-attributie zonder per-id lookups: labour/contractCharges via de al
-  // opgehaalde bulk-Contracts; ticketCharges/projectCharges via gebatchte
-  // Tickets/Projects id op:in-fetches (alleen de betrokken ids, niet de hele klantenbasis).
-  const ticketIds = ticketCharges.map((c) => c.ticketID);
-  const ticketsRows = await fetchBatchedIn("Tickets", "id", ticketIds, [], 300);
+  // Company-attributie EN Task-10 ticket-status in EEN gebatchte Tickets-fetch
+  // (id op:in), op de unie van alle ticket-ids uit ticketCharges, billable
+  // labour en RS-entries. Geen aparte per-onderdeel fetch, geen per-id lookups.
+  // ticketCharges/projectCharges attribution via gebatchte Tickets/Projects
+  // id op:in-fetches (alleen de betrokken ids, niet de hele klantenbasis);
+  // labour/contractCharges via de al opgehaalde bulk-Contracts.
+  const ticketIdsForLookup = [
+    ...ticketCharges.map((c) => c.ticketID),
+    ...labour.map((t) => t.ticketID),
+    ...rsRaw.map((t) => t.ticketID),
+  ];
+  const ticketsRows = await fetchBatchedIn("Tickets", "id", ticketIdsForLookup, [], 300);
   const ticketCompany = new Map(ticketsRows.map((t) => [t.id, t.companyID]));
+  // Task 10: een ticket is "afgerond" bij status 5 (Complete) of 16 (Autocomplete
+  // RMM). Alleen ticket-gebonden items op een afgerond ticket blijven staan.
+  const completeTicketIds = new Set(ticketsRows.filter((t) => COMPLETE_TICKET_STATUSES.has(t.status)).map((t) => t.id));
+
+  const postedRsIds = await postedIdsBatched("timeEntryID", rsRaw.map((t) => t.id));
+  const rsItemsAll = rsRaw
+    .filter((t) => !postedRsIds.has(t.id))
+    // Alleen gedekte contracten (niet al facturabel meegeteld hierboven):
+    // dezelfde INVOICED_CONTRACT_TYPES-classificatie als de rest van summary.
+    .filter((t) => !INVOICED_CONTRACT_TYPES.has(contractInfo.get(t.contractID)?.type))
+    .map((t) => {
+      const companyId = contractInfo.get(t.contractID)?.companyID ?? 0;
+      return { companyId, companyName: unassignedName(companyId, names), id: t.id, ticketID: t.ticketID ?? null, hours: t.hoursToBill ?? t.hoursWorked ?? 0, dateWorked: t.dateWorked ?? null, summary: t.summaryNotes ?? null };
+    });
+  // Task 10: RS-entries met een ticketID alleen meenemen als dat ticket afgerond
+  // is; ticketloze RS-entries (ticketID null) zijn niet ticket-gebonden en blijven.
+  const rsItems = keepIfTicketComplete(rsItemsAll, completeTicketIds);
+  const remoteSupportReview = buildRemoteSupportReview(rsItems);
 
   const projectIds = projectCharges.map((c) => c.projectID);
   const projectsRows = await fetchBatchedIn("Projects", "id", projectIds, [], 300);
   const projectCompany = new Map(projectsRows.map((p) => [p.id, p.companyID]));
 
+  // Task 10: ticket-gebonden items (labour met ticketID, ticket-charges) alleen
+  // houden als hun ticket afgerond is. Contract-/project-charges en labour
+  // zonder ticketID hebben ticketID == null en blijven dus altijd staan.
+  const labourFiltered = keepIfTicketComplete(labour, completeTicketIds);
+  const ticketChargesFiltered = keepIfTicketComplete(ticketCharges, completeTicketIds);
+
   const items = [];
-  for (const t of labour) {
+  for (const t of labourFiltered) {
     const companyId = contractInfo.get(t.contractID)?.companyID ?? 0;
     const checked = checkLabour(t, summaryCfg);
     items.push({ companyId, companyName: unassignedName(companyId, names), kind: "labour", amountEUR: 0, hours: checked.hours, problems: checked.problems });
@@ -618,7 +663,7 @@ export async function fetchSummary(cfg) {
     const checked = checkCharge(c, "contractCharge", summaryCfg);
     items.push({ companyId, companyName: unassignedName(companyId, names), kind: "contractCharge", amountEUR: checked.amountEUR ?? 0, hours: null, problems: checked.problems });
   }
-  for (const c of ticketCharges) {
+  for (const c of ticketChargesFiltered) {
     const companyId = ticketCompany.get(c.ticketID) ?? 0;
     const checked = checkCharge(c, "ticketCharge", summaryCfg);
     items.push({ companyId, companyName: unassignedName(companyId, names), kind: "ticketCharge", amountEUR: checked.amountEUR ?? 0, hours: null, problems: checked.problems });

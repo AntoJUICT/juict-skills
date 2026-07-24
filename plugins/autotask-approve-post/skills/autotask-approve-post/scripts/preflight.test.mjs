@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, keepIfTicketComplete, COMPLETE_TICKET_STATUSES } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -428,4 +428,40 @@ test("buildRemoteSupportReview: sorteert entries per bedrijf op dateWorked ascen
   const out = buildRemoteSupportReview(items);
   const acme = out.find((r) => r.companyId === 1);
   assert.deepEqual(acme.entries.map((e) => e.id), [11, 13, 10, 12]);
+});
+
+// ─── keepIfTicketComplete (alleen afgeronde tickets in review/summary/RS) ──
+
+test("keepIfTicketComplete: item zonder ticketID (niet ticket-gebonden) blijft altijd", () => {
+  const items = [{ id: 1, ticketID: null }];
+  const out = keepIfTicketComplete(items, new Set([5]));
+  assert.deepEqual(out, items);
+});
+
+test("keepIfTicketComplete: item op een afgerond ticket (id in completeTicketIds) blijft", () => {
+  const items = [{ id: 1, ticketID: 100 }];
+  const out = keepIfTicketComplete(items, new Set([100]));
+  assert.deepEqual(out, items);
+});
+
+test("keepIfTicketComplete: item op een niet-afgerond ticket (id niet in completeTicketIds) valt weg", () => {
+  const items = [{ id: 1, ticketID: 100 }];
+  const out = keepIfTicketComplete(items, new Set([200]));
+  assert.deepEqual(out, []);
+});
+
+test("keepIfTicketComplete: mix van ticketloos, afgerond en lopend", () => {
+  const items = [
+    { id: 1, ticketID: null },
+    { id: 2, ticketID: 100 },
+    { id: 3, ticketID: 200 },
+  ];
+  const out = keepIfTicketComplete(items, new Set([100]));
+  assert.deepEqual(out.map((i) => i.id), [1, 2]);
+});
+
+test("COMPLETE_TICKET_STATUSES bevat 5 (Complete) en 16 (Autocomplete RMM)", () => {
+  assert.ok(COMPLETE_TICKET_STATUSES.has(5));
+  assert.ok(COMPLETE_TICKET_STATUSES.has(16));
+  assert.equal(COMPLETE_TICKET_STATUSES.size, 2);
 });
