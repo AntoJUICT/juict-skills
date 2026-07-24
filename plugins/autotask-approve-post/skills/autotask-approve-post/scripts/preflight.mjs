@@ -479,8 +479,13 @@ export async function fetchSummary(cfg) {
   const companies = await atFetchAll("Companies", [{ field: "isActive", op: "eq", value: true }]);
   const names = new Map(companies.map((c) => [c.id, c.companyName]));
 
-  // Bulk-fetch #2: actieve Contracts (id -> {companyID, naam, type}), EEN keer.
-  const contracts = await atFetchAll("Contracts", [{ field: "status", op: "eq", value: 1 }]);
+  // Bulk-fetch #2: ALLE Contracts (id -> {companyID, naam, type}), EEN keer, zonder
+  // status-filter. De contractID -> companyID-attributie moet ook gesloten/afgelopen
+  // contracten kunnen herleiden (anders belandt labour/charges op een inmiddels
+  // gesloten contract onterecht in de "Niet toegewezen"-bak). Het active + billable
+  // type-filter (1/4/8) wordt hieronder apart toegepast, alleen voor de vraag welke
+  // contracten factureerbare labour opleveren.
+  const contracts = await atFetchAll("Contracts", [{ field: "id", op: "gte", value: 0 }]);
   const contractInfo = new Map(contracts.map((c) => [c.id, { companyID: c.companyID, name: c.contractName ?? null, type: c.contractType ?? null }]));
 
   // BillingCodes (work-type namen) wordt bewust NIET gebulkfetcht: checkLabour/
@@ -490,9 +495,11 @@ export async function fetchSummary(cfg) {
   // onbenutte netwerklatency toevoegen aan een command dat juist snelheid als
   // doel heeft. (fetchWorkTypeNames() blijft beschikbaar voor `review`.)
 
-  // Alleen facturabele contracttypes (1 T&M, 4 Block Hours, 8 Per Ticket) leveren
-  // te-factureren labour; gedekte contracttypes (Recurring e.d.) tellen niet mee.
-  const billableContractIds = contracts.filter((c) => INVOICED_CONTRACT_TYPES.has(c.contractType)).map((c) => c.id);
+  // Alleen ACTIEVE contracten (status 1) met een facturabel contracttype (1 T&M,
+  // 4 Block Hours, 8 Per Ticket) leveren te-factureren labour; gedekte contracttypes
+  // (Recurring e.d.) en gesloten contracten tellen niet mee. Dit filter raakt alleen
+  // de labour-query hieronder, niet de contractInfo-attributiekaart hierboven.
+  const billableContractIds = contracts.filter((c) => c.status === 1 && INVOICED_CONTRACT_TYPES.has(c.contractType)).map((c) => c.id);
   const labourRaw = await fetchBatchedIn("TimeEntries", "contractID", billableContractIds, [{ field: "isNonBillable", op: "eq", value: false }], 200);
 
   const chargeFilter = [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }];
@@ -500,13 +507,14 @@ export async function fetchSummary(cfg) {
   const contractChargesRaw = await atFetchAll("ContractCharges", chargeFilter);
   const projectChargesRaw = await atFetchAll("ProjectCharges", chargeFilter);
 
-  // Posted-exclusie via BillingItem-kruisverwijzing, gebatcht (~300/call), niet per losse id.
-  const [postedTimeEntryIds, postedTicketChargeIds, postedContractChargeIds, postedProjectChargeIds] = await Promise.all([
-    postedIdsBatched("timeEntryID", labourRaw.map((t) => t.id)),
-    postedIdsBatched("ticketChargeID", ticketChargesRaw.map((c) => c.id)),
-    postedIdsBatched("contractChargeID", contractChargesRaw.map((c) => c.id)),
-    postedIdsBatched("projectChargeID", projectChargesRaw.map((c) => c.id)),
-  ]);
+  // Posted-exclusie via BillingItem-kruisverwijzing, gebatcht (~300/call). Sequentieel
+  // (niet Promise.all) om binnen Autotask' rate-limit van 3 gelijktijdige threads te
+  // blijven; deze codebase houdt zich aan sequentieel/max ~2 parallel, dus 4 losse
+  // parallelle requests hier zou een 429-risico zijn.
+  const postedTimeEntryIds = await postedIdsBatched("timeEntryID", labourRaw.map((t) => t.id));
+  const postedTicketChargeIds = await postedIdsBatched("ticketChargeID", ticketChargesRaw.map((c) => c.id));
+  const postedContractChargeIds = await postedIdsBatched("contractChargeID", contractChargesRaw.map((c) => c.id));
+  const postedProjectChargeIds = await postedIdsBatched("projectChargeID", projectChargesRaw.map((c) => c.id));
 
   const labour = labourRaw.filter((t) => !postedTimeEntryIds.has(t.id));
   const ticketCharges = ticketChargesRaw.filter((c) => !postedTicketChargeIds.has(c.id)).map(mapCharge);
