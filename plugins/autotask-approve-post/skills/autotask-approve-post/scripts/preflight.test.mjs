@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -143,6 +143,72 @@ test("buildReview: projectCharge (geen ticket) landt in looseCharges met kind pr
   assert.equal(out.looseCharges[0].id, 60);
   assert.equal(out.looseCharges[0].kind, "projectCharge");
   assert.equal(out.totals.chargeAmountEUR, 40);
+});
+
+// ─── buildBilledMap / isInvoiced (gedekt-vs-gefactureerd classificatie) ──
+
+test("buildBilledMap: labour-item met bedrag>0 en timeEntryID zet workType in contract-set", () => {
+  const billingItems = [{ contractID: 5, billingCodeID: 20, timeEntryID: 900, totalAmount: 50 }];
+  const map = buildBilledMap(billingItems);
+  assert.ok(map.get(5).has(20));
+});
+
+test("buildBilledMap: alleen €0 items voegen niets toe", () => {
+  const billingItems = [{ contractID: 5, billingCodeID: 20, timeEntryID: 900, totalAmount: 0 }];
+  const map = buildBilledMap(billingItems);
+  assert.equal(map.get(5), undefined);
+});
+
+test("buildBilledMap: items zonder timeEntryID (charges) worden genegeerd", () => {
+  const billingItems = [{ contractID: 5, billingCodeID: 20, timeEntryID: null, totalAmount: 100 }];
+  const map = buildBilledMap(billingItems);
+  assert.equal(map.get(5), undefined);
+});
+
+test("buildBilledMap: valt terug op extendedPrice als totalAmount ontbreekt", () => {
+  const billingItems = [{ contractID: 5, billingCodeID: 20, timeEntryID: 900, extendedPrice: 50 }];
+  const map = buildBilledMap(billingItems);
+  assert.ok(map.get(5).has(20));
+});
+
+test("isInvoiced: billedMap-hit geeft true, andere workType op zelfde contract geeft false", () => {
+  const billedMap = new Map([[5, new Set([20])]]);
+  assert.equal(isInvoiced(5, 20, 7, billedMap), true);
+  assert.equal(isInvoiced(5, 21, 7, billedMap), false);
+});
+
+test("isInvoiced: geen historie voor contract valt terug op contractType (1/4/8 gefactureerd, 3/6/7/9 gedekt)", () => {
+  const billedMap = new Map();
+  assert.equal(isInvoiced(99, 20, 1, billedMap), true);
+  assert.equal(isInvoiced(99, 20, 4, billedMap), true);
+  assert.equal(isInvoiced(99, 20, 8, billedMap), true);
+  assert.equal(isInvoiced(99, 20, 3, billedMap), false);
+  assert.equal(isInvoiced(99, 20, 6, billedMap), false);
+  assert.equal(isInvoiced(99, 20, 7, billedMap), false);
+  assert.equal(isInvoiced(99, 20, 9, billedMap), false);
+});
+
+test("isInvoiced: onbekend contractType default naar false", () => {
+  assert.equal(isInvoiced(99, 20, 999, new Map()), false);
+});
+
+test("buildReview: billedMap + contractInfo bepalen invoiced per time entry en totals invoicedHours/coveredHours", () => {
+  const { timeEntries, charges, notesByTicket } = reviewFixtures();
+  const billedMap = new Map([[5, new Set([20])]]); // alleen workType 20 op contract 5 wordt gefactureerd
+  const contractInfo = new Map([[5, { name: "Easywork Basic", type: 7 }]]);
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg, billedMap, contractInfo);
+  const t100 = out.tickets.find((t) => t.ticketID === 100);
+  const te1 = t100.timeEntries.find((i) => i.id === 1); // billingCodeID 20 -> invoiced
+  const te3 = t100.timeEntries.find((i) => i.id === 3); // billingCodeID null -> covered
+  assert.equal(te1.invoiced, true);
+  assert.equal(te1.contractId, 5);
+  assert.equal(te1.contractName, "Easywork Basic");
+  assert.equal(te1.contractType, 7);
+  assert.equal(te3.invoiced, false);
+  assert.equal(te3.contractId, 5);
+  assert.equal(out.totals.invoicedHours, 2); // alleen te1 (2u)
+  assert.equal(out.totals.coveredHours, 4); // te2 (3u) + te3 (1u)
+  assert.equal(out.totals.billableHours, 6); // bestaand veld blijft ongewijzigd
 });
 
 // ─── set-nonbillable (gated write) ──────────────────────────────────────

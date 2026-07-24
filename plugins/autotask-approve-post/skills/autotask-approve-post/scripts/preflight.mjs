@@ -103,19 +103,51 @@ function mapGet(mapLike, key) {
   return mapLike[key];
 }
 
-export function buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg) {
+// Gedekt-vs-gefactureerd classificatie (zone 19, 2026-07-24): labour op een
+// Recurring-contract (bv. Easywork Basic, type 7) post historisch op totalAmount
+// €0 = gedekt door de vaste fee, niet apart gefactureerd (bevestigd op 138
+// Easywork-contracten). T&M (type 1) factureert labour wel (>0). Detectie:
+// heeft een historische BillingItem voor dat contract + work type ooit een
+// bedrag > 0 gehad. ContractExclusionBillingCodes is leeg en dus niet bruikbaar.
+export function buildBilledMap(billingItems) {
+  const map = new Map();
+  for (const b of billingItems ?? []) {
+    if (b.timeEntryID == null) continue; // alleen labour, geen charges
+    const amount = b.totalAmount ?? b.extendedPrice ?? 0;
+    if (!(amount > 0)) continue;
+    if (!map.has(b.contractID)) map.set(b.contractID, new Set());
+    map.get(b.contractID).add(b.billingCodeID);
+  }
+  return map;
+}
+
+// Fallback per contractType als er geen historie is voor het contract:
+// 1 = Time & Materials, 4 = Block Hours, 8 = Per Ticket -> gefactureerd.
+// 3/6/7/9 (o.a. Recurring/Retainer) -> gedekt. Onbekend type -> gedekt (conservatief).
+const INVOICED_CONTRACT_TYPES = new Set([1, 4, 8]);
+export function isInvoiced(contractID, billingCodeID, contractType, billedMap) {
+  const codes = billedMap?.get(contractID);
+  if (codes) return codes.has(billingCodeID);
+  return INVOICED_CONTRACT_TYPES.has(contractType);
+}
+
+export function buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg, billedMap = new Map(), contractInfo = new Map()) {
   const byTicket = new Map(); // ticketID -> { timeEntries: [], charges: [] }
   const ensure = (ticketID) => {
     if (!byTicket.has(ticketID)) byTicket.set(ticketID, { timeEntries: [], charges: [] });
     return byTicket.get(ticketID);
   };
 
-  let billableHours = 0;
+  let billableHours = 0, invoicedHours = 0, coveredHours = 0;
   for (const t of timeEntries) {
     const checked = checkLabour(t, cfg);
     billableHours += checked.hours;
     const workTypeName = t.billingCodeID != null ? mapGet(workTypeNames, t.billingCodeID) ?? null : null;
-    const item = { id: t.id, hours: checked.hours, workType: workTypeName, summary: t.summaryNotes ?? null, problems: checked.problems };
+    const info = mapGet(contractInfo, t.contractID);
+    const contractType = info?.type ?? null;
+    const invoiced = isInvoiced(t.contractID, t.billingCodeID, contractType, billedMap);
+    if (invoiced) invoicedHours += checked.hours; else coveredHours += checked.hours;
+    const item = { id: t.id, hours: checked.hours, workType: workTypeName, summary: t.summaryNotes ?? null, problems: checked.problems, contractId: t.contractID ?? null, contractName: info?.name ?? null, contractType, invoiced };
     if (t.ticketID != null) ensure(t.ticketID).timeEntries.push(item);
   }
 
@@ -156,6 +188,8 @@ export function buildReview(company, tickets, timeEntries, charges, notesByTicke
     period: { start: cfg.periodStart, end: cfg.periodEnd },
     totals: {
       billableHours,
+      invoicedHours,
+      coveredHours,
       chargeAmountEUR,
       ticketCount: reviewTickets.length,
       timeEntryCount: timeEntries.length,
@@ -279,6 +313,7 @@ export async function fetchReview(companyInput, cfg) {
 
   const contracts = await atFetchAll("Contracts", [{ field: "companyID", op: "eq", value: company.id }]);
   const contractIds = contracts.map((c) => c.id);
+  const contractInfo = new Map(contracts.map((c) => [c.id, { name: c.contractName ?? null, type: c.contractType ?? null }]));
 
   const ticketsRaw = await atFetchAll("Tickets", [{ field: "companyID", op: "eq", value: company.id }]);
   const tickets = ticketsRaw.map((t) => ({ id: t.id, ticketNumber: t.ticketNumber ?? null, title: t.title ?? null, description: t.description ?? null }));
@@ -292,7 +327,13 @@ export async function fetchReview(companyInput, cfg) {
   const contractChargesRaw = contractIds.length ? await atFetchAll("ContractCharges", [{ field: "contractID", op: "in", value: contractIds }, { field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]) : [];
   const projectChargesRaw = projectIds.length ? await atFetchAll("ProjectCharges", [{ field: "projectID", op: "in", value: projectIds }, { field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]) : [];
 
-  const postedTimeEntryIds = await postedIds("timeEntryID", labourRaw.map((t) => t.id));
+  // Eén BillingItems-fetch op contractID dekt zowel de posted-check op labour (was een
+  // aparte postedIds-call op timeEntryID: elke BillingItem met een timeEntryID hier is
+  // sowieso al gepost) als de historie voor de gedekt-vs-gefactureerd classificatie
+  // (buildBilledMap), dus geen dubbele round-trip naar BillingItems voor labour.
+  const billingItemsRaw = contractIds.length ? await atFetchAll("BillingItems", [{ field: "contractID", op: "in", value: contractIds }]) : [];
+  const postedTimeEntryIds = new Set(billingItemsRaw.filter((b) => b.timeEntryID != null).map((b) => b.timeEntryID));
+  const billedMap = buildBilledMap(billingItemsRaw);
   const postedTicketChargeIds = await postedIds("ticketChargeID", ticketChargesRaw.map((c) => c.id));
   const postedContractChargeIds = await postedIds("contractChargeID", contractChargesRaw.map((c) => c.id));
   const postedProjectChargeIds = await postedIds("projectChargeID", projectChargesRaw.map((c) => c.id));
@@ -317,7 +358,7 @@ export async function fetchReview(companyInput, cfg) {
   // review toont ALLE nog-niet-geposte items ongeacht datum, dus labour.outsidePeriod
   // zou hier valse "problemen" opleveren op legitiem oude, nog niet geposte entries.
   const reviewCfg = { ...cfg, enabledRules: cfg.enabledRules.filter((r) => r !== "labour.outsidePeriod") };
-  const reviewOutput = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, reviewCfg);
+  const reviewOutput = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, reviewCfg, billedMap, contractInfo);
 
   console.log(JSON.stringify(reviewOutput, null, 2));
   console.error(`Klant ${company.name} (${company.id}): ${reviewOutput.totals.ticketCount} tickets, ${reviewOutput.totals.timeEntryCount} time entries (${reviewOutput.totals.billableHours}u), ${reviewOutput.totals.chargeCount} charges (€${reviewOutput.totals.chargeAmountEUR.toFixed(2)}), ${reviewOutput.looseCharges.length} losse charges.`);
