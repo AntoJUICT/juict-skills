@@ -1,14 +1,27 @@
 ---
 name: autotask-approve-post
-description: Read-only pre-flight review vóór de maandelijkse Autotask Approve & Post, vindt nog-niet-geposte ContractCharges/TicketCharges/ProjectCharges en niet-approved TimeEntries, markeert problemen per item en groepeert per klant/contract/ticket. Gebruik wanneer Anto /autotask-approve-post typt of vraagt om de maandelijkse approve & post-review te doen.
+description: Bereidt de maandelijkse Autotask Approve & Post per klant voor. Haalt per klant alle nog niet geposte tickets, time entries en charges op, toont een totaaloverzicht en loopt data-issues en conservatieve AI-checks (ontbrekende charge, work-type-mismatch) langs. Kan op verzoek time entries non-billable zetten, verder blijft alles read-only. Gebruik wanneer Anto /autotask-approve-post typt of vraagt om de maandelijkse billing-review / approve & post-voorbereiding per klant.
 ---
 
-# Autotask Approve & Post pre-flight (JUICT)
+# Autotask Approve & Post voorbereiding (JUICT)
 
-**Approve & Post zelf kan niet via de API.** `BillingItem` heeft `canCreate: false`
-en er bestaat geen approve- of post-endpoint. Deze skill vervangt die stap dus niet:
-hij doet uitsluitend de read-only controle vooraf. Anto approvet en post daarna zelf
-in de Autotask UI, per klant/contract, op basis van het rapport dat deze skill maakt.
+## Kernbeperking
+
+**Approve & Post zelf kan niet via de API.** Er bestaat geen approve- of
+post-endpoint in Autotask. Deze skill vervangt die stap dus niet: ze bereidt
+per klant het overzicht voor waarop Anto daarna zelf approvet en post, in de
+Autotask UI. De skill mag daarnaast één ding muteren: time entries op
+non-billable zetten, en alleen na expliciet akkoord.
+
+## Read-only met een uitzondering
+
+Alle calls zijn `*/query` (dus alleen opvragen), op een uitzondering na:
+`PATCH /TimeEntries` met uitsluitend het veld `isNonBillable`, en die PATCH
+loopt alleen via `set-nonbillable ... --confirm`. Er wordt geen notitie
+gezet, geen impersonatie gebruikt en verder niets in Autotask aangepast. De
+actie is omkeerbaar (non-billable kan weer terug). Geposte entries worden
+door de Autotask API zelf geweigerd, dus een verkeerde zet op een geposte
+entry heeft sowieso geen effect.
 
 ## Vereisten
 
@@ -17,92 +30,64 @@ in de Autotask UI, per klant/contract, op basis van het rapport dat deze skill m
 
 ## Flow
 
-1. **Optioneel `config.json`** in de werkmap voor periode/regels/never-bill codes
-   (zie hieronder). Zonder config: vorige kalendermaand, alle regels aan.
-2. **Sanity-check tegen het scherm** voor één contract:
-   `node scripts/preflight.mjs verify <contractID>`
-   Print het aantal pending ContractCharges en nog-te-approven time entries voor dat
-   contract. Vergelijk dit met wat het Approve & Post-scherm in Autotask toont voordat
-   je het volledige rapport vertrouwt.
-3. **Draai de volledige periode:**
-   `node scripts/preflight.mjs`
-   Schrijft `report-<periodStart>_<periodEnd>.md` in de werkmap met alle pending
-   labour en charges, gegroepeerd en met problemen gemarkeerd.
-4. **Claude leest het rapport en loopt het door**, per Klant → Contract → Ticket:
-   - Noem eerst de **⚠️ EERST FIXEN**-items per groep, met de concrete fix
-     (bijv. "TimeEntry 12345, 0u te factureren: hoursToBill zetten of op
-     non-billable markeren").
-   - Noem daarna de **✅ SCHOON**-totalen per groep, zodat Anto weet welke
-     klant/contract/ticket hij direct kan posten in de UI.
-   - Werk het rapport groep voor groep af, niet als platte lijst: Anto post per
-     contract/ticket, niet in één keer voor de hele maand.
+1. **Draai de review voor één klant:**
+   `node scripts/preflight.mjs review "<klant>"`
+   (of een companyID). Dit is read-only en print een JSON-`ReviewOutput` naar
+   stdout plus een eenregelige samenvatting naar stderr. Eén klant per run.
+   Levert de klantnaam geen eenduidige match op, dan meldt het script de
+   kandidaten op stderr: geef dan het companyID mee in plaats van de naam.
 
-## config.json (optioneel)
+2. **Ik lees de JSON en toon het overzicht per Klant → Ticket.** Bovenaan
+   altijd eerst het totaaloverzicht uit `totals`: totale billable uren en
+   totaal charge-bedrag, zodat Anto in één oogopslag ziet of de maand hoog
+   uitvalt. Daaronder per ticket de time entries en charges.
+   - **Labour tonen we in uren**, niet in euro's: het uurtarief zit in het
+     contract, niet in de time entry, dus een euro-bedrag op labour zou
+     verzonnen zijn.
+   - **Euro's tonen we alleen bij charges** (`amountEUR` per charge, en het
+     totaal in `totals.chargeAmountEUR`).
 
-```json
-{
-  "periodStart": "2026-06-01",
-  "periodEnd": "2026-06-30",
-  "enabledRules": ["labour.missingWorkType", "labour.zeroHours"],
-  "minChargeAmount": 0,
-  "neverBillBillingCodeIDs": [12345]
-}
-```
+3. **Ik draai de checks** op wat de review teruggeeft:
+   - **Data-issues** uit `issues`/`problems` per item: 0 uur, ontbrekende
+     work type of rol, lege summary.
+   - **AI-checks** (zie hieronder), conservatief en op basis van
+     titel/omschrijving/notities/summary die de review meelevert.
 
-- `periodStart` / `periodEnd`: default = vorige kalendermaand.
-- `enabledRules`: default = alle regels (zie hieronder). Beperk als je een deel van
-  de controle tijdelijk wilt uitzetten. Let op: dit stuurt alleen de gewone
-  regels, niet `neverBillCode` (zie hieronder).
-- `neverBillBillingCodeIDs`: work types die altijd als "nooit factureren" gelden,
-  ongeacht de billable-vlag. Deze check wordt uitsluitend door
-  `neverBillBillingCodeIDs` gestuurd, niet door `enabledRules`: staat een
-  billingCodeID in deze lijst, dan vuurt de melding altijd, ook als je alle
-  regels in `enabledRules` hebt uitgezet.
-- `minChargeAmount`: wordt geaccepteerd in de config maar is nog niet aangesloten
-  op een check in het script (dead config voor nu, geen effect op het rapport).
+4. **Anto beslist** welke time entries non-billable moeten worden op basis
+   van dat overzicht.
 
-## Checkregels
+5. **Ik voer dat uit in twee stappen:**
+   `node scripts/preflight.mjs set-nonbillable <id...> --dry-run`
+   Toont de PATCH-payloads zonder iets te wijzigen (dit is ook het gedrag
+   zonder vlag). Na akkoord van Anto pas:
+   `node scripts/preflight.mjs set-nonbillable <id...> --confirm`
+   Dit voert de PATCH's echt uit, één per id.
 
-**Labour (TimeEntries, nog niet approved):**
-- `missingWorkType`: geen `billingCodeID`
-- `zeroHours`: 0 uur te factureren
-- `missingRole`: geen `roleID`
-- `emptySummary`: lege `summaryNotes` (wordt de factuurregel)
-- `outsidePeriod`: `dateWorked` valt buiten de gekozen periode
+## AI-check-instructies (conservatief)
 
-**Charges (Ticket-, Contract- en ProjectCharges, billable + nog niet gefactureerd):**
-- `missingWorkType`: geen `billingCodeID` én geen `productID`
-- `zeroAmount`: bedrag is €0
-- `negativeAmount`: negatief bedrag
-- `notBillableFlag`: `isBillableToCompany` staat uit terwijl het item toch meekomt
-- `neverBillCode`: work type staat in `neverBillBillingCodeIDs` (altijd actief,
-  onafhankelijk van `enabledRules`)
+Deze checks zijn een suggestie aan Anto, nooit een automatische wijziging.
+Bij twijfel niet flaggen: liever een gemiste suggestie dan een vals alarm.
 
-## Niet-toegewezen klant
+- **Ontbrekende charge:** alleen flaggen bij sterke signalen in de
+  omschrijving, titel of notities van het ticket, zoals expliciet genoemde
+  aangeschafte of vervangen hardware, een licentie, of een onderdeel/product
+  waar in de review geen bijbehorende charge tegenover staat. Een vage
+  vermelding ("misschien later een onderdeel nodig") is geen sterk signaal.
+- **Work-type-mismatch:** alleen bij een duidelijke discrepantie tussen het
+  geboekte work type en wat het ticket of de summary/notitie beschrijft,
+  bijvoorbeeld installatie- of projectwerk dat als remote support is
+  geboekt. Meld dit altijd als suggestie ("dit lijkt eerder X dan Y, wil je
+  dit checken?"), wijzig nooit zelf iets.
 
-In het rapport kan een groep "⚠️ Niet toegewezen (controleer handmatig)" verschijnen.
-Daar vallen items in waarvan de klant niet te bepalen was: labour op een
-projecttaak (alleen een `taskID`, geen ticket of contract) en items waarvan de
-ticket-, contract- of project-lookup niets opleverde. Loop deze groep altijd
-handmatig na voor je iets post, want de gewone klant/contract/ticket-indeling
-zegt hier niets over de juiste factuurbestemming.
+## Overige commando's (secundair)
 
-## Vangnet-checks (sluimerend op live data)
-
-Twee checks zijn in de praktijk sluimerend omdat de fetch al server-side filtert:
-
-- `labour.outsidePeriod`: de fetch selecteert al time entries met `dateWorked`
-  binnen de gekozen periode.
-- `charge.notBillableFlag`: de fetch selecteert al charges met
-  `isBillableToCompany == true`.
-
-Ze blijven als vangnet in de checks staan (bijvoorbeeld voor handmatig
-samengestelde input of toekomstig hergebruik), maar vuren op live data zelden
-tot nooit.
-
-## Read-only garantie
-
-Het script doet uitsluitend `*/query`-calls (GET/POST-query, nooit een echte create,
-update of delete). Er wordt niets geapproved, gepost of anderszins gewijzigd in
-Autotask. De skill is puur een controle vooraf, het posten blijft altijd een
-handmatige stap van Anto in de UI.
+- `node scripts/preflight.mjs verify <contractID>` : sanity-check tegen het
+  scherm, print het aantal pending ContractCharges en nog-te-approven time
+  entries voor één contract. Read-only, handig als losse controle naast de
+  klant-review.
+- `node scripts/preflight.mjs` (zonder subcommando) : draait de oude
+  periode-brede rapportage over alle klanten en schrijft
+  `report-<periodStart>_<periodEnd>.md`. Dit is de bulk-variant van vóór de
+  per-klant flow en blijft beschikbaar, maar de klant-voor-klant `review` +
+  `set-nonbillable`-flow hierboven is de manier waarop we deze skill nu
+  gebruiken.
