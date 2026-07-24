@@ -96,14 +96,14 @@ export function renderReport(groups, periodLabel) {
 // TASK 3: I/O-laag + verify-subcommand (read-only)
 // ─────────────────────────────────────────────────────────────────────
 
-import { execFileSync } from "node:child_process";
+import { execSync } from "node:child_process";
 
 const VAULT = "juict-kv-g4fhuo35";
 const BASE = "https://webservices19.autotask.net/ATServicesRest/V1.0";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function getSecret(name) {
-  return execFileSync("az", ["keyvault", "secret", "show", "--vault-name", VAULT, "--name", name, "--query", "value", "-o", "tsv"], { encoding: "utf8" }).trim();
+  return execSync(`az keyvault secret show --vault-name ${VAULT} --name ${name} --query value -o tsv`, { encoding: "utf8" }).trim();
 }
 let _headers = null;
 function authHeaders() {
