@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, keepIfTicketComplete, COMPLETE_TICKET_STATUSES } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, keepIfTicketComplete, COMPLETE_TICKET_STATUSES } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -51,15 +51,6 @@ test("groupItems: companyID 0 krijgt de niet-toegewezen bucket-naam, andere ID's
   const resolved = groupItems([checkLabour(te({ companyID: 1 }), cfg)], new Map());
   assert.equal(resolved[0].companyName, "Company 1");
 });
-test("renderReport toont klant/ticket/schoon/te-fixen + samenvatting", () => {
-  const groups = groupItems([checkCharge(ch({ billingCodeID: null, productID: null }), "ticketCharge", cfg)], new Map([[999, "Acme BV"]]));
-  const md = renderReport(groups, "juni 2026");
-  assert.ok(md.includes("## Klant: Acme BV"));
-  assert.ok(md.includes("Ticket 100"));
-  assert.ok(md.includes("⚠️"));
-  assert.match(md, /1 klant/);
-});
-
 // ─── buildReview (review-subcommand, pure kern) ─────────────────────────
 
 const company = { id: 999, name: "Acme BV" };
@@ -171,10 +162,15 @@ test("buildBilledMap: valt terug op extendedPrice als totalAmount ontbreekt", ()
   assert.ok(map.get(5).has(20));
 });
 
-test("isInvoiced: billedMap-hit geeft true, andere workType op zelfde contract geeft false", () => {
+test("isInvoiced: billedMap-hit (contract+code historisch >0 gefactureerd) geeft true", () => {
   const billedMap = new Map([[5, new Set([20])]]);
   assert.equal(isInvoiced(5, 20, 7, billedMap), true);
-  assert.equal(isInvoiced(5, 21, 7, billedMap), false);
+});
+
+test("isInvoiced: contract bekend maar code niet in billedMap valt terug op contractType (T&M true, recurring false)", () => {
+  const billedMap = new Map([[5, new Set([20])]]);
+  assert.equal(isInvoiced(5, 21, 1, billedMap), true); // T&M: eerste-keer work type toch gefactureerd, niet gedekt
+  assert.equal(isInvoiced(5, 21, 7, billedMap), false); // Recurring: geen historie -> gedekt
 });
 
 test("isInvoiced: geen historie voor contract valt terug op contractType (1/4/8 gefactureerd, 3/6/7/9 gedekt)", () => {

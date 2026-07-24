@@ -136,15 +136,14 @@ en ik beoordeel.
   automatisch iets: het work type aanpassen is (net als approve & post) iets
   wat Anto zelf in de Autotask UI doet.
 
-## Overige commando's (secundair)
+## Beschikbare commando's
 
-- `node scripts/preflight.mjs verify <contractID>` : sanity-check tegen het
-  scherm, print het aantal pending ContractCharges en nog-te-approven time
-  entries voor één contract. Read-only, handig als losse controle naast de
-  klant-review.
-- `node scripts/preflight.mjs` (zonder subcommando) : draait de oude
-  periode-brede rapportage over alle klanten en schrijft
-  `report-<periodStart>_<periodEnd>.md`. Dit is de bulk-variant van vóór de
-  per-klant flow en blijft beschikbaar, maar de klant-voor-klant `review` +
-  `set-nonbillable`-flow hierboven is de manier waarop we deze skill nu
-  gebruiken.
+Er zijn drie commando's: `summary` (org-brede triage), `review <klant>`
+(per-klant diepe AI-review) en `set-nonbillable <id...> [--dry-run|--confirm]`
+(de enige mutatie). Zonder subcommando (of bij een onbekend commando) print
+het script alleen een gebruiksregel en doet verder niets; er is geen losse
+`verify` of org-brede bulkrapportage meer. Die gebruikten de
+approval-timestamp op de bron-entiteit als pending-indicator zonder de
+BillingItem-kruisverwijzing en konden daardoor al-gepost werk verkeerd
+classificeren, dus zijn ze vervangen door `summary` en `review`, die wel de
+betrouwbare BillingItem-check gebruiken.

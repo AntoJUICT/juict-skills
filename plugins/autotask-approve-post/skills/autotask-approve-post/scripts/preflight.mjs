@@ -76,36 +76,6 @@ export function groupItems(items, names) {
   return result.sort((a, b) => a.companyName.localeCompare(b.companyName));
 }
 
-const money = (n) => n === null ? "" : `€${n.toFixed(2)}`;
-function itemLine(i) {
-  if (i.problems.length === 0) return `  - ${i.label} ${money(i.amountEUR)}`.trimEnd();
-  return `  - ⚠️ ${i.label} - ${i.problems.map((p) => p.message).join("; ")}`;
-}
-export function renderReport(groups, periodLabel) {
-  const all = [];
-  for (const g of groups) for (const c of g.contracts) { for (const t of c.tickets) all.push(...t.items); all.push(...c.looseItems); }
-  const withProblems = all.filter((i) => i.problems.length > 0);
-  const totalEUR = all.reduce((s, i) => s + (i.amountEUR ?? 0), 0);
-  const lines = [`# Approve & Post pre-flight - ${periodLabel}`, ""];
-  lines.push(`**${groups.length} klant${groups.length === 1 ? "" : "en"}**, ${all.length} pending items, ${withProblems.length} item${withProblems.length === 1 ? "" : "s"} met problemen, totaal ${money(totalEUR)}.`, "");
-  const renderItems = (items) => {
-    const clean = items.filter((i) => i.problems.length === 0), bad = items.filter((i) => i.problems.length > 0);
-    const cleanEUR = clean.reduce((s, i) => s + (i.amountEUR ?? 0), 0);
-    if (clean.length) { lines.push(`✅ SCHOON (${clean.length} items${cleanEUR ? `, ${money(cleanEUR)}` : ""})`); for (const i of clean) lines.push(itemLine(i)); }
-    if (bad.length) { lines.push(`⚠️ EERST FIXEN (${bad.length})`); for (const i of bad) lines.push(itemLine(i)); }
-  };
-  for (const g of groups) {
-    lines.push(`## Klant: ${g.companyName}`, "");
-    for (const c of g.contracts) {
-      lines.push(`### Contract ${c.contractID ?? "(geen contract)"}`);
-      for (const t of c.tickets) { lines.push(`#### Ticket ${t.ticketID}`); renderItems(t.items); }
-      if (c.looseItems.length) { lines.push(`#### Losse charges (geen ticket)`); renderItems(c.looseItems); }
-      lines.push("");
-    }
-  }
-  return lines.join("\n");
-}
-
 // ─────────────────────────────────────────────────────────────────────
 // review-subcommand: pure kern (buildReview), groepeert per ticket,
 // past checkLabour/checkCharge toe, berekent totalen.
@@ -141,8 +111,8 @@ export function buildBilledMap(billingItems) {
 const INVOICED_CONTRACT_TYPES = new Set([1, 4, 8]);
 export function isInvoiced(contractID, billingCodeID, contractType, billedMap) {
   const codes = billedMap?.get(contractID);
-  if (codes) return codes.has(billingCodeID);
-  return INVOICED_CONTRACT_TYPES.has(contractType);
+  if (codes && codes.has(billingCodeID)) return true; // historisch >0 gefactureerd
+  return INVOICED_CONTRACT_TYPES.has(contractType); // fallback: geen historie voor dit work type -> contracttype beslist
 }
 
 export function buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg, billedMap = new Map(), contractInfo = new Map(), availableContracts = []) {
@@ -274,7 +244,7 @@ export function buildRemoteSupportReview(items) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// TASK 3: I/O-laag + verify-subcommand (read-only)
+// TASK 3: I/O-laag (read-only)
 // ─────────────────────────────────────────────────────────────────────
 
 import { execSync } from "node:child_process";
@@ -315,25 +285,6 @@ async function atFetchAll(entity, filterItems) {
 function mapCharge(c) {
   return { id: c.id, billingCodeID: c.billingCodeID ?? null, status: c.status ?? null, isBillableToCompany: !!c.isBillableToCompany, isBilled: !!c.isBilled, name: c.name ?? null, description: c.description ?? null, productID: c.productID ?? null, unitPrice: c.unitPrice ?? null, unitQuantity: c.unitQuantity ?? null, billableAmount: c.billableAmount ?? null, datePurchased: c.datePurchased ?? null, createDate: c.createDate ?? null, companyID: 0, contractID: c.contractID ?? null, ticketID: c.ticketID ?? null, projectID: c.projectID ?? null };
 }
-async function fetchChargeEntity(entity, cfg) {
-  const rows = await atFetchAll(entity, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
-  return rows.map(mapCharge).filter((c) => { const d = (c.datePurchased ?? c.createDate ?? "").slice(0, 10); return d === "" || (d >= cfg.periodStart && d <= cfg.periodEnd); });
-}
-export async function fetchPendingCharges(cfg) {
-  return { ticket: await fetchChargeEntity("TicketCharges", cfg), contract: await fetchChargeEntity("ContractCharges", cfg), project: await fetchChargeEntity("ProjectCharges", cfg) };
-}
-export async function fetchPendingLabour(cfg) {
-  const rows = await atFetchAll("TimeEntries", [{ field: "isNonBillable", op: "eq", value: false }, { field: "dateWorked", op: "gte", value: `${cfg.periodStart}T00:00:00` }, { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` }]);
-  return rows.filter((t) => t.billingApprovalDateTime == null).map((t) => ({ id: t.id, ticketID: t.ticketID ?? null, taskID: t.taskID ?? null, contractID: t.contractID ?? null, resourceID: t.resourceID ?? null, roleID: t.roleID ?? null, billingCodeID: t.billingCodeID ?? null, hoursWorked: t.hoursWorked ?? null, hoursToBill: t.hoursToBill ?? null, isNonBillable: !!t.isNonBillable, billingApprovalDateTime: t.billingApprovalDateTime ?? null, dateWorked: t.dateWorked ?? null, summaryNotes: t.summaryNotes ?? null, companyID: 0 }));
-}
-
-async function verify(contractID) {
-  const cfg = loadConfig({}, new Date());
-  const charges = await atFetchAll("ContractCharges", [{ field: "contractID", op: "eq", value: Number(contractID) }, { field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
-  const labour = (await atFetchAll("TimeEntries", [{ field: "contractID", op: "eq", value: Number(contractID) }, { field: "isNonBillable", op: "eq", value: false }])).filter((t) => t.billingApprovalDateTime == null);
-  console.log(`Contract ${contractID}: ${charges.length} pending ContractCharges, ${labour.length} nog-te-approven time entries. Vergelijk met het Approve & Post-scherm.`);
-}
-
 // ─────────────────────────────────────────────────────────────────────
 // review-subcommand: I/O-laag (resolveCompany, fetchReview)
 // ─────────────────────────────────────────────────────────────────────
@@ -358,18 +309,6 @@ export async function resolveCompany(input) {
 // de kandidaat-ids te houden en niet afhankelijk te maken van bredere/afwijkende data.
 export function postedIdsFromRows(rows, billingItemField) {
   return new Set(rows.map((r) => r[billingItemField]).filter((x) => x != null));
-}
-
-// Levert de set opgehaalde-id's die al een BillingItem hebben (dus al gepost zijn).
-// billingApprovalDateTime is NIET betrouwbaar als pending-indicator (24/31 bleek al
-// gepost bij testklant 251), de BillingItem-kruisverwijzing is de autoritatieve check.
-// Precieze id-query (timeEntryID/ticketChargeID/... op:in de kandidaat-ids), niet via
-// een bredere contract-brede fetch, om dubbel factureren door mismatchende contractID's
-// op legacy/afwijkende BillingItem-rijen te voorkomen.
-async function postedIds(billingItemField, ids) {
-  if (ids.length === 0) return new Set();
-  const rows = await atFetchAll("BillingItems", [{ field: billingItemField, op: "in", value: ids }]);
-  return postedIdsFromRows(rows, billingItemField);
 }
 
 async function fetchWorkTypeNames() {
@@ -416,23 +355,24 @@ export async function fetchReview(companyInput, cfg) {
   const projects = await atFetchAll("Projects", [{ field: "companyID", op: "eq", value: company.id }]);
   const projectIds = projects.map((p) => p.id);
 
-  const labourRaw = contractIds.length ? await atFetchAll("TimeEntries", [{ field: "contractID", op: "in", value: contractIds }, { field: "isNonBillable", op: "eq", value: false }]) : [];
-  const ticketChargesRaw = ticketIds.length ? await atFetchAll("TicketCharges", [{ field: "ticketID", op: "in", value: ticketIds }, { field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]) : [];
-  const contractChargesRaw = contractIds.length ? await atFetchAll("ContractCharges", [{ field: "contractID", op: "in", value: contractIds }, { field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]) : [];
-  const projectChargesRaw = projectIds.length ? await atFetchAll("ProjectCharges", [{ field: "projectID", op: "in", value: projectIds }, { field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]) : [];
+  const labourRaw = await fetchBatchedIn("TimeEntries", "contractID", contractIds, [{ field: "isNonBillable", op: "eq", value: false }]);
+  const ticketChargesRaw = await fetchBatchedIn("TicketCharges", "ticketID", ticketIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
+  const contractChargesRaw = await fetchBatchedIn("ContractCharges", "contractID", contractIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
+  const projectChargesRaw = await fetchBatchedIn("ProjectCharges", "projectID", projectIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
 
   // Precieze posted-detectie op labour: BillingItems met timeEntryID in de kandidaat-ids
   // zelf, niet via de bredere contract-fetch. Als BillingItem.contractID bij afwijkende/
   // legacy data niet exact matcht met de bron-time-entry, zou een al-geposte entry anders
-  // ten onrechte als "pending" kunnen terugkomen -> risico op dubbel factureren.
-  const postedTimeEntryIds = await postedIds("timeEntryID", labourRaw.map((t) => t.id));
+  // ten onrechte als "pending" kunnen terugkomen -> risico op dubbel factureren. Gebatcht
+  // (net als summary) om 500's bij klanten met veel tickets/time entries te voorkomen.
+  const postedTimeEntryIds = await postedIdsBatched("timeEntryID", labourRaw.map((t) => t.id));
   // Aparte, bredere BillingItems-fetch op contractID: uitsluitend input voor buildBilledMap
   // (historische gefactureerd/gedekt-classificatie), niet voor de posted-exclusie hierboven.
-  const billingItemsRaw = contractIds.length ? await atFetchAll("BillingItems", [{ field: "contractID", op: "in", value: contractIds }]) : [];
+  const billingItemsRaw = await fetchBatchedIn("BillingItems", "contractID", contractIds, []);
   const billedMap = buildBilledMap(billingItemsRaw);
-  const postedTicketChargeIds = await postedIds("ticketChargeID", ticketChargesRaw.map((c) => c.id));
-  const postedContractChargeIds = await postedIds("contractChargeID", contractChargesRaw.map((c) => c.id));
-  const postedProjectChargeIds = await postedIds("projectChargeID", projectChargesRaw.map((c) => c.id));
+  const postedTicketChargeIds = await postedIdsBatched("ticketChargeID", ticketChargesRaw.map((c) => c.id));
+  const postedContractChargeIds = await postedIdsBatched("contractChargeID", contractChargesRaw.map((c) => c.id));
+  const postedProjectChargeIds = await postedIdsBatched("projectChargeID", projectChargesRaw.map((c) => c.id));
 
   const timeEntriesAll = labourRaw
     .filter((t) => !postedTimeEntryIds.has(t.id))
@@ -523,6 +463,14 @@ async function fetchBatchedIn(entity, field, ids, extraFilters = [], batchSize =
   return out;
 }
 
+// Levert de set opgehaalde-id's die al een BillingItem hebben (dus al gepost zijn).
+// De approval-timestamp op de bron-entiteit is NIET betrouwbaar als pending-indicator
+// (24/31 bleek al gepost bij testklant 251), de BillingItem-kruisverwijzing is de
+// autoritatieve check.
+// Precieze id-query (timeEntryID/ticketChargeID/... op:in de kandidaat-ids), niet via
+// een bredere contract-brede fetch, om dubbel factureren door mismatchende contractID's
+// op legacy/afwijkende BillingItem-rijen te voorkomen. Gebatcht (~300/call) zodat dit
+// ook bij klanten met veel tickets/time entries niet op een 500 loopt.
 async function postedIdsBatched(field, ids, batchSize = 300) {
   const rows = await fetchBatchedIn("BillingItems", field, ids, [], batchSize);
   return postedIdsFromRows(rows, field);
@@ -698,55 +646,17 @@ export async function fetchSummary(cfg) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// TASK 4: run-orchestratie + company-verrijking + main()/CLI-dispatch
+// main()/CLI-dispatch
 // ─────────────────────────────────────────────────────────────────────
 
-async function idToCompany(entity, ids) {
-  const map = new Map();
-  for (const id of [...new Set(ids)].filter((x) => x > 0)) {
-    const rows = await atFetchAll(entity, [{ field: "id", op: "eq", value: id }]);
-    if (rows[0]) map.set(id, rows[0].companyID);
-  }
-  return map;
-}
-async function enrichCompanyIDs(labour, charges) {
-  const ticketIDs = [...labour, ...charges.ticket].map((x) => x.ticketID).filter(Boolean);
-  const contractIDs = charges.contract.map((c) => c.contractID).filter(Boolean).concat(labour.map((t) => t.contractID).filter(Boolean));
-  const projectIDs = charges.project.map((c) => c.projectID).filter(Boolean);
-  const tC = await idToCompany("Tickets", ticketIDs), cC = await idToCompany("Contracts", contractIDs), pC = await idToCompany("Projects", projectIDs);
-  for (const t of labour) t.companyID = (t.ticketID && tC.get(t.ticketID)) || (t.contractID && cC.get(t.contractID)) || 0;
-  for (const c of charges.ticket) c.companyID = (c.ticketID && tC.get(c.ticketID)) || 0;
-  for (const c of charges.contract) c.companyID = (c.contractID && cC.get(c.contractID)) || 0;
-  for (const c of charges.project) c.companyID = (c.projectID && pC.get(c.projectID)) || 0;
-}
-async function companyNames(ids) {
-  const map = new Map();
-  for (const id of [...new Set(ids)].filter((x) => x > 0)) {
-    const rows = await atFetchAll("Companies", [{ field: "id", op: "eq", value: id }]);
-    if (rows[0]) map.set(id, rows[0].companyName);
-  }
-  return map;
-}
 async function readCfg() {
   const raw = fs.existsSync("config.json") ? JSON.parse(fs.readFileSync("config.json", "utf8")) : {};
   return loadConfig(raw, new Date());
 }
-async function run() {
-  const cfg = await readCfg();
-  const labour = await fetchPendingLabour(cfg);
-  const charges = await fetchPendingCharges(cfg);
-  await enrichCompanyIDs(labour, charges);
-  const checked = [...labour.map((t) => checkLabour(t, cfg)), ...charges.ticket.map((c) => checkCharge(c, "ticketCharge", cfg)), ...charges.contract.map((c) => checkCharge(c, "contractCharge", cfg)), ...charges.project.map((c) => checkCharge(c, "projectCharge", cfg))];
-  const names = await companyNames(checked.map((i) => i.companyID));
-  const md = renderReport(groupItems(checked, names), `${cfg.periodStart} t/m ${cfg.periodEnd}`);
-  const out = `report-${cfg.periodStart}_${cfg.periodEnd}.md`;
-  fs.writeFileSync(out, md, "utf8");
-  console.log(`Rapport: ${out} (${checked.length} items)`);
-}
+const USAGE = "Gebruik: preflight.mjs summary | review <klant> | set-nonbillable <id...> [--dry-run|--confirm]";
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
-  if (cmd === "verify") await verify(rest[0]);
-  else if (cmd === "summary") {
+  if (cmd === "summary") {
     const cfg = await readCfg();
     await fetchSummary(cfg);
   }
@@ -762,7 +672,7 @@ async function main() {
     if (ids.length === 0) { console.error("Gebruik: preflight.mjs set-nonbillable <id...> [--dry-run|--confirm]"); process.exit(1); return; }
     await setNonBillable(ids, { confirm });
   }
-  else await run();
+  else console.log(USAGE);
 }
 // Alleen draaien als direct aangeroepen (niet bij import in de test):
 if (process.argv[1] && process.argv[1].endsWith("preflight.mjs")) main().catch((e) => { console.error(String(e)); process.exit(1); });
