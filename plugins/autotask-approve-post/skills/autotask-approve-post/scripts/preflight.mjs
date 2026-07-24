@@ -93,6 +93,80 @@ export function renderReport(groups, periodLabel) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// review-subcommand: pure kern (buildReview), groepeert per ticket,
+// past checkLabour/checkCharge toe, berekent totalen.
+// ─────────────────────────────────────────────────────────────────────
+
+function mapGet(mapLike, key) {
+  if (mapLike == null) return undefined;
+  if (typeof mapLike.get === "function") return mapLike.get(key);
+  return mapLike[key];
+}
+
+export function buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg) {
+  const byTicket = new Map(); // ticketID -> { timeEntries: [], charges: [] }
+  const ensure = (ticketID) => {
+    if (!byTicket.has(ticketID)) byTicket.set(ticketID, { timeEntries: [], charges: [] });
+    return byTicket.get(ticketID);
+  };
+
+  let billableHours = 0;
+  for (const t of timeEntries) {
+    const checked = checkLabour(t, cfg);
+    billableHours += checked.hours;
+    const workTypeName = t.billingCodeID != null ? mapGet(workTypeNames, t.billingCodeID) ?? null : null;
+    const item = { id: t.id, hours: checked.hours, workType: workTypeName, summary: t.summaryNotes ?? null, problems: checked.problems };
+    if (t.ticketID != null) ensure(t.ticketID).timeEntries.push(item);
+  }
+
+  let chargeAmountEUR = 0;
+  const looseCharges = [];
+  for (const c of charges) {
+    const kind = c.kind ?? "ticketCharge";
+    const checked = checkCharge(c, kind, cfg);
+    const amountEUR = checked.amountEUR ?? 0;
+    chargeAmountEUR += amountEUR;
+    const item = { id: c.id, name: c.name ?? null, amountEUR, kind, problems: checked.problems };
+    if (c.ticketID != null) ensure(c.ticketID).charges.push(item);
+    else looseCharges.push(item);
+  }
+
+  const reviewTickets = [];
+  for (const ticket of tickets) {
+    const grouped = byTicket.get(ticket.id);
+    if (!grouped || (grouped.timeEntries.length === 0 && grouped.charges.length === 0)) continue;
+    const issues = [
+      ...grouped.timeEntries.flatMap((i) => i.problems.map((p) => ({ ...p, source: `timeEntry:${i.id}` }))),
+      ...grouped.charges.flatMap((i) => i.problems.map((p) => ({ ...p, source: `${i.kind}:${i.id}` }))),
+    ];
+    reviewTickets.push({
+      ticketID: ticket.id,
+      title: ticket.title ?? null,
+      description: ticket.description ?? null,
+      notes: mapGet(notesByTicket, ticket.id) ?? [],
+      billableHours: grouped.timeEntries.reduce((s, i) => s + i.hours, 0),
+      timeEntries: grouped.timeEntries,
+      charges: grouped.charges,
+      issues,
+    });
+  }
+
+  return {
+    company,
+    period: { start: cfg.periodStart, end: cfg.periodEnd },
+    totals: {
+      billableHours,
+      chargeAmountEUR,
+      ticketCount: reviewTickets.length,
+      timeEntryCount: timeEntries.length,
+      chargeCount: charges.length,
+    },
+    tickets: reviewTickets,
+    looseCharges,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // TASK 3: I/O-laag + verify-subcommand (read-only)
 // ─────────────────────────────────────────────────────────────────────
 
@@ -153,6 +227,93 @@ async function verify(contractID) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// review-subcommand: I/O-laag (resolveCompany, fetchReview)
+// ─────────────────────────────────────────────────────────────────────
+
+export async function resolveCompany(input) {
+  const trimmed = String(input).trim();
+  if (/^\d+$/.test(trimmed)) {
+    const id = Number(trimmed);
+    const rows = await atFetchAll("Companies", [{ field: "id", op: "eq", value: id }]);
+    if (!rows[0]) throw new Error(`Company ${id} niet gevonden`);
+    return { id: rows[0].id, name: rows[0].companyName };
+  }
+  const rows = await atFetchAll("Companies", [{ field: "companyName", op: "contains", value: trimmed }]);
+  if (rows.length === 0) throw new Error(`Geen company gevonden voor "${trimmed}"`);
+  if (rows.length > 1) return { candidates: rows.map((r) => ({ id: r.id, name: r.companyName })) };
+  return { id: rows[0].id, name: rows[0].companyName };
+}
+
+// Levert de set opgehaalde-id's die al een BillingItem hebben (dus al gepost zijn).
+// billingApprovalDateTime is NIET betrouwbaar als pending-indicator (24/31 bleek al
+// gepost bij testklant 251), de BillingItem-kruisverwijzing is de autoritatieve check.
+async function postedIds(billingItemField, ids) {
+  if (ids.length === 0) return new Set();
+  const rows = await atFetchAll("BillingItems", [{ field: billingItemField, op: "in", value: ids }]);
+  return new Set(rows.map((r) => r[billingItemField]).filter((x) => x != null));
+}
+
+async function fetchWorkTypeNames() {
+  const rows = await atFetchAll("BillingCodes", [{ field: "isActive", op: "eq", value: true }, { field: "billingCodeType", op: "eq", value: 0 }, { field: "useType", op: "eq", value: 1 }]);
+  return new Map(rows.map((r) => [r.id, r.name]));
+}
+
+async function fetchNotesByTicket(ticketIds) {
+  const notesByTicket = new Map();
+  for (const ticketID of ticketIds) {
+    const notes = await atFetchAll("TicketNotes", [{ field: "ticketID", op: "eq", value: ticketID }]);
+    notesByTicket.set(ticketID, notes.map((n) => ({ date: n.lastActivityDate ?? null, text: n.description ?? n.title ?? null, publish: n.publish ?? null })));
+  }
+  return notesByTicket;
+}
+
+export async function fetchReview(companyInput, cfg) {
+  const resolved = await resolveCompany(companyInput);
+  if (resolved.candidates) {
+    console.error(`Meerdere klanten gevonden voor "${companyInput}", geef een companyID mee:`);
+    for (const c of resolved.candidates) console.error(`  ${c.id}: ${c.name}`);
+    return resolved;
+  }
+  const company = { id: resolved.id, name: resolved.name };
+
+  const contracts = await atFetchAll("Contracts", [{ field: "companyID", op: "eq", value: company.id }]);
+  const contractIds = contracts.map((c) => c.id);
+
+  const ticketsRaw = await atFetchAll("Tickets", [{ field: "companyID", op: "eq", value: company.id }]);
+  const tickets = ticketsRaw.map((t) => ({ id: t.id, ticketNumber: t.ticketNumber ?? null, title: t.title ?? null, description: t.description ?? null }));
+  const ticketIds = tickets.map((t) => t.id);
+
+  const labourRaw = contractIds.length ? await atFetchAll("TimeEntries", [{ field: "contractID", op: "in", value: contractIds }, { field: "isNonBillable", op: "eq", value: false }]) : [];
+  const ticketChargesRaw = ticketIds.length ? await atFetchAll("TicketCharges", [{ field: "ticketID", op: "in", value: ticketIds }, { field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]) : [];
+  const contractChargesRaw = contractIds.length ? await atFetchAll("ContractCharges", [{ field: "contractID", op: "in", value: contractIds }, { field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]) : [];
+  // ProjectCharges bewust overgeslagen voor v1 van deze taak (zie brief): company heeft
+  // hier geen makkelijk bereikbare projecten; toe te voegen zodra nodig.
+
+  const postedTimeEntryIds = await postedIds("timeEntryID", labourRaw.map((t) => t.id));
+  const postedTicketChargeIds = await postedIds("ticketChargeID", ticketChargesRaw.map((c) => c.id));
+  const postedContractChargeIds = await postedIds("contractChargeID", contractChargesRaw.map((c) => c.id));
+
+  const timeEntries = labourRaw
+    .filter((t) => !postedTimeEntryIds.has(t.id))
+    .map((t) => ({ id: t.id, ticketID: t.ticketID ?? null, taskID: t.taskID ?? null, contractID: t.contractID ?? null, roleID: t.roleID ?? null, billingCodeID: t.billingCodeID ?? null, hoursWorked: t.hoursWorked ?? null, hoursToBill: t.hoursToBill ?? null, dateWorked: t.dateWorked ?? null, summaryNotes: t.summaryNotes ?? null }));
+
+  const charges = [
+    ...ticketChargesRaw.filter((c) => !postedTicketChargeIds.has(c.id)).map((c) => ({ ...mapCharge(c), kind: "ticketCharge" })),
+    ...contractChargesRaw.filter((c) => !postedContractChargeIds.has(c.id)).map((c) => ({ ...mapCharge(c), kind: "contractCharge" })),
+  ];
+
+  const ticketsWithItems = [...new Set([...timeEntries.map((t) => t.ticketID), ...charges.map((c) => c.ticketID)].filter((x) => x != null))];
+  const notesByTicket = await fetchNotesByTicket(ticketsWithItems);
+  const workTypeNames = await fetchWorkTypeNames();
+
+  const reviewOutput = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg);
+
+  console.log(JSON.stringify(reviewOutput, null, 2));
+  console.error(`Klant ${company.name} (${company.id}): ${reviewOutput.totals.ticketCount} tickets, ${reviewOutput.totals.timeEntryCount} time entries (${reviewOutput.totals.billableHours}u), ${reviewOutput.totals.chargeCount} charges (€${reviewOutput.totals.chargeAmountEUR.toFixed(2)}), ${reviewOutput.looseCharges.length} losse charges.`);
+  return reviewOutput;
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // TASK 4: run-orchestratie + company-verrijking + main()/CLI-dispatch
 // ─────────────────────────────────────────────────────────────────────
 
@@ -182,10 +343,13 @@ async function companyNames(ids) {
   }
   return map;
 }
-async function run() {
+async function readCfg() {
   const fs = await import("node:fs");
   const raw = fs.existsSync("config.json") ? JSON.parse(fs.readFileSync("config.json", "utf8")) : {};
-  const cfg = loadConfig(raw, new Date());
+  return loadConfig(raw, new Date());
+}
+async function run() {
+  const cfg = await readCfg();
   const labour = await fetchPendingLabour(cfg);
   const charges = await fetchPendingCharges(cfg);
   await enrichCompanyIDs(labour, charges);
@@ -199,6 +363,11 @@ async function run() {
 async function main() {
   const [cmd, arg] = process.argv.slice(2);
   if (cmd === "verify") await verify(arg);
+  else if (cmd === "review") {
+    if (!arg) { console.error("Gebruik: preflight.mjs review <companyID of klantnaam>"); process.exit(1); return; }
+    const cfg = await readCfg();
+    await fetchReview(arg, cfg);
+  }
   else await run();
 }
 // Alleen draaien als direct aangeroepen (niet bij import in de test):
