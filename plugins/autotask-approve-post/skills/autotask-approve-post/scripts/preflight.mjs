@@ -1,4 +1,5 @@
 // preflight.mjs: pure logica bovenaan; I/O + main() onderaan (Task 3/4).
+// charge.neverBillCode is intentionally NOT in ALL_RULES: it fires independently whenever billingCodeID is in neverBillBillingCodeIDs, irrespective of enabledRules.
 export const ALL_RULES = ["labour.missingWorkType","labour.zeroHours","labour.missingRole","labour.emptySummary","labour.outsidePeriod","charge.missingWorkType","charge.zeroAmount","charge.negativeAmount","charge.notBillableFlag"];
 
 const iso = (d) => d.toISOString().slice(0, 10);
@@ -245,7 +246,18 @@ export function buildRemoteSupportReview(items) {
     agg.hours += item.hours ?? 0;
     agg.entries.push({ id: item.id, hours: item.hours, dateWorked: item.dateWorked, summary: item.summary });
   }
-  return [...byCompany.values()].sort((a, b) => b.count - a.count);
+  const result = [...byCompany.values()];
+  for (const company of result) {
+    company.entries.sort((a, b) => {
+      const aDate = a.dateWorked?.slice(0, 10) ?? "";
+      const bDate = b.dateWorked?.slice(0, 10) ?? "";
+      if (aDate === "" && bDate === "") return 0;
+      if (aDate === "") return 1;
+      if (bDate === "") return -1;
+      return aDate.localeCompare(bDate);
+    });
+  }
+  return result.sort((a, b) => b.count - a.count);
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -447,8 +459,9 @@ export function buildNonBillablePatches(ids) {
 async function realPatchTimeEntry(patch) {
   const res = await fetch(`${BASE}/TimeEntries`, { method: "PATCH", headers: authHeaders(), body: JSON.stringify(patch) });
   if (res.ok) return { id: patch.id, status: res.status, ok: true };
+  const raw = await res.text().catch(() => "");
   let error;
-  try { const body = await res.json(); error = body?.errors?.[0] ?? JSON.stringify(body); } catch { error = await res.text().catch(() => String(res.status)); }
+  try { error = JSON.parse(raw)?.errors?.[0] ?? raw ?? String(res.status); } catch { error = raw || String(res.status); }
   return { id: patch.id, status: res.status, ok: false, error };
 }
 

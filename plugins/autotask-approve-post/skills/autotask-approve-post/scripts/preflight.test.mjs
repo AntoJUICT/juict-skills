@@ -417,3 +417,15 @@ test("buildRemoteSupportReview: sorteert op count desc", () => {
 test("buildRemoteSupportReview: lege input geeft lege array", () => {
   assert.deepEqual(buildRemoteSupportReview([]), []);
 });
+
+test("buildRemoteSupportReview: sorteert entries per bedrijf op dateWorked ascending (null/empty last)", () => {
+  const items = [
+    rs({ companyId: 1, id: 10, dateWorked: "2026-06-03T09:00:00" }),
+    rs({ companyId: 1, id: 11, dateWorked: "2026-06-01T09:00:00" }),
+    rs({ companyId: 1, id: 12, dateWorked: null }),
+    rs({ companyId: 1, id: 13, dateWorked: "2026-06-02T09:00:00" }),
+  ];
+  const out = buildRemoteSupportReview(items);
+  const acme = out.find((r) => r.companyId === 1);
+  assert.deepEqual(acme.entries.map((e) => e.id), [11, 13, 10, 12]);
+});
