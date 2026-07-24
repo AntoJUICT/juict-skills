@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, renderReport, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -280,4 +280,102 @@ test("shouldConfirm: --confirm wint alleen zonder --dry-run", () => {
   assert.equal(shouldConfirm(["--dry-run"]), false);
   assert.equal(shouldConfirm([]), false);
   assert.equal(shouldConfirm(["--dry-run", "--confirm"]), false);
+});
+
+// ─── buildSummary (org-brede triage, pure aggregatie) ───────────────────
+
+const si = (o = {}) => ({ companyId: 1, companyName: "Acme BV", kind: "labour", amountEUR: 0, hours: 0, problems: [], ...o });
+
+test("buildSummary: sommeert chargeEUR over charge-kinds per klant", () => {
+  const items = [
+    si({ companyId: 1, kind: "ticketCharge", amountEUR: 100 }),
+    si({ companyId: 1, kind: "contractCharge", amountEUR: 50 }),
+    si({ companyId: 1, kind: "projectCharge", amountEUR: 25 }),
+  ];
+  const { rows } = buildSummary(items);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].companyId, 1);
+  assert.equal(rows[0].chargeEUR, 175);
+});
+
+test("buildSummary: sommeert billableHours alleen over labour-items", () => {
+  const items = [
+    si({ companyId: 1, kind: "labour", hours: 2 }),
+    si({ companyId: 1, kind: "labour", hours: 3.5 }),
+    si({ companyId: 1, kind: "ticketCharge", amountEUR: 10, hours: 999 }), // hours op een charge telt niet mee
+  ];
+  const { rows } = buildSummary(items);
+  assert.equal(rows[0].billableHours, 5.5);
+});
+
+test("buildSummary: signalCount is de som van problems.length over alle items van de klant", () => {
+  const items = [
+    si({ companyId: 1, kind: "labour", hours: 1, problems: [{ code: "labour.zeroHours" }] }),
+    si({ companyId: 1, kind: "ticketCharge", amountEUR: 10, problems: [{ code: "charge.zeroAmount" }, { code: "charge.missingWorkType" }] }),
+  ];
+  const { rows } = buildSummary(items);
+  assert.equal(rows[0].signalCount, 3);
+});
+
+test("buildSummary: aggregeert per companyId, niet cross-klant", () => {
+  const items = [
+    si({ companyId: 1, companyName: "Acme BV", kind: "ticketCharge", amountEUR: 100 }),
+    si({ companyId: 2, companyName: "Contoso", kind: "ticketCharge", amountEUR: 50 }),
+  ];
+  const { rows } = buildSummary(items);
+  assert.equal(rows.length, 2);
+  const acme = rows.find((r) => r.companyId === 1), contoso = rows.find((r) => r.companyId === 2);
+  assert.equal(acme.companyName, "Acme BV");
+  assert.equal(acme.chargeEUR, 100);
+  assert.equal(contoso.companyName, "Contoso");
+  assert.equal(contoso.chargeEUR, 50);
+});
+
+test("buildSummary: klant zonder te-factureren en zonder signalen wordt verborgen en meegeteld in hidden", () => {
+  const items = [
+    si({ companyId: 1, kind: "ticketCharge", amountEUR: 0, hours: 0, problems: [] }), // niets actiehoudend
+    si({ companyId: 2, kind: "ticketCharge", amountEUR: 10 }), // wel actiehoudend
+  ];
+  const { rows, hidden } = buildSummary(items);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].companyId, 2);
+  assert.equal(hidden, 1);
+});
+
+test("buildSummary: signalCount>0 alleen is ook actiehoudend (0 charge, 0 uur, wel signalen)", () => {
+  const items = [
+    si({ companyId: 1, kind: "labour", hours: 0, problems: [{ code: "labour.zeroHours" }] }),
+  ];
+  const { rows, hidden } = buildSummary(items);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].signalCount, 1);
+  assert.equal(hidden, 0);
+});
+
+test("buildSummary: sorteert op chargeEUR desc, dan billableHours desc", () => {
+  const items = [
+    si({ companyId: 1, companyName: "Laag bedrag", kind: "ticketCharge", amountEUR: 10 }),
+    si({ companyId: 2, companyName: "Hoog bedrag", kind: "ticketCharge", amountEUR: 500 }),
+    si({ companyId: 3, companyName: "Alleen uren hoog", kind: "labour", hours: 20 }),
+    si({ companyId: 4, companyName: "Alleen uren laag", kind: "labour", hours: 2 }),
+  ];
+  const { rows } = buildSummary(items);
+  assert.deepEqual(rows.map((r) => r.companyId), [2, 1, 3, 4]);
+});
+
+test("buildSummary: bij gelijke chargeEUR wint hogere billableHours", () => {
+  const items = [
+    si({ companyId: 1, kind: "ticketCharge", amountEUR: 100 }),
+    si({ companyId: 1, kind: "labour", hours: 1 }),
+    si({ companyId: 2, kind: "ticketCharge", amountEUR: 100 }),
+    si({ companyId: 2, kind: "labour", hours: 5 }),
+  ];
+  const { rows } = buildSummary(items);
+  assert.deepEqual(rows.map((r) => r.companyId), [2, 1]);
+});
+
+test("buildSummary: lege input geeft lege rows en hidden 0", () => {
+  const { rows, hidden } = buildSummary([]);
+  assert.deepEqual(rows, []);
+  assert.equal(hidden, 0);
 });

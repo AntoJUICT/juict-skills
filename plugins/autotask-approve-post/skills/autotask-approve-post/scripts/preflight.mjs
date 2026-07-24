@@ -202,6 +202,31 @@ export function buildReview(company, tickets, timeEntries, charges, notesByTicke
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// summary-subcommand: pure kern (buildSummary), org-brede triage-ranglijst.
+// Aggregeert pending items per klant zonder AI/per-ticket detail; "review
+// <klant>" blijft de plek voor de diepe, per-ticket AI-inspectie.
+// ─────────────────────────────────────────────────────────────────────
+
+const CHARGE_KINDS = new Set(["ticketCharge", "contractCharge", "projectCharge"]);
+
+export function buildSummary(items) {
+  const byCompany = new Map();
+  for (const item of items) {
+    if (!byCompany.has(item.companyId)) {
+      byCompany.set(item.companyId, { companyId: item.companyId, companyName: item.companyName, chargeEUR: 0, billableHours: 0, signalCount: 0 });
+    }
+    const agg = byCompany.get(item.companyId);
+    if (CHARGE_KINDS.has(item.kind)) agg.chargeEUR += item.amountEUR ?? 0;
+    if (item.kind === "labour") agg.billableHours += item.hours ?? 0;
+    agg.signalCount += item.problems?.length ?? 0;
+  }
+  const all = [...byCompany.values()];
+  const actionable = all.filter((r) => r.chargeEUR > 0 || r.billableHours > 0 || r.signalCount > 0);
+  actionable.sort((a, b) => b.chargeEUR - a.chargeEUR || b.billableHours - a.billableHours);
+  return { rows: actionable, hidden: all.length - actionable.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // TASK 3: I/O-laag + verify-subcommand (read-only)
 // ─────────────────────────────────────────────────────────────────────
 
@@ -421,6 +446,121 @@ export async function setNonBillable(ids, { confirm } = {}, patchFn = realPatchT
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// summary-subcommand: I/O-laag (fetchSummary), org-brede snel-triage.
+// Bulk-fetch Companies/Contracts/BillingCodes elk EEN keer en join in-memory,
+// GEEN per-ticket/contract/project losse query (dat was de 6m47s org-run via
+// run()). Posted-exclusie en company-attributie gebeuren via gebatchte
+// `id op:in`-fetches (BillingItems/Tickets/Projects), nooit per losse id.
+// ─────────────────────────────────────────────────────────────────────
+
+async function fetchBatchedIn(entity, field, ids, extraFilters = [], batchSize = 300) {
+  const unique = [...new Set(ids)].filter((x) => x != null);
+  const out = [];
+  for (let i = 0; i < unique.length; i += batchSize) {
+    const batch = unique.slice(i, i + batchSize);
+    out.push(...(await atFetchAll(entity, [{ field, op: "in", value: batch }, ...extraFilters])));
+  }
+  return out;
+}
+
+async function postedIdsBatched(field, ids, batchSize = 300) {
+  const rows = await fetchBatchedIn("BillingItems", field, ids, [], batchSize);
+  return postedIdsFromRows(rows, field);
+}
+
+const unassignedName = (companyId, names) => companyId === 0 ? "⚠️ Niet toegewezen (controleer handmatig)" : names.get(companyId) ?? `Company ${companyId}`;
+
+export async function fetchSummary(cfg) {
+  // labour.outsidePeriod zou hier valse signalen geven: summary kijkt (net als
+  // review) naar ALLE nog-niet-geposte items, ongeacht datum.
+  const summaryCfg = { ...cfg, enabledRules: cfg.enabledRules.filter((r) => r !== "labour.outsidePeriod") };
+
+  // Bulk-fetch #1: Companies (id -> naam), EEN keer voor de hele org.
+  const companies = await atFetchAll("Companies", [{ field: "isActive", op: "eq", value: true }]);
+  const names = new Map(companies.map((c) => [c.id, c.companyName]));
+
+  // Bulk-fetch #2: actieve Contracts (id -> {companyID, naam, type}), EEN keer.
+  const contracts = await atFetchAll("Contracts", [{ field: "status", op: "eq", value: 1 }]);
+  const contractInfo = new Map(contracts.map((c) => [c.id, { companyID: c.companyID, name: c.contractName ?? null, type: c.contractType ?? null }]));
+
+  // BillingCodes (work-type namen) wordt bewust NIET gebulkfetcht: checkLabour/
+  // checkCharge signaleren alleen op de aanwezigheid van billingCodeID zelf
+  // (labour.missingWorkType/charge.missingWorkType), niet op de naam. Namen zijn
+  // dus geen input voor de signalCount-aggregatie hier; die extra call zou puur
+  // onbenutte netwerklatency toevoegen aan een command dat juist snelheid als
+  // doel heeft. (fetchWorkTypeNames() blijft beschikbaar voor `review`.)
+
+  // Alleen facturabele contracttypes (1 T&M, 4 Block Hours, 8 Per Ticket) leveren
+  // te-factureren labour; gedekte contracttypes (Recurring e.d.) tellen niet mee.
+  const billableContractIds = contracts.filter((c) => INVOICED_CONTRACT_TYPES.has(c.contractType)).map((c) => c.id);
+  const labourRaw = await fetchBatchedIn("TimeEntries", "contractID", billableContractIds, [{ field: "isNonBillable", op: "eq", value: false }], 200);
+
+  const chargeFilter = [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }];
+  const ticketChargesRaw = await atFetchAll("TicketCharges", chargeFilter);
+  const contractChargesRaw = await atFetchAll("ContractCharges", chargeFilter);
+  const projectChargesRaw = await atFetchAll("ProjectCharges", chargeFilter);
+
+  // Posted-exclusie via BillingItem-kruisverwijzing, gebatcht (~300/call), niet per losse id.
+  const [postedTimeEntryIds, postedTicketChargeIds, postedContractChargeIds, postedProjectChargeIds] = await Promise.all([
+    postedIdsBatched("timeEntryID", labourRaw.map((t) => t.id)),
+    postedIdsBatched("ticketChargeID", ticketChargesRaw.map((c) => c.id)),
+    postedIdsBatched("contractChargeID", contractChargesRaw.map((c) => c.id)),
+    postedIdsBatched("projectChargeID", projectChargesRaw.map((c) => c.id)),
+  ]);
+
+  const labour = labourRaw.filter((t) => !postedTimeEntryIds.has(t.id));
+  const ticketCharges = ticketChargesRaw.filter((c) => !postedTicketChargeIds.has(c.id)).map(mapCharge);
+  const contractCharges = contractChargesRaw.filter((c) => !postedContractChargeIds.has(c.id)).map(mapCharge);
+  const projectCharges = projectChargesRaw.filter((c) => !postedProjectChargeIds.has(c.id)).map(mapCharge);
+
+  // Company-attributie zonder per-id lookups: labour/contractCharges via de al
+  // opgehaalde bulk-Contracts; ticketCharges/projectCharges via gebatchte
+  // Tickets/Projects id op:in-fetches (alleen de betrokken ids, niet de hele klantenbasis).
+  const ticketIds = ticketCharges.map((c) => c.ticketID);
+  const ticketsRows = await fetchBatchedIn("Tickets", "id", ticketIds, [], 300);
+  const ticketCompany = new Map(ticketsRows.map((t) => [t.id, t.companyID]));
+
+  const projectIds = projectCharges.map((c) => c.projectID);
+  const projectsRows = await fetchBatchedIn("Projects", "id", projectIds, [], 300);
+  const projectCompany = new Map(projectsRows.map((p) => [p.id, p.companyID]));
+
+  const items = [];
+  for (const t of labour) {
+    const companyId = contractInfo.get(t.contractID)?.companyID ?? 0;
+    const checked = checkLabour(t, summaryCfg);
+    items.push({ companyId, companyName: unassignedName(companyId, names), kind: "labour", amountEUR: 0, hours: checked.hours, problems: checked.problems });
+  }
+  for (const c of contractCharges) {
+    const companyId = contractInfo.get(c.contractID)?.companyID ?? 0;
+    const checked = checkCharge(c, "contractCharge", summaryCfg);
+    items.push({ companyId, companyName: unassignedName(companyId, names), kind: "contractCharge", amountEUR: checked.amountEUR ?? 0, hours: null, problems: checked.problems });
+  }
+  for (const c of ticketCharges) {
+    const companyId = ticketCompany.get(c.ticketID) ?? 0;
+    const checked = checkCharge(c, "ticketCharge", summaryCfg);
+    items.push({ companyId, companyName: unassignedName(companyId, names), kind: "ticketCharge", amountEUR: checked.amountEUR ?? 0, hours: null, problems: checked.problems });
+  }
+  for (const c of projectCharges) {
+    const companyId = projectCompany.get(c.projectID) ?? 0;
+    const checked = checkCharge(c, "projectCharge", summaryCfg);
+    items.push({ companyId, companyName: unassignedName(companyId, names), kind: "projectCharge", amountEUR: checked.amountEUR ?? 0, hours: null, problems: checked.problems });
+  }
+
+  const { rows, hidden } = buildSummary(items);
+
+  console.log("KLANT | TE FACTUREREN | SIGNALEN");
+  for (const r of rows) {
+    const parts = [];
+    if (r.chargeEUR > 0) parts.push(`EUR${r.chargeEUR.toFixed(0)}`);
+    if (r.billableHours > 0) parts.push(`${r.billableHours}u`);
+    console.log(`${r.companyName} | ${parts.join(" + ") || "-"} | ${r.signalCount}`);
+  }
+  console.log(`(${hidden} klanten zonder te factureren verborgen)`);
+
+  return { rows, hidden };
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // TASK 4: run-orchestratie + company-verrijking + main()/CLI-dispatch
 // ─────────────────────────────────────────────────────────────────────
 
@@ -469,6 +609,10 @@ async function run() {
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   if (cmd === "verify") await verify(rest[0]);
+  else if (cmd === "summary") {
+    const cfg = await readCfg();
+    await fetchSummary(cfg);
+  }
   else if (cmd === "review") {
     const arg = rest[0];
     if (!arg) { console.error("Gebruik: preflight.mjs review <companyID of klantnaam>"); process.exit(1); return; }
