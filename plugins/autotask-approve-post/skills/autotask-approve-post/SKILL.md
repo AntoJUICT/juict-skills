@@ -1,18 +1,18 @@
 ---
 name: autotask-approve-post
-description: Read-only pre-flight review vóór de maandelijkse Autotask Approve & Post — vindt nog-niet-geposte ContractCharges/TicketCharges/ProjectCharges en niet-approved TimeEntries, markeert problemen per item en groepeert per klant/contract/ticket. Gebruik wanneer Anto /autotask-approve-post typt of vraagt om de maandelijkse approve & post-review te doen.
+description: Read-only pre-flight review vóór de maandelijkse Autotask Approve & Post, vindt nog-niet-geposte ContractCharges/TicketCharges/ProjectCharges en niet-approved TimeEntries, markeert problemen per item en groepeert per klant/contract/ticket. Gebruik wanneer Anto /autotask-approve-post typt of vraagt om de maandelijkse approve & post-review te doen.
 ---
 
 # Autotask Approve & Post pre-flight (JUICT)
 
 **Approve & Post zelf kan niet via de API.** `BillingItem` heeft `canCreate: false`
-en er bestaat geen approve- of post-endpoint. Deze skill vervangt die stap dus niet —
+en er bestaat geen approve- of post-endpoint. Deze skill vervangt die stap dus niet:
 hij doet uitsluitend de read-only controle vooraf. Anto approvet en post daarna zelf
 in de Autotask UI, per klant/contract, op basis van het rapport dat deze skill maakt.
 
 ## Vereisten
 
-- Ingelogd op Azure CLI (`az login`) — secrets komen uit Key Vault `juict-kv-g4fhuo35`.
+- Ingelogd op Azure CLI (`az login`), secrets komen uit Key Vault `juict-kv-g4fhuo35`.
 - Node 18+ (geen npm install nodig).
 
 ## Flow
@@ -30,11 +30,11 @@ in de Autotask UI, per klant/contract, op basis van het rapport dat deze skill m
    labour en charges, gegroepeerd en met problemen gemarkeerd.
 4. **Claude leest het rapport en loopt het door**, per Klant → Contract → Ticket:
    - Noem eerst de **⚠️ EERST FIXEN**-items per groep, met de concrete fix
-     (bijv. "TimeEntry 12345 — 0u te factureren: hoursToBill zetten of op
+     (bijv. "TimeEntry 12345, 0u te factureren: hoursToBill zetten of op
      non-billable markeren").
    - Noem daarna de **✅ SCHOON**-totalen per groep, zodat Anto weet welke
      klant/contract/ticket hij direct kan posten in de UI.
-   - Werk het rapport groep voor groep af, niet als platte lijst — Anto post per
+   - Werk het rapport groep voor groep af, niet als platte lijst: Anto post per
      contract/ticket, niet in één keer voor de hele maand.
 
 ## config.json (optioneel)
@@ -51,29 +51,36 @@ in de Autotask UI, per klant/contract, op basis van het rapport dat deze skill m
 
 - `periodStart` / `periodEnd`: default = vorige kalendermaand.
 - `enabledRules`: default = alle regels (zie hieronder). Beperk als je een deel van
-  de controle tijdelijk wilt uitzetten.
+  de controle tijdelijk wilt uitzetten. Let op: dit stuurt alleen de gewone
+  regels, niet `neverBillCode` (zie hieronder).
 - `neverBillBillingCodeIDs`: work types die altijd als "nooit factureren" gelden,
-  ongeacht de billable-vlag.
+  ongeacht de billable-vlag. Deze check wordt uitsluitend door
+  `neverBillBillingCodeIDs` gestuurd, niet door `enabledRules`: staat een
+  billingCodeID in deze lijst, dan vuurt de melding altijd, ook als je alle
+  regels in `enabledRules` hebt uitgezet.
+- `minChargeAmount`: wordt geaccepteerd in de config maar is nog niet aangesloten
+  op een check in het script (dead config voor nu, geen effect op het rapport).
 
 ## Checkregels
 
 **Labour (TimeEntries, nog niet approved):**
-- `missingWorkType` — geen `billingCodeID`
-- `zeroHours` — 0 uur te factureren
-- `missingRole` — geen `roleID`
-- `emptySummary` — lege `summaryNotes` (wordt de factuurregel)
-- `outsidePeriod` — `dateWorked` valt buiten de gekozen periode
+- `missingWorkType`: geen `billingCodeID`
+- `zeroHours`: 0 uur te factureren
+- `missingRole`: geen `roleID`
+- `emptySummary`: lege `summaryNotes` (wordt de factuurregel)
+- `outsidePeriod`: `dateWorked` valt buiten de gekozen periode
 
 **Charges (Ticket-, Contract- en ProjectCharges, billable + nog niet gefactureerd):**
-- `missingWorkType` — geen `billingCodeID` én geen `productID`
-- `zeroAmount` — bedrag is €0
-- `negativeAmount` — negatief bedrag
-- `notBillableFlag` — `isBillableToCompany` staat uit terwijl het item toch meekomt
-- `neverBillCode` — work type staat in `neverBillBillingCodeIDs`
+- `missingWorkType`: geen `billingCodeID` én geen `productID`
+- `zeroAmount`: bedrag is €0
+- `negativeAmount`: negatief bedrag
+- `notBillableFlag`: `isBillableToCompany` staat uit terwijl het item toch meekomt
+- `neverBillCode`: work type staat in `neverBillBillingCodeIDs` (altijd actief,
+  onafhankelijk van `enabledRules`)
 
 ## Read-only garantie
 
 Het script doet uitsluitend `*/query`-calls (GET/POST-query, nooit een echte create,
 update of delete). Er wordt niets geapproved, gepost of anderszins gewijzigd in
-Autotask — de skill is puur een controle vooraf, het posten blijft altijd een
+Autotask. De skill is puur een controle vooraf, het posten blijft altijd een
 handmatige stap van Anto in de UI.
