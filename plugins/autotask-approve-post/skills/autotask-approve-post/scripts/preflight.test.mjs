@@ -383,9 +383,26 @@ test("buildHourFlags: change entries samen 2.5u (boven 2u drempel) geeft een fla
   assert.deepEqual(out, [{ ticketID: 200, companyName: "Acme BV", category: "change", hours: 2.5, threshold: 2 }]);
 });
 
-test("buildHourFlags: 1.5u change (op de drempel, niet erboven) geeft geen flag", () => {
-  const entries = [hf({ ticketID: 200, hours: 1.5, category: "change" })];
+test("buildHourFlags: change-som PRECIES OP de drempel (2u == changeHoursThreshold 2) geeft geen flag (strict >)", () => {
+  const entries = [hf({ ticketID: 200, hours: 2, category: "change" })];
   assert.deepEqual(buildHourFlags(entries, hfCfg), []);
+});
+
+test("buildHourFlags: remote-som PRECIES OP de drempel (1.5u == remoteSupportHoursThreshold 1.5) geeft geen flag (strict >)", () => {
+  const entries = [hf({ ticketID: 100, hours: 1.5, category: "remote" })];
+  assert.deepEqual(buildHourFlags(entries, hfCfg), []);
+});
+
+test("buildHourFlags: remote-som net boven de drempel (1.75u > 1.5u) geeft wel een flag", () => {
+  const entries = [hf({ ticketID: 100, hours: 1.75, category: "remote" })];
+  const out = buildHourFlags(entries, hfCfg);
+  assert.deepEqual(out, [{ ticketID: 100, companyName: "Acme BV", category: "remote", hours: 1.75, threshold: 1.5 }]);
+});
+
+test("buildHourFlags: change-som net boven de drempel (2.25u > 2u) geeft wel een flag", () => {
+  const entries = [hf({ ticketID: 200, hours: 2.25, category: "change" })];
+  const out = buildHourFlags(entries, hfCfg);
+  assert.deepEqual(out, [{ ticketID: 200, companyName: "Acme BV", category: "change", hours: 2.25, threshold: 2 }]);
 });
 
 test("buildHourFlags: category other wordt genegeerd, ook bij veel uren", () => {
