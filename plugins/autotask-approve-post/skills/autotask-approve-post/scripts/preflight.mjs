@@ -524,17 +524,21 @@ export async function setNonBillable(ids, { confirm } = {}, patchFn = realPatchT
 // gedrag, bestaande aanroepers/tests): een mislukte batch gooit door. Mét
 // `warnings`: elke batch afzonderlijk try/catch, een mislukte batch wordt
 // overgeslagen (partial resultaat) en genoteerd, de overige batches lopen door.
-async function fetchBatchedIn(entity, field, ids, extraFilters = [], batchSize = 300, warnings) {
+// `queryFn` is injecteerbaar (default de echte atFetchAll) zodat de
+// skip-continue-lus hieronder getest kan worden zonder netwerk (Task 13
+// follow-up). Trailing optioneel param, dus bestaande call-sites (die geen
+// queryFn meegeven) blijven ongewijzigd werken.
+export async function fetchBatchedIn(entity, field, ids, extraFilters = [], batchSize = 300, warnings, queryFn = atFetchAll) {
   const unique = [...new Set(ids)].filter((x) => x != null);
   const out = [];
   for (let i = 0; i < unique.length; i += batchSize) {
     const batch = unique.slice(i, i + batchSize);
     if (!warnings) {
-      out.push(...(await atFetchAll(entity, [{ field, op: "in", value: batch }, ...extraFilters])));
+      out.push(...(await queryFn(entity, [{ field, op: "in", value: batch }, ...extraFilters])));
       continue;
     }
     try {
-      out.push(...(await atFetchAll(entity, [{ field, op: "in", value: batch }, ...extraFilters])));
+      out.push(...(await queryFn(entity, [{ field, op: "in", value: batch }, ...extraFilters])));
     } catch (e) {
       warnings.push(`${entity}/${field} batch mislukt: ${e?.message ?? e}`);
     }
@@ -554,9 +558,14 @@ async function fetchBatchedIn(entity, field, ids, extraFilters = [], batchSize =
 // (delegeert aan fetchBatchedIn, gooit door). Mét `warnings`: eigen per-batch
 // try/catch zodat de warning-tekst expliciet vermeldt dat de posted-check
 // onvolledig is (al-geposte items kunnen dan als pending getoond worden).
-async function postedIdsBatched(field, ids, batchSize = 300, warnings) {
+// `queryFn` idem als bij fetchBatchedIn: injecteerbaar, default atFetchAll,
+// trailing optioneel param zodat bestaande call-sites ongewijzigd blijven
+// werken (Task 13 follow-up). De warning-tekst blijft hier bewust apart van
+// fetchBatchedIn's generieke bericht: die vermeldt expliciet dat de
+// posted-check onvolledig is, dus geen delegatie hierheen.
+export async function postedIdsBatched(field, ids, batchSize = 300, warnings, queryFn = atFetchAll) {
   if (!warnings) {
-    const rows = await fetchBatchedIn("BillingItems", field, ids, [], batchSize);
+    const rows = await fetchBatchedIn("BillingItems", field, ids, [], batchSize, undefined, queryFn);
     return postedIdsFromRows(rows, field);
   }
   const unique = [...new Set(ids)].filter((x) => x != null);
@@ -564,7 +573,7 @@ async function postedIdsBatched(field, ids, batchSize = 300, warnings) {
   for (let i = 0; i < unique.length; i += batchSize) {
     const batch = unique.slice(i, i + batchSize);
     try {
-      rows.push(...(await atFetchAll("BillingItems", [{ field, op: "in", value: batch }])));
+      rows.push(...(await queryFn("BillingItems", [{ field, op: "in", value: batch }])));
     } catch (e) {
       warnings.push(`BillingItems/${field} posted-check batch mislukt: ${e?.message ?? e}; posted-check onvolledig, mogelijk al-geposte items tonen als pending`);
     }

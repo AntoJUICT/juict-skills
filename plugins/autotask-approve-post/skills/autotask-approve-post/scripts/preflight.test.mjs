@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod, safeFetch, renderWarnings } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod, safeFetch, renderWarnings, fetchBatchedIn, postedIdsBatched } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -596,4 +596,50 @@ test("renderWarnings: met items geeft een banner met ONVOLLEDIG en de warning-te
   const out = renderWarnings(["a: b"]);
   assert.ok(out.includes("ONVOLLEDIG"));
   assert.ok(out.includes("a: b"));
+});
+
+// ─── fetchBatchedIn / postedIdsBatched skip-continue (Task 13 follow-up: ──
+// injecteerbare queryFn maakt de batch-lus zelf testbaar zonder netwerk) ────
+
+test("fetchBatchedIn: mét warnings slaat een mislukte batch over en gaat door (partial resultaat, 1 warning)", async () => {
+  let call = 0;
+  const queryFn = async (entity, filterItems) => {
+    call++;
+    if (call === 2) throw new Error("batch2 boom");
+    const batch = filterItems[0].value;
+    return batch.map((id) => ({ id }));
+  };
+  const warnings = [];
+  const out = await fetchBatchedIn("TimeEntries", "contractID", [1, 2, 3, 4, 5, 6], [], 2, warnings, queryFn);
+  assert.deepEqual(out.map((r) => r.id).sort((a, b) => a - b), [1, 2, 5, 6]); // batch 2 ([3,4]) ontbreekt
+  assert.equal(warnings.length, 1);
+  assert.ok(warnings[0].includes("TimeEntries/contractID"));
+});
+
+test("fetchBatchedIn: zonder warnings gooit een mislukte batch nog steeds door (oud strikt gedrag)", async () => {
+  const queryFn = async () => { throw new Error("boom"); };
+  await assert.rejects(
+    () => fetchBatchedIn("TimeEntries", "contractID", [1, 2, 3, 4], [], 2, undefined, queryFn),
+    /boom/
+  );
+});
+
+test("postedIdsBatched: mét warnings slaat een mislukte batch over, geslaagde batches blijven in de set, 1 warning, geen throw", async () => {
+  let call = 0;
+  const queryFn = async (entity, filterItems) => {
+    call++;
+    if (call === 2) throw new Error("posted batch boom");
+    const batch = filterItems[0].value;
+    return batch.map((id) => ({ timeEntryID: id }));
+  };
+  const warnings = [];
+  const result = await postedIdsBatched("timeEntryID", [10, 20, 30, 40, 50, 60], 2, warnings, queryFn);
+  assert.equal(result.has(10), true);
+  assert.equal(result.has(20), true);
+  assert.equal(result.has(30), false); // mislukte batch: niet in de set
+  assert.equal(result.has(40), false);
+  assert.equal(result.has(50), true);
+  assert.equal(result.has(60), true);
+  assert.equal(warnings.length, 1);
+  assert.ok(warnings[0].includes("onvolledig"));
 });
