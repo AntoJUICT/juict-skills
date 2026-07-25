@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod, safeFetch, renderWarnings, fetchBatchedIn, postedIdsBatched } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, buildHourFlags, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod, safeFetch, renderWarnings, fetchBatchedIn, postedIdsBatched } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -20,6 +20,27 @@ test("loadConfig: rankHourRate overneembaar uit raw config als getal", () => {
 });
 test("loadConfig: rankHourRate negeert niet-getal en valt terug op 75", () => {
   assert.equal(loadConfig({ rankHourRate: "100" }, new Date("2026-07-24T10:00:00Z")).rankHourRate, 75);
+});
+
+// ─── urennorm-drempels (Task 14: Remote Support >1.5u, Change >2u per ticket) ──
+
+test("loadConfig: remoteSupportHoursThreshold default 1.5", () => {
+  assert.equal(loadConfig({}, new Date("2026-07-24T10:00:00Z")).remoteSupportHoursThreshold, 1.5);
+});
+test("loadConfig: remoteSupportHoursThreshold overneembaar uit raw config als getal", () => {
+  assert.equal(loadConfig({ remoteSupportHoursThreshold: 2.5 }, new Date("2026-07-24T10:00:00Z")).remoteSupportHoursThreshold, 2.5);
+});
+test("loadConfig: remoteSupportHoursThreshold negeert niet-getal en valt terug op 1.5", () => {
+  assert.equal(loadConfig({ remoteSupportHoursThreshold: "2.5" }, new Date("2026-07-24T10:00:00Z")).remoteSupportHoursThreshold, 1.5);
+});
+test("loadConfig: changeHoursThreshold default 2", () => {
+  assert.equal(loadConfig({}, new Date("2026-07-24T10:00:00Z")).changeHoursThreshold, 2);
+});
+test("loadConfig: changeHoursThreshold overneembaar uit raw config als getal", () => {
+  assert.equal(loadConfig({ changeHoursThreshold: 3 }, new Date("2026-07-24T10:00:00Z")).changeHoursThreshold, 3);
+});
+test("loadConfig: changeHoursThreshold negeert niet-getal en valt terug op 2", () => {
+  assert.equal(loadConfig({ changeHoursThreshold: "3" }, new Date("2026-07-24T10:00:00Z")).changeHoursThreshold, 2);
 });
 
 // ─── inPeriod (Task 12.1: bron voor de outsidePeriod-FLAG in buildReview, geen fetch-filter meer) ───
@@ -86,7 +107,7 @@ const tickets = [
   { id: 100, ticketNumber: "T20260601.0001", title: "Ticket A", description: "Desc A" },
   { id: 101, ticketNumber: "T20260601.0002", title: "Ticket B", description: "Desc B" },
 ];
-const workTypeNames = new Map([[20, "Onsite Support"], [21, "Remote Support"]]);
+const workTypeNames = new Map([[20, "Onsite Support"], [21, "Remote Support"], [22, "Minor Change"], [23, "Major Change"]]);
 
 function reviewFixtures() {
   const timeEntries = [
@@ -289,6 +310,125 @@ test("buildReview: availableContracts default naar lege array als niet meegegeve
   const { timeEntries, charges, notesByTicket } = reviewFixtures();
   const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg);
   assert.deepEqual(out.availableContracts, []);
+});
+
+// ─── ticket.hourFlags (Task 14: Remote Support >1.5u, Change >2u per ticket) ──
+
+test("buildReview: ticket.hourFlags bij Remote Support-som boven drempel (2u > 1.5u)", () => {
+  const { charges, notesByTicket } = reviewFixtures();
+  const timeEntries = [
+    te({ id: 1, ticketID: 100, billingCodeID: 21, hoursToBill: 1, hoursWorked: 1, summaryNotes: "werk 1" }),
+    te({ id: 2, ticketID: 100, billingCodeID: 21, hoursToBill: 1, hoursWorked: 1, summaryNotes: "werk 2" }),
+  ];
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg);
+  const t100 = out.tickets.find((t) => t.ticketID === 100);
+  assert.deepEqual(t100.hourFlags, ["remote 2u > 1.5u"]);
+});
+
+test("buildReview: geen ticket.hourFlags onder de Remote Support-drempel (1u)", () => {
+  const { charges, notesByTicket } = reviewFixtures();
+  const timeEntries = [te({ id: 1, ticketID: 100, billingCodeID: 21, hoursToBill: 1, hoursWorked: 1, summaryNotes: "werk 1" })];
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg);
+  const t100 = out.tickets.find((t) => t.ticketID === 100);
+  assert.deepEqual(t100.hourFlags, []);
+});
+
+test("buildReview: ticket.hourFlags bij Change-som (Minor+Major) boven drempel (2.5u > 2u)", () => {
+  const { charges, notesByTicket } = reviewFixtures();
+  const timeEntries = [
+    te({ id: 1, ticketID: 100, billingCodeID: 22, hoursToBill: 1.5, hoursWorked: 1.5, summaryNotes: "minor change" }),
+    te({ id: 2, ticketID: 100, billingCodeID: 23, hoursToBill: 1, hoursWorked: 1, summaryNotes: "major change" }),
+  ];
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg);
+  const t100 = out.tickets.find((t) => t.ticketID === 100);
+  assert.deepEqual(t100.hourFlags, ["change 2.5u > 2u"]);
+});
+
+test("buildReview: ticket kan zowel remote als change hourFlag hebben", () => {
+  const { charges, notesByTicket } = reviewFixtures();
+  const timeEntries = [
+    te({ id: 1, ticketID: 100, billingCodeID: 21, hoursToBill: 2, hoursWorked: 2, summaryNotes: "remote" }),
+    te({ id: 2, ticketID: 100, billingCodeID: 22, hoursToBill: 2.5, hoursWorked: 2.5, summaryNotes: "change" }),
+  ];
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg);
+  const t100 = out.tickets.find((t) => t.ticketID === 100);
+  assert.deepEqual(t100.hourFlags.sort(), ["change 2.5u > 2u", "remote 2u > 1.5u"]);
+});
+
+// ─── buildHourFlags (pure kern van de urennorm-flags, Task 14) ──────────
+
+const hf = (o = {}) => ({ ticketID: 100, companyId: 1, companyName: "Acme BV", hours: 1, category: "remote", ...o });
+const hfCfg = { remoteSupportHoursThreshold: 1.5, changeHoursThreshold: 2 };
+
+test("buildHourFlags: twee remote entries samen 2u (boven 1.5u drempel) geeft een flag", () => {
+  const entries = [
+    hf({ ticketID: 100, hours: 1, category: "remote" }),
+    hf({ ticketID: 100, hours: 1, category: "remote" }),
+  ];
+  const out = buildHourFlags(entries, hfCfg);
+  assert.deepEqual(out, [{ ticketID: 100, companyName: "Acme BV", category: "remote", hours: 2, threshold: 1.5 }]);
+});
+
+test("buildHourFlags: 1u remote (onder drempel) geeft geen flag", () => {
+  const entries = [hf({ ticketID: 100, hours: 1, category: "remote" })];
+  assert.deepEqual(buildHourFlags(entries, hfCfg), []);
+});
+
+test("buildHourFlags: change entries samen 2.5u (boven 2u drempel) geeft een flag", () => {
+  const entries = [
+    hf({ ticketID: 200, hours: 1.5, category: "change" }),
+    hf({ ticketID: 200, hours: 1, category: "change" }),
+  ];
+  const out = buildHourFlags(entries, hfCfg);
+  assert.deepEqual(out, [{ ticketID: 200, companyName: "Acme BV", category: "change", hours: 2.5, threshold: 2 }]);
+});
+
+test("buildHourFlags: 1.5u change (op de drempel, niet erboven) geeft geen flag", () => {
+  const entries = [hf({ ticketID: 200, hours: 1.5, category: "change" })];
+  assert.deepEqual(buildHourFlags(entries, hfCfg), []);
+});
+
+test("buildHourFlags: category other wordt genegeerd, ook bij veel uren", () => {
+  const entries = [hf({ ticketID: 300, hours: 10, category: "other" })];
+  assert.deepEqual(buildHourFlags(entries, hfCfg), []);
+});
+
+test("buildHourFlags: sortering op hours desc over meerdere tickets/categorieen", () => {
+  const entries = [
+    hf({ ticketID: 100, hours: 1, category: "remote" }),
+    hf({ ticketID: 100, hours: 1, category: "remote" }), // 2u remote
+    hf({ ticketID: 200, hours: 1.5, category: "change" }),
+    hf({ ticketID: 200, hours: 2, category: "change" }), // 3.5u change
+  ];
+  const out = buildHourFlags(entries, hfCfg);
+  assert.deepEqual(out.map((f) => f.ticketID), [200, 100]);
+  assert.deepEqual(out.map((f) => f.hours), [3.5, 2]);
+});
+
+test("buildHourFlags: eenzelfde ticket kan zowel een remote- als change-flag opleveren (twee rows)", () => {
+  const entries = [
+    hf({ ticketID: 100, hours: 2, category: "remote" }),
+    hf({ ticketID: 100, hours: 2.5, category: "change" }),
+  ];
+  const out = buildHourFlags(entries, hfCfg);
+  assert.equal(out.length, 2);
+  assert.deepEqual(out.map((f) => f.category).sort(), ["change", "remote"]);
+});
+
+test("buildHourFlags: per-ticket sommatie werkt over meerdere entries, andere ticket blijft gescheiden", () => {
+  const entries = [
+    hf({ ticketID: 100, companyName: "Acme BV", hours: 1, category: "remote" }),
+    hf({ ticketID: 100, companyName: "Acme BV", hours: 0.6, category: "remote" }),
+    hf({ ticketID: 101, companyId: 2, companyName: "Contoso", hours: 1, category: "remote" }),
+  ];
+  const out = buildHourFlags(entries, hfCfg);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].ticketID, 100);
+  assert.equal(Math.round(out[0].hours * 10) / 10, 1.6);
+});
+
+test("buildHourFlags: lege input geeft lege array", () => {
+  assert.deepEqual(buildHourFlags([], hfCfg), []);
 });
 
 // ─── postedIdsFromRows (precieze posted-detectie, los van contract-brede historie) ──

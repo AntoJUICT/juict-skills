@@ -30,6 +30,11 @@ export function loadConfig(raw, now) {
     neverBillBillingCodeIDs: Array.isArray(r.neverBillBillingCodeIDs) ? r.neverBillBillingCodeIDs : [],
     // Task 12 (N3): weegt uren mee in de summary-ranking (chargeEUR + billableHours*rankHourRate).
     rankHourRate: typeof r.rankHourRate === "number" ? r.rankHourRate : 75,
+    // Task 14 (v2.9): urennorm-drempels per ticket. Veel uren op één work type
+    // (Remote Support of Change) op hetzelfde ticket is vaak eigenlijk onsite/
+    // project/meerwerk of verdient anders aandacht. Instelbaar per klant/org.
+    remoteSupportHoursThreshold: typeof r.remoteSupportHoursThreshold === "number" ? r.remoteSupportHoursThreshold : 1.5,
+    changeHoursThreshold: typeof r.changeHoursThreshold === "number" ? r.changeHoursThreshold : 2,
   };
 }
 // null/ontbrekende datum -> null (onbeslist); anders true/false op basis van [periodStart, periodEnd].
@@ -169,6 +174,17 @@ export function buildReview(company, tickets, timeEntries, charges, notesByTicke
       ...grouped.timeEntries.flatMap((i) => i.problems.map((p) => ({ ...p, source: `timeEntry:${i.id}` }))),
       ...grouped.charges.flatMap((i) => i.problems.map((p) => ({ ...p, source: `${i.kind}:${i.id}` }))),
     ];
+    // Task 14 (v2.9): urennorm-flags per ticket. Classificeert op de resolved
+    // workType-naam (Remote Support / Minor Change / Major Change), sommeert
+    // binnen dit ticket, en flagt bij overschrijding van de ingestelde drempel.
+    let remoteHours = 0, changeHours = 0;
+    for (const i of grouped.timeEntries) {
+      if (i.workType === "Remote Support") remoteHours += i.hours;
+      else if (i.workType === "Minor Change" || i.workType === "Major Change") changeHours += i.hours;
+    }
+    const hourFlags = [];
+    if (remoteHours > cfg.remoteSupportHoursThreshold) hourFlags.push(`remote ${remoteHours}u > ${cfg.remoteSupportHoursThreshold}u`);
+    if (changeHours > cfg.changeHoursThreshold) hourFlags.push(`change ${changeHours}u > ${cfg.changeHoursThreshold}u`);
     reviewTickets.push({
       ticketID: ticket.id,
       title: ticket.title ?? null,
@@ -178,6 +194,7 @@ export function buildReview(company, tickets, timeEntries, charges, notesByTicke
       timeEntries: grouped.timeEntries,
       charges: grouped.charges,
       issues,
+      hourFlags,
     });
   }
 
@@ -263,6 +280,30 @@ export function buildRemoteSupportReview(items) {
     });
   }
   return result.sort((a, b) => b.count - a.count);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// summary-subcommand: urennorm-flags per ticket (Task 14, v2.9). Veel uren op
+// één work type op hetzelfde ticket (Remote Support of Change) is vaak
+// eigenlijk onsite/project/meerwerk of verdient anders aandacht. PURE: som per
+// (ticketID, category), flag een ticket zodra de remote-som > cfg.remoteSupportHoursThreshold
+// of de change-som > cfg.changeHoursThreshold. "other" telt niet mee.
+// ─────────────────────────────────────────────────────────────────────
+
+export function buildHourFlags(entries, cfg) {
+  const byTicket = new Map(); // ticketID -> { companyName, remote, change }
+  for (const entry of entries) {
+    if (entry.category !== "remote" && entry.category !== "change") continue;
+    if (!byTicket.has(entry.ticketID)) byTicket.set(entry.ticketID, { companyName: entry.companyName, remote: 0, change: 0 });
+    const agg = byTicket.get(entry.ticketID);
+    agg[entry.category] += entry.hours ?? 0;
+  }
+  const flags = [];
+  for (const [ticketID, agg] of byTicket) {
+    if (agg.remote > cfg.remoteSupportHoursThreshold) flags.push({ ticketID, companyName: agg.companyName, category: "remote", hours: agg.remote, threshold: cfg.remoteSupportHoursThreshold });
+    if (agg.change > cfg.changeHoursThreshold) flags.push({ ticketID, companyName: agg.companyName, category: "change", hours: agg.change, threshold: cfg.changeHoursThreshold });
+  }
+  return flags.sort((a, b) => b.hours - a.hours);
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -593,6 +634,15 @@ async function resolveRemoteSupportCodeId() {
   return match ? match.id : null;
 }
 
+// Task 14 (v2.9): resolveert de Change-work-types ("Minor Change" en "Major
+// Change") op naam, zelfde robuustheid-redenering als resolveRemoteSupportCodeId
+// (id-drift tussen zones). Levert geen van beide een match op dan is de
+// urennorm-Change-check gracieus leeg (geen harde fout).
+async function resolveChangeCodeIds() {
+  const rows = await atFetchAll("BillingCodes", [{ field: "isActive", op: "eq", value: true }, { field: "billingCodeType", op: "eq", value: 0 }]);
+  return rows.filter((r) => r.name === "Minor Change" || r.name === "Major Change").map((r) => r.id);
+}
+
 export async function fetchSummary(cfg) {
   // Task 13: verzamelt niet-fatale ophaalfouten; wordt bovenaan de output als
   // banner getoond (renderWarnings) zodat een gedeeltelijk overzicht opvalt.
@@ -693,16 +743,31 @@ export async function fetchSummary(cfg) {
     { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` },
   ])) : [];
 
+  // Task 14 (v2.9): urennorm-flags per ticket, Change-kant (Minor Change +
+  // Major Change). Zelfde bounded aanpak als de Remote Support-fetch hierboven
+  // (binnen periode, niet non-billable); de remote-kant van de urennorm-flags
+  // hergebruikt rsRaw hierboven, geen dubbele fetch.
+  const changeCodeIds = await safeFetch(warnings, "Change work type lookup", () => resolveChangeCodeIds(), []);
+  if (changeCodeIds.length === 0) console.error("Waarschuwing: work types 'Minor Change'/'Major Change' niet gevonden; Change-urennorm overgeslagen.");
+  const changeRaw = changeCodeIds.length ? await safeFetch(warnings, "Change TimeEntries", () => atFetchAll("TimeEntries", [
+    { field: "billingCodeID", op: "in", value: changeCodeIds },
+    { field: "isNonBillable", op: "eq", value: false },
+    { field: "dateWorked", op: "gte", value: `${cfg.periodStart}T00:00:00` },
+    { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` },
+  ])) : [];
+
   // Company-attributie EN Task-10 ticket-status in EEN gebatchte Tickets-fetch
   // (id op:in), op de unie van alle ticket-ids uit ticketCharges, billable
-  // labour en RS-entries. Geen aparte per-onderdeel fetch, geen per-id lookups.
-  // ticketCharges/projectCharges attribution via gebatchte Tickets/Projects
-  // id op:in-fetches (alleen de betrokken ids, niet de hele klantenbasis);
-  // labour/contractCharges via de al opgehaalde bulk-Contracts.
+  // labour, RS-entries en Change-entries. Geen aparte per-onderdeel fetch,
+  // geen per-id lookups. ticketCharges/projectCharges attribution via
+  // gebatchte Tickets/Projects id op:in-fetches (alleen de betrokken ids, niet
+  // de hele klantenbasis); labour/contractCharges via de al opgehaalde
+  // bulk-Contracts.
   const ticketIdsForLookup = [
     ...ticketCharges.map((c) => c.ticketID),
     ...labour.map((t) => t.ticketID),
     ...rsRaw.map((t) => t.ticketID),
+    ...changeRaw.map((t) => t.ticketID),
   ];
   const ticketsRows = await fetchBatchedIn("Tickets", "id", ticketIdsForLookup, [], 300, warnings);
   const ticketCompany = new Map(ticketsRows.map((t) => [t.id, t.companyID]));
@@ -724,6 +789,25 @@ export async function fetchSummary(cfg) {
   // is; ticketloze RS-entries (ticketID null) zijn niet ticket-gebonden en blijven.
   const rsItems = keepIfTicketComplete(rsItemsAll, completeTicketIds);
   const remoteSupportReview = buildRemoteSupportReview(rsItems);
+
+  // Task 14 (v2.9): urennorm-flags per ticket (Remote Support >drempel of
+  // Change >drempel op hetzelfde ticket). Reuse rsRaw (ongefilterd op gedekt/
+  // facturabel, in tegenstelling tot rsItemsAll hierboven: de urennorm kijkt
+  // naar ALLE Remote Support-uren op een ticket, niet alleen de gedekte).
+  // Posted-exclusie + afgeronde-tickets-filter via dezelfde helpers als de
+  // rest van summary; ticketloze entries leveren geen per-ticket flag op.
+  const postedChangeIds = await postedIdsBatched("timeEntryID", changeRaw.map((t) => t.id), 300, warnings);
+  const toHourEntry = (t, category) => {
+    const companyId = contractInfo.get(t.contractID)?.companyID ?? 0;
+    return { ticketID: t.ticketID, companyId, companyName: unassignedName(companyId, names), hours: t.hoursToBill ?? t.hoursWorked ?? 0, category };
+  };
+  const remoteHourEntries = keepIfTicketComplete(rsRaw.filter((t) => !postedRsIds.has(t.id)), completeTicketIds)
+    .filter((t) => t.ticketID != null)
+    .map((t) => toHourEntry(t, "remote"));
+  const changeHourEntries = keepIfTicketComplete(changeRaw.filter((t) => !postedChangeIds.has(t.id)), completeTicketIds)
+    .filter((t) => t.ticketID != null)
+    .map((t) => toHourEntry(t, "change"));
+  const hourFlags = buildHourFlags([...remoteHourEntries, ...changeHourEntries], cfg);
 
   const projectIds = projectCharges.map((c) => c.projectID);
   const projectsRows = await fetchBatchedIn("Projects", "id", projectIds, [], 300, warnings);
@@ -786,7 +870,18 @@ export async function fetchSummary(cfg) {
     }
   }
 
-  return { rows, hidden, remoteSupportReview, warnings };
+  // Task 14 (v2.9): getoond ongeacht de actionable-filter van buildSummary
+  // hierboven, zodat Anto deze tickets altijd ziet ook als de klant verder
+  // niets te factureren heeft.
+  if (hourFlags.length) {
+    console.log("");
+    console.log("Tickets boven urennorm:");
+    for (const f of hourFlags) {
+      console.log(`  - ${f.companyName} ticket ${f.ticketID}: ${f.hours}u ${f.category} (drempel ${f.threshold}u)`);
+    }
+  }
+
+  return { rows, hidden, remoteSupportReview, hourFlags, warnings };
 }
 
 // ─────────────────────────────────────────────────────────────────────

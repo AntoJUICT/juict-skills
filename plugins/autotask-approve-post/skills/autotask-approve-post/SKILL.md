@@ -181,6 +181,25 @@ en ik beoordeel.
   automatisch iets: het work type aanpassen is (net als approve & post) iets
   wat Anto zelf in de Autotask UI doet.
 
+## Urennorm-flags per ticket (na `summary` en in `review`)
+
+Veel uren op een ticket op één work type is vaak eigenlijk onsite/project/
+meerwerk of verdient anders aandacht: meer dan 1,5u Remote Support of meer
+dan 2u Change (Minor Change + Major Change samen) op hetzelfde ticket.
+
+- `summary` print, na de Remote Support-sectie, een extra sectie "Tickets
+  boven urennorm:" met per regel de klant, het ticketnummer, de gesommeerde
+  uren en het work type dat de drempel overschrijdt. Dit staat ook in het
+  geretourneerde object onder `hourFlags`. Deze tickets tonen altijd, ook als
+  de klant verder niets te factureren heeft (los van de actionable-filter).
+- `review <klant>` zet dezelfde flag op het ticket zelf (`ticket.hourFlags`),
+  bijvoorbeeld `"remote 2u > 1.5u"`, zodat hij ook in de per-klant diepe
+  review meteen zichtbaar is.
+- Beide drempels zijn instelbaar in `config.json`: `remoteSupportHoursThreshold`
+  (default 1,5) en `changeHoursThreshold` (default 2).
+- Puur signalerend: er wordt niets automatisch gewijzigd of herboekt, net als
+  bij de Remote Support work-type-review hierboven.
+
 ## Beschikbare commando's
 
 Er zijn drie commando's: `summary` (org-brede triage), `review <klant>`
