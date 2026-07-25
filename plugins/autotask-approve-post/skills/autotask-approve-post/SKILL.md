@@ -23,13 +23,20 @@ actie is omkeerbaar (non-billable kan weer terug). Geposte entries worden
 door de Autotask API zelf geweigerd, dus een verkeerde zet op een geposte
 entry heeft sowieso geen effect.
 
-## Periode-begrenzing en T&M vs prepaid
+## Periode als referentie (geen filter) en T&M vs prepaid
 
-`summary` en `review` zijn begrensd op de facturatieperiode uit `config.json`
-(`periodStart`/`periodEnd`, default vorige maand). Labour telt mee op
-`dateWorked`, charges op `datePurchased` (of `createDate` als die leeg is);
-een charge zonder beide datumvelden valt niet stilzwijgend weg en blijft
-staan. Wil je een andere periode zien, pas dan `periodStart`/`periodEnd` in
+`summary` en `review` tonen ALLE nog niet geposte time entries en charges op
+afgeronde tickets. Er wordt niets op datum verborgen: een item met een datum
+buiten de facturatieperiode blijft gewoon in het overzicht staan, want een
+oudere post kan legitiem zijn (bijvoorbeeld een "Buitenbundel mei"-charge die
+pas in juli wordt gepost). De periode uit `config.json`
+(`periodStart`/`periodEnd`, default vorige maand) dient als referentie: elke
+time entry en charge in `review` krijgt een `outsidePeriod`-boolean
+(labour op `dateWorked`, charges op `datePurchased` of `createDate` als die
+leeg is; een charge zonder beide datumvelden krijgt `outsidePeriod: false`).
+Ik gebruik die flag om items ouder dan de periode te markeren als "ouder dan
+`<maand>`, controleren of dit klopt", niet om ze te verbergen. Wil je de
+referentieperiode veranderen, pas dan `periodStart`/`periodEnd` in
 `config.json` aan.
 
 `summary` splitst labour-uren in twee groepen:
@@ -75,6 +82,10 @@ onder een klant met alleen een hoog chargebedrag komt te staan. Pas
 3. **Ik draai de checks** op wat de review teruggeeft:
    - **Data-issues** uit `issues`/`problems` per item: 0 uur, ontbrekende
      work type of rol, lege summary.
+   - **Periode-check**: items met `outsidePeriod: true` (datum ouder dan
+     `periodStart`) markeer ik als "ouder dan `<maand>`, controleren of dit
+     klopt". Dit is een signalering, geen filter: het item stond en blijft
+     gewoon in het overzicht.
    - **AI-checks** (zie hieronder), conservatief en op basis van
      titel/omschrijving/notities/summary die de review meelevert.
    - **Contract-check** (zie hieronder), op basis van `availableContracts`.

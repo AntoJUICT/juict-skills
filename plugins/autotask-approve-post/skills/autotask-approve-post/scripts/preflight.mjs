@@ -34,10 +34,11 @@ export function loadConfig(raw, now) {
 }
 // null/ontbrekende datum -> null (onbeslist); anders true/false op basis van [periodStart, periodEnd].
 function dateInRange(date, cfg) { if (!date) return null; const d = date.slice(0, 10); return d >= cfg.periodStart && d <= cfg.periodEnd; }
-// Task 12 (N2): periode-filter voor fetch-laag (fetchReview/fetchSummary). Anders dan
-// dateInRange hierboven (die checkLabour een ontbrekende dateWorked laat signaleren als
-// "buiten periode"), telt hier een lege/ontbrekende datum als "hou dit item": een
-// dateless charge (geen datePurchased/createDate) mag niet stilzwijgend uit de lijst vallen.
+// Task 12.1: periode-check voor de `outsidePeriod`-FLAG in buildReview (niet meer als
+// fetch-filter gebruikt: dat verborg legitieme nog-te-posten items met een datum buiten de
+// maand). Anders dan dateInRange hierboven (die checkLabour een ontbrekende dateWorked laat
+// signaleren als "buiten periode"), telt hier een lege/ontbrekende datum als "in periode":
+// een dateless charge (geen datePurchased/createDate) krijgt zo geen valse outsidePeriod-flag.
 export function inPeriod(dateStr, cfg) { const r = dateInRange(dateStr, cfg); return r === null ? true : r; }
 
 export function checkLabour(t, cfg) {
@@ -139,7 +140,11 @@ export function buildReview(company, tickets, timeEntries, charges, notesByTicke
     const contractType = info?.type ?? null;
     const invoiced = isInvoiced(t.contractID, t.billingCodeID, contractType, billedMap);
     if (invoiced) invoicedHours += checked.hours; else coveredHours += checked.hours;
-    const item = { id: t.id, hours: checked.hours, workType: workTypeName, summary: t.summaryNotes ?? null, problems: checked.problems, contractId: t.contractID ?? null, contractName: info?.name ?? null, contractType, invoiced };
+    // Task 12.1: outsidePeriod is een informatieve flag ("ouder dan <maand>"), geen filter.
+    // Losstaand van enabledRules/problems zodat hij altijd meekomt, ook als de
+    // labour.outsidePeriod-regel voor review is uitgeschakeld (zie fetchReview).
+    const outsidePeriod = !inPeriod(t.dateWorked, cfg);
+    const item = { id: t.id, hours: checked.hours, workType: workTypeName, summary: t.summaryNotes ?? null, problems: checked.problems, contractId: t.contractID ?? null, contractName: info?.name ?? null, contractType, invoiced, outsidePeriod };
     if (t.ticketID != null) ensure(t.ticketID).timeEntries.push(item);
   }
 
@@ -150,7 +155,8 @@ export function buildReview(company, tickets, timeEntries, charges, notesByTicke
     const checked = checkCharge(c, kind, cfg);
     const amountEUR = checked.amountEUR ?? 0;
     chargeAmountEUR += amountEUR;
-    const item = { id: c.id, name: c.name ?? null, amountEUR, kind, problems: checked.problems };
+    const outsidePeriod = !inPeriod(c.datePurchased ?? c.createDate, cfg);
+    const item = { id: c.id, name: c.name ?? null, amountEUR, kind, problems: checked.problems, outsidePeriod };
     if (c.ticketID != null) ensure(c.ticketID).charges.push(item);
     else looseCharges.push(item);
   }
@@ -371,17 +377,14 @@ export async function fetchReview(companyInput, cfg) {
   const projects = await atFetchAll("Projects", [{ field: "companyID", op: "eq", value: company.id }]);
   const projectIds = projects.map((p) => p.id);
 
-  // Task 12 (N2): periode-begrenzing zodat het `period`-label de lading dekt. Labour op
-  // dateWorked, charges op (datePurchased ?? createDate); dateloze charges blijven staan
-  // (inPeriod: null/leeg -> true) zodat we niets stilzwijgend laten vallen.
-  const labourRaw = (await fetchBatchedIn("TimeEntries", "contractID", contractIds, [{ field: "isNonBillable", op: "eq", value: false }]))
-    .filter((t) => inPeriod(t.dateWorked, cfg));
-  const ticketChargesRaw = (await fetchBatchedIn("TicketCharges", "ticketID", ticketIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]))
-    .filter((c) => inPeriod(c.datePurchased ?? c.createDate, cfg));
-  const contractChargesRaw = (await fetchBatchedIn("ContractCharges", "contractID", contractIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]))
-    .filter((c) => inPeriod(c.datePurchased ?? c.createDate, cfg));
-  const projectChargesRaw = (await fetchBatchedIn("ProjectCharges", "projectID", projectIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]))
-    .filter((c) => inPeriod(c.datePurchased ?? c.createDate, cfg));
+  // Task 12.1: GEEN periode-filter meer op de fetch (verborg legitieme nog-te-posten
+  // items met een datum buiten de maand, bv. "Buitenbundel mei"). review toont weer ALLE
+  // nog-niet-geposte items; outsidePeriod wordt als informatieve flag per item meegegeven
+  // door buildReview (zie daar), niet als drop-filter hier.
+  const labourRaw = await fetchBatchedIn("TimeEntries", "contractID", contractIds, [{ field: "isNonBillable", op: "eq", value: false }]);
+  const ticketChargesRaw = await fetchBatchedIn("TicketCharges", "ticketID", ticketIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
+  const contractChargesRaw = await fetchBatchedIn("ContractCharges", "contractID", contractIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
+  const projectChargesRaw = await fetchBatchedIn("ProjectCharges", "projectID", projectIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
 
   // Precieze posted-detectie op labour: BillingItems met timeEntryID in de kandidaat-ids
   // zelf, niet via de bredere contract-fetch. Als BillingItem.contractID bij afwijkende/
@@ -541,15 +544,14 @@ export async function fetchSummary(cfg) {
   // (Recurring e.d.) en gesloten contracten tellen niet mee. Dit filter raakt alleen
   // de labour-query hieronder, niet de contractInfo-attributiekaart hierboven.
   const billableContractIds = contracts.filter((c) => c.status === 1 && INVOICED_CONTRACT_TYPES.has(c.contractType)).map((c) => c.id);
-  // Task 12 (N2): periode-begrenzing, zelfde inPeriod-helper als fetchReview. Labour op
-  // dateWorked, charges op (datePurchased ?? createDate); dateloze charges blijven staan.
-  const labourRaw = (await fetchBatchedIn("TimeEntries", "contractID", billableContractIds, [{ field: "isNonBillable", op: "eq", value: false }], 200))
-    .filter((t) => inPeriod(t.dateWorked, cfg));
+  // Task 12.1: GEEN periode-filter meer (zie fetchReview hierboven voor de reden). summary
+  // toont weer ALLE nog-niet-geposte labour/charges op afgeronde tickets, ongeacht datum.
+  const labourRaw = await fetchBatchedIn("TimeEntries", "contractID", billableContractIds, [{ field: "isNonBillable", op: "eq", value: false }], 200);
 
   const chargeFilter = [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }];
-  const ticketChargesRaw = (await atFetchAll("TicketCharges", chargeFilter)).filter((c) => inPeriod(c.datePurchased ?? c.createDate, cfg));
-  const contractChargesRaw = (await atFetchAll("ContractCharges", chargeFilter)).filter((c) => inPeriod(c.datePurchased ?? c.createDate, cfg));
-  const projectChargesRaw = (await atFetchAll("ProjectCharges", chargeFilter)).filter((c) => inPeriod(c.datePurchased ?? c.createDate, cfg));
+  const ticketChargesRaw = await atFetchAll("TicketCharges", chargeFilter);
+  const contractChargesRaw = await atFetchAll("ContractCharges", chargeFilter);
+  const projectChargesRaw = await atFetchAll("ProjectCharges", chargeFilter);
 
   // Posted-exclusie via BillingItem-kruisverwijzing, gebatcht (~300/call). Sequentieel
   // (niet Promise.all) om binnen Autotask' rate-limit van 3 gelijktijdige threads te

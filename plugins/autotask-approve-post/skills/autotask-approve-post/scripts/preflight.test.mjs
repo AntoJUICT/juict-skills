@@ -22,7 +22,7 @@ test("loadConfig: rankHourRate negeert niet-getal en valt terug op 75", () => {
   assert.equal(loadConfig({ rankHourRate: "100" }, new Date("2026-07-24T10:00:00Z")).rankHourRate, 75);
 });
 
-// ─── inPeriod (fetch-laag periode-filter, Task 12 N2) ───────────────────
+// ─── inPeriod (Task 12.1: bron voor de outsidePeriod-FLAG in buildReview, geen fetch-filter meer) ───
 
 test("inPeriod: datum binnen periode is true", () => {
   assert.equal(inPeriod("2026-06-15T09:00:00", cfg), true);
@@ -162,6 +162,46 @@ test("buildReview: projectCharge (geen ticket) landt in looseCharges met kind pr
   assert.equal(out.looseCharges[0].id, 60);
   assert.equal(out.looseCharges[0].kind, "projectCharge");
   assert.equal(out.totals.chargeAmountEUR, 40);
+});
+
+// ─── outsidePeriod (Task 12.1: FLAG i.p.v. filter, item blijft altijd staan) ──
+
+test("buildReview: time entry met dateWorked vóór periodStart krijgt outsidePeriod:true en wordt NIET weggefilterd", () => {
+  const { charges, notesByTicket } = reviewFixtures();
+  const timeEntries = [
+    te({ id: 1, ticketID: 100, dateWorked: "2026-05-20T09:00:00" }), // vóór periodStart 2026-06-01
+    te({ id: 2, ticketID: 101, dateWorked: "2026-06-15T09:00:00" }), // binnen periode
+  ];
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg);
+  const t100 = out.tickets.find((t) => t.ticketID === 100);
+  const t101 = out.tickets.find((t) => t.ticketID === 101);
+  const oud = t100.timeEntries.find((i) => i.id === 1);
+  const binnen = t101.timeEntries.find((i) => i.id === 2);
+  assert.equal(oud.outsidePeriod, true); // geflagd, niet gedropt
+  assert.equal(binnen.outsidePeriod, false);
+  assert.equal(out.totals.timeEntryCount, 2); // beide blijven staan
+});
+
+test("buildReview: charge met datePurchased vóór periodStart krijgt outsidePeriod:true en wordt NIET weggefilterd", () => {
+  const { timeEntries, notesByTicket } = reviewFixtures();
+  const charges = [
+    { ...ch({ id: 50, ticketID: 100, datePurchased: "2026-05-10T00:00:00", createDate: "2026-05-10T00:00:00" }), kind: "ticketCharge" }, // "Buitenbundel mei"
+  ];
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg);
+  const t100 = out.tickets.find((t) => t.ticketID === 100);
+  const item = t100.charges.find((i) => i.id === 50);
+  assert.equal(item.outsidePeriod, true);
+  assert.equal(out.totals.chargeCount, 1); // blijft staan, wordt niet gedropt
+});
+
+test("buildReview: charge zonder datePurchased/createDate krijgt outsidePeriod:false (niet valselijk geflagd)", () => {
+  const { timeEntries, notesByTicket } = reviewFixtures();
+  const charges = [
+    { ...ch({ id: 50, ticketID: 100, datePurchased: null, createDate: null }), kind: "ticketCharge" },
+  ];
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg);
+  const t100 = out.tickets.find((t) => t.ticketID === 100);
+  assert.equal(t100.charges.find((i) => i.id === 50).outsidePeriod, false);
 });
 
 // ─── buildBilledMap / isInvoiced (gedekt-vs-gefactureerd classificatie) ──
