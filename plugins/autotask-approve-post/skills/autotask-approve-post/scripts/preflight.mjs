@@ -276,6 +276,33 @@ const VAULT = "juict-kv-g4fhuo35";
 const BASE = "https://webservices19.autotask.net/ATServicesRest/V1.0";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// ─────────────────────────────────────────────────────────────────────
+// Task 13 (v2.8): partial-failure vangnet. Eén mislukte fetch (na
+// atFetchAll's eigen 429/5xx-retries) mag de hele org-run niet meer
+// afbreken. safeFetch vangt de fout, noteert een warning en levert een
+// fallback zodat de aanroeper met een gedeeltelijk resultaat doorgaat.
+// renderWarnings maakt daarvan aan het eind een niet-te-missen banner.
+// ─────────────────────────────────────────────────────────────────────
+
+export async function safeFetch(warnings, label, fn, fallback = []) {
+  try {
+    return await fn();
+  } catch (e) {
+    warnings.push(`${label}: ${e?.message ?? e}`);
+    return fallback;
+  }
+}
+
+// PURE: leeg -> lege string (geen valse banner bij een schone run).
+export function renderWarnings(warnings) {
+  if (!warnings || warnings.length === 0) return "";
+  return [
+    "LET OP: dit overzicht is mogelijk ONVOLLEDIG. De volgende ophaalacties faalden:",
+    ...warnings.map((w) => `  - ${w}`),
+    "Draai het commando opnieuw of controleer de ontbrekende data handmatig in Autotask.",
+  ].join("\n");
+}
+
 function getSecret(name) {
   return execSync(`az keyvault secret show --vault-name ${VAULT} --name ${name} --query value -o tsv`, { encoding: "utf8" }).trim();
 }
@@ -348,6 +375,9 @@ async function fetchNotesByTicket(ticketIds) {
 }
 
 export async function fetchReview(companyInput, cfg) {
+  // Task 13: company-resolutie blijft FATAAL (zonder company is er niets om te
+  // reviewen); resolveCompany gooit al een nette Error (geen stacktrace), dat
+  // gedrag blijft ongewijzigd. Alle sub-fetches hieronder zijn wel resilient.
   const resolved = await resolveCompany(companyInput);
   if (resolved.candidates) {
     console.error(`Meerdere klanten gevonden voor "${companyInput}", geef een companyID mee:`);
@@ -356,7 +386,11 @@ export async function fetchReview(companyInput, cfg) {
   }
   const company = { id: resolved.id, name: resolved.name };
 
-  const contracts = await atFetchAll("Contracts", [{ field: "companyID", op: "eq", value: company.id }]);
+  // Task 13: verzamelt niet-fatale ophaalfouten voor deze klant; wordt aan het
+  // eind zowel in ReviewOutput.warnings als via renderWarnings naar stderr getoond.
+  const warnings = [];
+
+  const contracts = await safeFetch(warnings, "Contracts", () => atFetchAll("Contracts", [{ field: "companyID", op: "eq", value: company.id }]));
   const contractIds = contracts.map((c) => c.id);
   const contractInfo = new Map(contracts.map((c) => [c.id, { name: c.contractName ?? null, type: c.contractType ?? null }]));
   // Volledige actieve contractlijst van de klant (status 1), meegegeven aan buildReview
@@ -366,7 +400,7 @@ export async function fetchReview(companyInput, cfg) {
     .filter((c) => c.status === 1)
     .map((c) => ({ id: c.id, name: c.contractName ?? null, type: c.contractType ?? null }));
 
-  const ticketsRaw = await atFetchAll("Tickets", [{ field: "companyID", op: "eq", value: company.id }]);
+  const ticketsRaw = await safeFetch(warnings, "Tickets", () => atFetchAll("Tickets", [{ field: "companyID", op: "eq", value: company.id }]));
   const tickets = ticketsRaw.map((t) => ({ id: t.id, ticketNumber: t.ticketNumber ?? null, title: t.title ?? null, description: t.description ?? null, status: t.status ?? null }));
   const ticketIds = tickets.map((t) => t.id);
   // Task 10: alleen afgeronde tickets (status 5/16) horen in het overzicht.
@@ -374,31 +408,34 @@ export async function fetchReview(companyInput, cfg) {
   // extra fetch nodig.
   const completeTicketIds = new Set(tickets.filter((t) => COMPLETE_TICKET_STATUSES.has(t.status)).map((t) => t.id));
 
-  const projects = await atFetchAll("Projects", [{ field: "companyID", op: "eq", value: company.id }]);
+  const projects = await safeFetch(warnings, "Projects", () => atFetchAll("Projects", [{ field: "companyID", op: "eq", value: company.id }]));
   const projectIds = projects.map((p) => p.id);
 
   // Task 12.1: GEEN periode-filter meer op de fetch (verborg legitieme nog-te-posten
   // items met een datum buiten de maand, bv. "Buitenbundel mei"). review toont weer ALLE
   // nog-niet-geposte items; outsidePeriod wordt als informatieve flag per item meegegeven
   // door buildReview (zie daar), niet als drop-filter hier.
-  const labourRaw = await fetchBatchedIn("TimeEntries", "contractID", contractIds, [{ field: "isNonBillable", op: "eq", value: false }]);
-  const ticketChargesRaw = await fetchBatchedIn("TicketCharges", "ticketID", ticketIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
-  const contractChargesRaw = await fetchBatchedIn("ContractCharges", "contractID", contractIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
-  const projectChargesRaw = await fetchBatchedIn("ProjectCharges", "projectID", projectIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
+  // Task 13: niet-fataal, gebatcht mét warnings.
+  const labourRaw = await fetchBatchedIn("TimeEntries", "contractID", contractIds, [{ field: "isNonBillable", op: "eq", value: false }], 300, warnings);
+  const ticketChargesRaw = await fetchBatchedIn("TicketCharges", "ticketID", ticketIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }], 300, warnings);
+  const contractChargesRaw = await fetchBatchedIn("ContractCharges", "contractID", contractIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }], 300, warnings);
+  const projectChargesRaw = await fetchBatchedIn("ProjectCharges", "projectID", projectIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }], 300, warnings);
 
   // Precieze posted-detectie op labour: BillingItems met timeEntryID in de kandidaat-ids
   // zelf, niet via de bredere contract-fetch. Als BillingItem.contractID bij afwijkende/
   // legacy data niet exact matcht met de bron-time-entry, zou een al-geposte entry anders
   // ten onrechte als "pending" kunnen terugkomen -> risico op dubbel factureren. Gebatcht
   // (net als summary) om 500's bij klanten met veel tickets/time entries te voorkomen.
-  const postedTimeEntryIds = await postedIdsBatched("timeEntryID", labourRaw.map((t) => t.id));
+  // Task 13: niet-fataal; een mislukte posted-check-batch noteert expliciet dat de
+  // posted-check onvolledig is (mogelijk al-geposte items tonen als pending).
+  const postedTimeEntryIds = await postedIdsBatched("timeEntryID", labourRaw.map((t) => t.id), 300, warnings);
   // Aparte, bredere BillingItems-fetch op contractID: uitsluitend input voor buildBilledMap
   // (historische gefactureerd/gedekt-classificatie), niet voor de posted-exclusie hierboven.
-  const billingItemsRaw = await fetchBatchedIn("BillingItems", "contractID", contractIds, []);
+  const billingItemsRaw = await fetchBatchedIn("BillingItems", "contractID", contractIds, [], 300, warnings);
   const billedMap = buildBilledMap(billingItemsRaw);
-  const postedTicketChargeIds = await postedIdsBatched("ticketChargeID", ticketChargesRaw.map((c) => c.id));
-  const postedContractChargeIds = await postedIdsBatched("contractChargeID", contractChargesRaw.map((c) => c.id));
-  const postedProjectChargeIds = await postedIdsBatched("projectChargeID", projectChargesRaw.map((c) => c.id));
+  const postedTicketChargeIds = await postedIdsBatched("ticketChargeID", ticketChargesRaw.map((c) => c.id), 300, warnings);
+  const postedContractChargeIds = await postedIdsBatched("contractChargeID", contractChargesRaw.map((c) => c.id), 300, warnings);
+  const postedProjectChargeIds = await postedIdsBatched("projectChargeID", projectChargesRaw.map((c) => c.id), 300, warnings);
 
   const timeEntriesAll = labourRaw
     .filter((t) => !postedTimeEntryIds.has(t.id))
@@ -422,16 +459,20 @@ export async function fetchReview(companyInput, cfg) {
   const reviewTicketsList = tickets.filter((t) => completeTicketIds.has(t.id));
 
   const ticketsWithItems = [...new Set([...timeEntries.map((t) => t.ticketID), ...charges.map((c) => c.ticketID)].filter((x) => x != null))];
-  const notesByTicket = await fetchNotesByTicket(ticketsWithItems);
-  const workTypeNames = await fetchWorkTypeNames();
+  const notesByTicket = await safeFetch(warnings, "TicketNotes", () => fetchNotesByTicket(ticketsWithItems), new Map());
+  const workTypeNames = await safeFetch(warnings, "BillingCodes (work type namen)", () => fetchWorkTypeNames(), new Map());
 
   // review toont ALLE nog-niet-geposte items ongeacht datum, dus labour.outsidePeriod
   // zou hier valse "problemen" opleveren op legitiem oude, nog niet geposte entries.
   const reviewCfg = { ...cfg, enabledRules: cfg.enabledRules.filter((r) => r !== "labour.outsidePeriod") };
   const reviewOutput = buildReview(company, reviewTicketsList, timeEntries, charges, notesByTicket, workTypeNames, reviewCfg, billedMap, contractInfo, availableContracts);
+  reviewOutput.warnings = warnings;
 
   console.log(JSON.stringify(reviewOutput, null, 2));
   console.error(`Klant ${company.name} (${company.id}): ${reviewOutput.totals.ticketCount} tickets, ${reviewOutput.totals.timeEntryCount} time entries (${reviewOutput.totals.billableHours}u), ${reviewOutput.totals.chargeCount} charges (€${reviewOutput.totals.chargeAmountEUR.toFixed(2)}), ${reviewOutput.looseCharges.length} losse charges.`);
+  // Task 13: waarschuwingsbanner naar stderr zodat een gedeeltelijk overzicht
+  // niet onopgemerkt blijft (stdout blijft schone JSON voor pipes/tooling).
+  if (warnings.length) console.error(renderWarnings(warnings));
   return reviewOutput;
 }
 
@@ -479,12 +520,24 @@ export async function setNonBillable(ids, { confirm } = {}, patchFn = realPatchT
 // `id op:in`-fetches (BillingItems/Tickets/Projects), nooit per losse id.
 // ─────────────────────────────────────────────────────────────────────
 
-async function fetchBatchedIn(entity, field, ids, extraFilters = [], batchSize = 300) {
+// Task 13: optionele trailing `warnings`-param. Zonder `warnings` (ongewijzigd
+// gedrag, bestaande aanroepers/tests): een mislukte batch gooit door. Mét
+// `warnings`: elke batch afzonderlijk try/catch, een mislukte batch wordt
+// overgeslagen (partial resultaat) en genoteerd, de overige batches lopen door.
+async function fetchBatchedIn(entity, field, ids, extraFilters = [], batchSize = 300, warnings) {
   const unique = [...new Set(ids)].filter((x) => x != null);
   const out = [];
   for (let i = 0; i < unique.length; i += batchSize) {
     const batch = unique.slice(i, i + batchSize);
-    out.push(...(await atFetchAll(entity, [{ field, op: "in", value: batch }, ...extraFilters])));
+    if (!warnings) {
+      out.push(...(await atFetchAll(entity, [{ field, op: "in", value: batch }, ...extraFilters])));
+      continue;
+    }
+    try {
+      out.push(...(await atFetchAll(entity, [{ field, op: "in", value: batch }, ...extraFilters])));
+    } catch (e) {
+      warnings.push(`${entity}/${field} batch mislukt: ${e?.message ?? e}`);
+    }
   }
   return out;
 }
@@ -497,8 +550,25 @@ async function fetchBatchedIn(entity, field, ids, extraFilters = [], batchSize =
 // een bredere contract-brede fetch, om dubbel factureren door mismatchende contractID's
 // op legacy/afwijkende BillingItem-rijen te voorkomen. Gebatcht (~300/call) zodat dit
 // ook bij klanten met veel tickets/time entries niet op een 500 loopt.
-async function postedIdsBatched(field, ids, batchSize = 300) {
-  const rows = await fetchBatchedIn("BillingItems", field, ids, [], batchSize);
+// Task 13: optionele trailing `warnings`-param. Zonder `warnings`: ongewijzigd
+// (delegeert aan fetchBatchedIn, gooit door). Mét `warnings`: eigen per-batch
+// try/catch zodat de warning-tekst expliciet vermeldt dat de posted-check
+// onvolledig is (al-geposte items kunnen dan als pending getoond worden).
+async function postedIdsBatched(field, ids, batchSize = 300, warnings) {
+  if (!warnings) {
+    const rows = await fetchBatchedIn("BillingItems", field, ids, [], batchSize);
+    return postedIdsFromRows(rows, field);
+  }
+  const unique = [...new Set(ids)].filter((x) => x != null);
+  const rows = [];
+  for (let i = 0; i < unique.length; i += batchSize) {
+    const batch = unique.slice(i, i + batchSize);
+    try {
+      rows.push(...(await atFetchAll("BillingItems", [{ field, op: "in", value: batch }])));
+    } catch (e) {
+      warnings.push(`BillingItems/${field} posted-check batch mislukt: ${e?.message ?? e}; posted-check onvolledig, mogelijk al-geposte items tonen als pending`);
+    }
+  }
   return postedIdsFromRows(rows, field);
 }
 
@@ -515,12 +585,25 @@ async function resolveRemoteSupportCodeId() {
 }
 
 export async function fetchSummary(cfg) {
+  // Task 13: verzamelt niet-fatale ophaalfouten; wordt bovenaan de output als
+  // banner getoond (renderWarnings) zodat een gedeeltelijk overzicht opvalt.
+  const warnings = [];
+
   // labour.outsidePeriod zou hier valse signalen geven: summary kijkt (net als
   // review) naar ALLE nog-niet-geposte items, ongeacht datum.
   const summaryCfg = { ...cfg, enabledRules: cfg.enabledRules.filter((r) => r !== "labour.outsidePeriod") };
 
-  // Bulk-fetch #1: Companies (id -> naam), EEN keer voor de hele org.
-  const companies = await atFetchAll("Companies", [{ field: "isActive", op: "eq", value: true }]);
+  // Bulk-fetch #1: Companies (id -> naam), EEN keer voor de hele org. Zonder deze
+  // map is geen enkele company-attributie mogelijk, dus dit blijft FATAAL -- maar
+  // met een nette foutmelding i.p.v. een ruwe stacktrace (Task 13).
+  let companies;
+  try {
+    companies = await atFetchAll("Companies", [{ field: "isActive", op: "eq", value: true }]);
+  } catch (e) {
+    console.error(`Kan summary niet starten: Companies ophalen mislukt: ${e?.message ?? e}`);
+    process.exit(1);
+    return;
+  }
   const names = new Map(companies.map((c) => [c.id, c.companyName]));
 
   // Bulk-fetch #2: ALLE Contracts (id -> {companyID, naam, type}), EEN keer, zonder
@@ -528,8 +611,16 @@ export async function fetchSummary(cfg) {
   // contracten kunnen herleiden (anders belandt labour/charges op een inmiddels
   // gesloten contract onterecht in de "Niet toegewezen"-bak). Het active + billable
   // type-filter (1/4/8) wordt hieronder apart toegepast, alleen voor de vraag welke
-  // contracten factureerbare labour opleveren.
-  const contracts = await atFetchAll("Contracts", [{ field: "id", op: "gte", value: 0 }]);
+  // contracten factureerbare labour opleveren. Zonder deze map is toewijzing
+  // onmogelijk, dus ook FATAAL (Task 13), met dezelfde nette foutmelding.
+  let contracts;
+  try {
+    contracts = await atFetchAll("Contracts", [{ field: "id", op: "gte", value: 0 }]);
+  } catch (e) {
+    console.error(`Kan summary niet starten: Contracts ophalen mislukt: ${e?.message ?? e}`);
+    process.exit(1);
+    return;
+  }
   const contractInfo = new Map(contracts.map((c) => [c.id, { companyID: c.companyID, name: c.contractName ?? null, type: c.contractType ?? null }]));
 
   // BillingCodes (work-type namen) wordt bewust NIET gebulkfetcht: checkLabour/
@@ -546,21 +637,25 @@ export async function fetchSummary(cfg) {
   const billableContractIds = contracts.filter((c) => c.status === 1 && INVOICED_CONTRACT_TYPES.has(c.contractType)).map((c) => c.id);
   // Task 12.1: GEEN periode-filter meer (zie fetchReview hierboven voor de reden). summary
   // toont weer ALLE nog-niet-geposte labour/charges op afgeronde tickets, ongeacht datum.
-  const labourRaw = await fetchBatchedIn("TimeEntries", "contractID", billableContractIds, [{ field: "isNonBillable", op: "eq", value: false }], 200);
+  // Task 13: niet-fataal -- een mislukte batch levert een partial lijst + warning i.p.v.
+  // de hele summary-run af te breken.
+  const labourRaw = await fetchBatchedIn("TimeEntries", "contractID", billableContractIds, [{ field: "isNonBillable", op: "eq", value: false }], 200, warnings);
 
   const chargeFilter = [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }];
-  const ticketChargesRaw = await atFetchAll("TicketCharges", chargeFilter);
-  const contractChargesRaw = await atFetchAll("ContractCharges", chargeFilter);
-  const projectChargesRaw = await atFetchAll("ProjectCharges", chargeFilter);
+  const ticketChargesRaw = await safeFetch(warnings, "TicketCharges", () => atFetchAll("TicketCharges", chargeFilter));
+  const contractChargesRaw = await safeFetch(warnings, "ContractCharges", () => atFetchAll("ContractCharges", chargeFilter));
+  const projectChargesRaw = await safeFetch(warnings, "ProjectCharges", () => atFetchAll("ProjectCharges", chargeFilter));
 
   // Posted-exclusie via BillingItem-kruisverwijzing, gebatcht (~300/call). Sequentieel
   // (niet Promise.all) om binnen Autotask' rate-limit van 3 gelijktijdige threads te
   // blijven; deze codebase houdt zich aan sequentieel/max ~2 parallel, dus 4 losse
-  // parallelle requests hier zou een 429-risico zijn.
-  const postedTimeEntryIds = await postedIdsBatched("timeEntryID", labourRaw.map((t) => t.id));
-  const postedTicketChargeIds = await postedIdsBatched("ticketChargeID", ticketChargesRaw.map((c) => c.id));
-  const postedContractChargeIds = await postedIdsBatched("contractChargeID", contractChargesRaw.map((c) => c.id));
-  const postedProjectChargeIds = await postedIdsBatched("projectChargeID", projectChargesRaw.map((c) => c.id));
+  // parallelle requests hier zou een 429-risico zijn. Task 13: niet-fataal, gebatcht
+  // met warnings zodat een mislukte posted-check-batch expliciet vermeldt dat de
+  // posted-check onvolledig is (mogelijk al-geposte items tonen als pending).
+  const postedTimeEntryIds = await postedIdsBatched("timeEntryID", labourRaw.map((t) => t.id), 300, warnings);
+  const postedTicketChargeIds = await postedIdsBatched("ticketChargeID", ticketChargesRaw.map((c) => c.id), 300, warnings);
+  const postedContractChargeIds = await postedIdsBatched("contractChargeID", contractChargesRaw.map((c) => c.id), 300, warnings);
+  const postedProjectChargeIds = await postedIdsBatched("projectChargeID", projectChargesRaw.map((c) => c.id), 300, warnings);
 
   const labour = labourRaw.filter((t) => !postedTimeEntryIds.has(t.id));
   const ticketCharges = ticketChargesRaw.filter((c) => !postedTicketChargeIds.has(c.id)).map(mapCharge);
@@ -578,16 +673,16 @@ export async function fetchSummary(cfg) {
   // rsRaw wordt hier alvast opgehaald (ongefilterd) zodat de ticket-ids ervan
   // meekunnen in de EEN gebatchte Tickets-fetch hieronder; de eigenlijke
   // rsItems-classificatie/filtering gebeurt verderop, na completeTicketIds.
-  const remoteSupportCodeId = await resolveRemoteSupportCodeId();
+  const remoteSupportCodeId = await safeFetch(warnings, "Remote Support work type lookup", () => resolveRemoteSupportCodeId(), null);
   // Task 12 (N5): stil leeg overslaan verbergt een kapotte work-type-lookup; een expliciete
   // waarschuwing maakt dat zichtbaar in plaats van dat de RS-digest gewoon leeg lijkt.
   if (remoteSupportCodeId == null) console.error("Waarschuwing: work type 'Remote Support' niet gevonden; RS-digest overgeslagen.");
-  const rsRaw = remoteSupportCodeId != null ? await atFetchAll("TimeEntries", [
+  const rsRaw = remoteSupportCodeId != null ? await safeFetch(warnings, "Remote Support TimeEntries", () => atFetchAll("TimeEntries", [
     { field: "billingCodeID", op: "eq", value: remoteSupportCodeId },
     { field: "isNonBillable", op: "eq", value: false },
     { field: "dateWorked", op: "gte", value: `${cfg.periodStart}T00:00:00` },
     { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` },
-  ]) : [];
+  ])) : [];
 
   // Company-attributie EN Task-10 ticket-status in EEN gebatchte Tickets-fetch
   // (id op:in), op de unie van alle ticket-ids uit ticketCharges, billable
@@ -600,13 +695,13 @@ export async function fetchSummary(cfg) {
     ...labour.map((t) => t.ticketID),
     ...rsRaw.map((t) => t.ticketID),
   ];
-  const ticketsRows = await fetchBatchedIn("Tickets", "id", ticketIdsForLookup, [], 300);
+  const ticketsRows = await fetchBatchedIn("Tickets", "id", ticketIdsForLookup, [], 300, warnings);
   const ticketCompany = new Map(ticketsRows.map((t) => [t.id, t.companyID]));
   // Task 10: een ticket is "afgerond" bij status 5 (Complete) of 16 (Autocomplete
   // RMM). Alleen ticket-gebonden items op een afgerond ticket blijven staan.
   const completeTicketIds = new Set(ticketsRows.filter((t) => COMPLETE_TICKET_STATUSES.has(t.status)).map((t) => t.id));
 
-  const postedRsIds = await postedIdsBatched("timeEntryID", rsRaw.map((t) => t.id));
+  const postedRsIds = await postedIdsBatched("timeEntryID", rsRaw.map((t) => t.id), 300, warnings);
   const rsItemsAll = rsRaw
     .filter((t) => !postedRsIds.has(t.id))
     // Alleen gedekte contracten (niet al facturabel meegeteld hierboven):
@@ -622,7 +717,7 @@ export async function fetchSummary(cfg) {
   const remoteSupportReview = buildRemoteSupportReview(rsItems);
 
   const projectIds = projectCharges.map((c) => c.projectID);
-  const projectsRows = await fetchBatchedIn("Projects", "id", projectIds, [], 300);
+  const projectsRows = await fetchBatchedIn("Projects", "id", projectIds, [], 300, warnings);
   const projectCompany = new Map(projectsRows.map((p) => [p.id, p.companyID]));
 
   // Task 10: ticket-gebonden items (labour met ticketID, ticket-charges) alleen
@@ -658,6 +753,10 @@ export async function fetchSummary(cfg) {
 
   const { rows, hidden } = buildSummary(items, cfg.rankHourRate);
 
+  // Task 13: waarschuwingsbanner bovenaan, vóór de KLANT-tabel, zodat een
+  // gedeeltelijk (door mislukte fetches) overzicht niet onopgemerkt blijft.
+  if (warnings.length) console.log(renderWarnings(warnings));
+
   console.log("KLANT | TE FACTUREREN | SIGNALEN");
   for (const r of rows) {
     const parts = [];
@@ -678,7 +777,7 @@ export async function fetchSummary(cfg) {
     }
   }
 
-  return { rows, hidden, remoteSupportReview };
+  return { rows, hidden, remoteSupportReview, warnings };
 }
 
 // ─────────────────────────────────────────────────────────────────────

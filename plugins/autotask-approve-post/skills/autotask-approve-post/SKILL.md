@@ -23,6 +23,19 @@ actie is omkeerbaar (non-billable kan weer terug). Geposte entries worden
 door de Autotask API zelf geweigerd, dus een verkeerde zet op een geposte
 entry heeft sowieso geen effect.
 
+## Onvolledig overzicht (partial-failure vangnet)
+
+Eén mislukte fetch breekt `summary`/`review` niet meer af. Companies en
+Contracts blijven fataal (zonder die twee kan niets aan een klant worden
+toegewezen); alle andere ophaalacties (charges, time entries, BillingItems,
+tickets, projects, de Remote Support-fetch en de posted-checks) vangen een
+fout op en gaan door met de rest. Als er iets is misgelukt, verschijnt
+bovenaan de output (bij `summary` op stdout, bij `review` op stderr en in
+`ReviewOutput.warnings`) een banner die begint met "LET OP: dit overzicht is
+mogelijk ONVOLLEDIG" met daaronder welke ophaalactie(s) faalden. Zie ik die
+banner, dan draai ik het commando gewoon opnieuw of check de ontbrekende data
+handmatig in Autotask voordat ik het overzicht als volledig behandel.
+
 ## Periode als referentie (geen filter) en T&M vs prepaid
 
 `summary` en `review` tonen ALLE nog niet geposte time entries en charges op

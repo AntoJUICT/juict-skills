@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod, safeFetch, renderWarnings } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -562,4 +562,38 @@ test("COMPLETE_TICKET_STATUSES bevat 5 (Complete) en 16 (Autocomplete RMM)", () 
   assert.ok(COMPLETE_TICKET_STATUSES.has(5));
   assert.ok(COMPLETE_TICKET_STATUSES.has(16));
   assert.equal(COMPLETE_TICKET_STATUSES.size, 2);
+});
+
+// ─── safeFetch / renderWarnings (Task 13: partial-failure vangnet) ──────
+
+test("safeFetch: fn slaagt -> geeft data terug, warnings blijft leeg", async () => {
+  const warnings = [];
+  const result = await safeFetch(warnings, "X", async () => [1, 2]);
+  assert.deepEqual(result, [1, 2]);
+  assert.deepEqual(warnings, []);
+});
+
+test("safeFetch: fn gooit -> geeft fallback terug en noteert een warning met label+foutmelding", async () => {
+  const warnings = [];
+  const result = await safeFetch(warnings, "X", async () => { throw new Error("boom"); });
+  assert.deepEqual(result, []);
+  assert.equal(warnings.length, 1);
+  assert.ok(warnings[0].includes("X"));
+  assert.ok(warnings[0].includes("boom"));
+});
+
+test("safeFetch: custom fallback wordt teruggegeven bij een fout", async () => {
+  const warnings = [];
+  const result = await safeFetch(warnings, "X", async () => { throw new Error("boom"); }, null);
+  assert.equal(result, null);
+});
+
+test("renderWarnings: lege array geeft lege string", () => {
+  assert.equal(renderWarnings([]), "");
+});
+
+test("renderWarnings: met items geeft een banner met ONVOLLEDIG en de warning-tekst", () => {
+  const out = renderWarnings(["a: b"]);
+  assert.ok(out.includes("ONVOLLEDIG"));
+  assert.ok(out.includes("a: b"));
 });
