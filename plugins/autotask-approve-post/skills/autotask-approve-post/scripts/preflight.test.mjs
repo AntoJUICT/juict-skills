@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, keepIfTicketComplete, COMPLETE_TICKET_STATUSES } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -11,6 +11,34 @@ test("loadConfig valt terug op vorige maand", () => {
   const c = loadConfig({}, new Date("2026-07-24T10:00:00Z"));
   assert.equal(c.periodStart, "2026-06-01");
   assert.equal(c.periodEnd, "2026-06-30");
+});
+test("loadConfig: rankHourRate default 75", () => {
+  assert.equal(loadConfig({}, new Date("2026-07-24T10:00:00Z")).rankHourRate, 75);
+});
+test("loadConfig: rankHourRate overneembaar uit raw config als getal", () => {
+  assert.equal(loadConfig({ rankHourRate: 100 }, new Date("2026-07-24T10:00:00Z")).rankHourRate, 100);
+});
+test("loadConfig: rankHourRate negeert niet-getal en valt terug op 75", () => {
+  assert.equal(loadConfig({ rankHourRate: "100" }, new Date("2026-07-24T10:00:00Z")).rankHourRate, 75);
+});
+
+// ─── inPeriod (fetch-laag periode-filter, Task 12 N2) ───────────────────
+
+test("inPeriod: datum binnen periode is true", () => {
+  assert.equal(inPeriod("2026-06-15T09:00:00", cfg), true);
+});
+test("inPeriod: datum buiten periode is false", () => {
+  assert.equal(inPeriod("2026-05-30T09:00:00", cfg), false);
+  assert.equal(inPeriod("2026-07-01T09:00:00", cfg), false);
+});
+test("inPeriod: grenswaarden periodStart/periodEnd zijn inclusief", () => {
+  assert.equal(inPeriod("2026-06-01T00:00:00", cfg), true);
+  assert.equal(inPeriod("2026-06-30T23:59:59", cfg), true);
+});
+test("inPeriod: null of lege datum is true (dateloos item niet stilzwijgend laten vallen)", () => {
+  assert.equal(inPeriod(null, cfg), true);
+  assert.equal(inPeriod("", cfg), true);
+  assert.equal(inPeriod(undefined, cfg), true);
 });
 test("checkLabour: schone entry = geen problemen", () => {
   assert.deepEqual(checkLabour(te(), cfg).problems, []);
@@ -281,6 +309,7 @@ test("shouldConfirm: --confirm wint alleen zonder --dry-run", () => {
 // ─── buildSummary (org-brede triage, pure aggregatie) ───────────────────
 
 const si = (o = {}) => ({ companyId: 1, companyName: "Acme BV", kind: "labour", amountEUR: 0, hours: 0, problems: [], ...o });
+const RANK = 75;
 
 test("buildSummary: sommeert chargeEUR over charge-kinds per klant", () => {
   const items = [
@@ -288,20 +317,31 @@ test("buildSummary: sommeert chargeEUR over charge-kinds per klant", () => {
     si({ companyId: 1, kind: "contractCharge", amountEUR: 50 }),
     si({ companyId: 1, kind: "projectCharge", amountEUR: 25 }),
   ];
-  const { rows } = buildSummary(items);
+  const { rows } = buildSummary(items, RANK);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].companyId, 1);
   assert.equal(rows[0].chargeEUR, 175);
 });
 
-test("buildSummary: sommeert billableHours alleen over labour-items", () => {
+test("buildSummary: sommeert billableHours alleen over niet-prepaid labour-items", () => {
   const items = [
     si({ companyId: 1, kind: "labour", hours: 2 }),
     si({ companyId: 1, kind: "labour", hours: 3.5 }),
     si({ companyId: 1, kind: "ticketCharge", amountEUR: 10, hours: 999 }), // hours op een charge telt niet mee
   ];
-  const { rows } = buildSummary(items);
+  const { rows } = buildSummary(items, RANK);
   assert.equal(rows[0].billableHours, 5.5);
+  assert.equal(rows[0].prepaidHours, 0);
+});
+
+test("buildSummary: prepaid labour (Block Hours/Per Ticket) telt apart mee als prepaidHours, niet als billableHours", () => {
+  const items = [
+    si({ companyId: 1, kind: "labour", hours: 4, prepaid: false }),
+    si({ companyId: 1, kind: "labour", hours: 10, prepaid: true }),
+  ];
+  const { rows } = buildSummary(items, RANK);
+  assert.equal(rows[0].billableHours, 4);
+  assert.equal(rows[0].prepaidHours, 10);
 });
 
 test("buildSummary: signalCount is de som van problems.length over alle items van de klant", () => {
@@ -309,7 +349,7 @@ test("buildSummary: signalCount is de som van problems.length over alle items va
     si({ companyId: 1, kind: "labour", hours: 1, problems: [{ code: "labour.zeroHours" }] }),
     si({ companyId: 1, kind: "ticketCharge", amountEUR: 10, problems: [{ code: "charge.zeroAmount" }, { code: "charge.missingWorkType" }] }),
   ];
-  const { rows } = buildSummary(items);
+  const { rows } = buildSummary(items, RANK);
   assert.equal(rows[0].signalCount, 3);
 });
 
@@ -318,7 +358,7 @@ test("buildSummary: aggregeert per companyId, niet cross-klant", () => {
     si({ companyId: 1, companyName: "Acme BV", kind: "ticketCharge", amountEUR: 100 }),
     si({ companyId: 2, companyName: "Contoso", kind: "ticketCharge", amountEUR: 50 }),
   ];
-  const { rows } = buildSummary(items);
+  const { rows } = buildSummary(items, RANK);
   assert.equal(rows.length, 2);
   const acme = rows.find((r) => r.companyId === 1), contoso = rows.find((r) => r.companyId === 2);
   assert.equal(acme.companyName, "Acme BV");
@@ -332,7 +372,7 @@ test("buildSummary: klant zonder te-factureren en zonder signalen wordt verborge
     si({ companyId: 1, kind: "ticketCharge", amountEUR: 0, hours: 0, problems: [] }), // niets actiehoudend
     si({ companyId: 2, kind: "ticketCharge", amountEUR: 10 }), // wel actiehoudend
   ];
-  const { rows, hidden } = buildSummary(items);
+  const { rows, hidden } = buildSummary(items, RANK);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].companyId, 2);
   assert.equal(hidden, 1);
@@ -342,36 +382,58 @@ test("buildSummary: signalCount>0 alleen is ook actiehoudend (0 charge, 0 uur, w
   const items = [
     si({ companyId: 1, kind: "labour", hours: 0, problems: [{ code: "labour.zeroHours" }] }),
   ];
-  const { rows, hidden } = buildSummary(items);
+  const { rows, hidden } = buildSummary(items, RANK);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].signalCount, 1);
   assert.equal(hidden, 0);
 });
 
-test("buildSummary: sorteert op chargeEUR desc, dan billableHours desc", () => {
+test("buildSummary: prepaidHours>0 alleen (0 charge, 0 T&M-uren, geen signalen) is ook actiehoudend", () => {
+  const items = [
+    si({ companyId: 1, companyName: "Alleen prepaid", kind: "labour", hours: 8, prepaid: true }),
+  ];
+  const { rows, hidden } = buildSummary(items, RANK);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].companyId, 1);
+  assert.equal(rows[0].prepaidHours, 8);
+  assert.equal(rows[0].billableHours, 0);
+  assert.equal(hidden, 0);
+});
+
+test("buildSummary: rangeert op chargeEUR + billableHours*rankHourRate desc (uren-zware klant boven charge-zware klant met lager rankHourRate-gewogen totaal)", () => {
   const items = [
     si({ companyId: 1, companyName: "Laag bedrag", kind: "ticketCharge", amountEUR: 10 }),
     si({ companyId: 2, companyName: "Hoog bedrag", kind: "ticketCharge", amountEUR: 500 }),
-    si({ companyId: 3, companyName: "Alleen uren hoog", kind: "labour", hours: 20 }),
-    si({ companyId: 4, companyName: "Alleen uren laag", kind: "labour", hours: 2 }),
+    si({ companyId: 3, companyName: "Alleen uren hoog", kind: "labour", hours: 20 }), // 20*75 = 1500
+    si({ companyId: 4, companyName: "Alleen uren laag", kind: "labour", hours: 2 }), // 2*75 = 150
   ];
-  const { rows } = buildSummary(items);
-  assert.deepEqual(rows.map((r) => r.companyId), [2, 1, 3, 4]);
+  const { rows } = buildSummary(items, RANK);
+  // rank: 3=1500, 2=500, 4=150, 1=10 -> uren-zware klant (3) staat nu boven de charge-zware klant (2)
+  assert.deepEqual(rows.map((r) => r.companyId), [3, 2, 4, 1]);
 });
 
-test("buildSummary: bij gelijke chargeEUR wint hogere billableHours", () => {
+test("buildSummary: prepaidHours telt niet mee in de rank, alleen billableHours (T&M)", () => {
+  const items = [
+    si({ companyId: 1, companyName: "T&M uren", kind: "labour", hours: 10, prepaid: false }), // rank 10*75=750
+    si({ companyId: 2, companyName: "Prepaid uren", kind: "labour", hours: 1000, prepaid: true }), // rank blijft 0
+  ];
+  const { rows } = buildSummary(items, RANK);
+  assert.deepEqual(rows.map((r) => r.companyId), [1, 2]);
+});
+
+test("buildSummary: bij gelijke chargeEUR+billableHours*rankHourRate wint hogere billableHours (tie-break)", () => {
   const items = [
     si({ companyId: 1, kind: "ticketCharge", amountEUR: 100 }),
     si({ companyId: 1, kind: "labour", hours: 1 }),
     si({ companyId: 2, kind: "ticketCharge", amountEUR: 100 }),
     si({ companyId: 2, kind: "labour", hours: 5 }),
   ];
-  const { rows } = buildSummary(items);
+  const { rows } = buildSummary(items, RANK);
   assert.deepEqual(rows.map((r) => r.companyId), [2, 1]);
 });
 
 test("buildSummary: lege input geeft lege rows en hidden 0", () => {
-  const { rows, hidden } = buildSummary([]);
+  const { rows, hidden } = buildSummary([], RANK);
   assert.deepEqual(rows, []);
   assert.equal(hidden, 0);
 });

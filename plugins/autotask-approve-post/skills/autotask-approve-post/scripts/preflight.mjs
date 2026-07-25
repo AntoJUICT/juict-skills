@@ -28,9 +28,17 @@ export function loadConfig(raw, now) {
     enabledRules: Array.isArray(r.enabledRules) ? r.enabledRules : [...ALL_RULES],
     minChargeAmount: typeof r.minChargeAmount === "number" ? r.minChargeAmount : 0,
     neverBillBillingCodeIDs: Array.isArray(r.neverBillBillingCodeIDs) ? r.neverBillBillingCodeIDs : [],
+    // Task 12 (N3): weegt uren mee in de summary-ranking (chargeEUR + billableHours*rankHourRate).
+    rankHourRate: typeof r.rankHourRate === "number" ? r.rankHourRate : 75,
   };
 }
-const inPeriod = (date, cfg) => { if (!date) return false; const d = date.slice(0, 10); return d >= cfg.periodStart && d <= cfg.periodEnd; };
+// null/ontbrekende datum -> null (onbeslist); anders true/false op basis van [periodStart, periodEnd].
+function dateInRange(date, cfg) { if (!date) return null; const d = date.slice(0, 10); return d >= cfg.periodStart && d <= cfg.periodEnd; }
+// Task 12 (N2): periode-filter voor fetch-laag (fetchReview/fetchSummary). Anders dan
+// dateInRange hierboven (die checkLabour een ontbrekende dateWorked laat signaleren als
+// "buiten periode"), telt hier een lege/ontbrekende datum als "hou dit item": een
+// dateless charge (geen datePurchased/createDate) mag niet stilzwijgend uit de lijst vallen.
+export function inPeriod(dateStr, cfg) { const r = dateInRange(dateStr, cfg); return r === null ? true : r; }
 
 export function checkLabour(t, cfg) {
   const problems = [], on = (r) => cfg.enabledRules.includes(r);
@@ -39,7 +47,7 @@ export function checkLabour(t, cfg) {
   if (on("labour.zeroHours") && hours <= 0) problems.push({ code: "labour.zeroHours", message: "0 uur te factureren" });
   if (on("labour.missingRole") && !t.roleID) problems.push({ code: "labour.missingRole", message: "geen roleID" });
   if (on("labour.emptySummary") && (!t.summaryNotes || t.summaryNotes.trim() === "")) problems.push({ code: "labour.emptySummary", message: "lege summary (wordt factuurregel)" });
-  if (on("labour.outsidePeriod") && !inPeriod(t.dateWorked, cfg)) problems.push({ code: "labour.outsidePeriod", message: `dateWorked buiten periode (${t.dateWorked ?? "leeg"})` });
+  if (on("labour.outsidePeriod") && dateInRange(t.dateWorked, cfg) !== true) problems.push({ code: "labour.outsidePeriod", message: `dateWorked buiten periode (${t.dateWorked ?? "leeg"})` });
   return { kind: "labour", id: t.id, companyID: t.companyID, contractID: t.contractID, ticketID: t.ticketID, label: `TimeEntry ${t.id} - ${hours}u`, amountEUR: null, hours, problems };
 }
 
@@ -193,20 +201,28 @@ export function buildReview(company, tickets, timeEntries, charges, notesByTicke
 
 const CHARGE_KINDS = new Set(["ticketCharge", "contractCharge", "projectCharge"]);
 
-export function buildSummary(items) {
+// Task 12 (N4/N3): alleen echte T&M-uren (contractType 1, prepaid=false) tellen als
+// "te factureren" billableHours. Block Hours (4) en Per Ticket (8) zijn vooruitbetaald,
+// tonen we apart als prepaidHours, en tellen niet mee in de ranking (rankHourRate) --
+// anders zakt een klant met veel echte T&M-uren onterecht onder een prepaid-zware klant.
+export function buildSummary(items, rankHourRate) {
   const byCompany = new Map();
   for (const item of items) {
     if (!byCompany.has(item.companyId)) {
-      byCompany.set(item.companyId, { companyId: item.companyId, companyName: item.companyName, chargeEUR: 0, billableHours: 0, signalCount: 0 });
+      byCompany.set(item.companyId, { companyId: item.companyId, companyName: item.companyName, chargeEUR: 0, billableHours: 0, prepaidHours: 0, signalCount: 0 });
     }
     const agg = byCompany.get(item.companyId);
     if (CHARGE_KINDS.has(item.kind)) agg.chargeEUR += item.amountEUR ?? 0;
-    if (item.kind === "labour") agg.billableHours += item.hours ?? 0;
+    if (item.kind === "labour") {
+      if (item.prepaid) agg.prepaidHours += item.hours ?? 0;
+      else agg.billableHours += item.hours ?? 0;
+    }
     agg.signalCount += item.problems?.length ?? 0;
   }
   const all = [...byCompany.values()];
-  const actionable = all.filter((r) => r.chargeEUR > 0 || r.billableHours > 0 || r.signalCount > 0);
-  actionable.sort((a, b) => b.chargeEUR - a.chargeEUR || b.billableHours - a.billableHours);
+  const actionable = all.filter((r) => r.chargeEUR > 0 || r.billableHours > 0 || r.prepaidHours > 0 || r.signalCount > 0);
+  const rank = (r) => r.chargeEUR + r.billableHours * rankHourRate;
+  actionable.sort((a, b) => rank(b) - rank(a) || b.billableHours - a.billableHours);
   return { rows: actionable, hidden: all.length - actionable.length };
 }
 
@@ -355,10 +371,17 @@ export async function fetchReview(companyInput, cfg) {
   const projects = await atFetchAll("Projects", [{ field: "companyID", op: "eq", value: company.id }]);
   const projectIds = projects.map((p) => p.id);
 
-  const labourRaw = await fetchBatchedIn("TimeEntries", "contractID", contractIds, [{ field: "isNonBillable", op: "eq", value: false }]);
-  const ticketChargesRaw = await fetchBatchedIn("TicketCharges", "ticketID", ticketIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
-  const contractChargesRaw = await fetchBatchedIn("ContractCharges", "contractID", contractIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
-  const projectChargesRaw = await fetchBatchedIn("ProjectCharges", "projectID", projectIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]);
+  // Task 12 (N2): periode-begrenzing zodat het `period`-label de lading dekt. Labour op
+  // dateWorked, charges op (datePurchased ?? createDate); dateloze charges blijven staan
+  // (inPeriod: null/leeg -> true) zodat we niets stilzwijgend laten vallen.
+  const labourRaw = (await fetchBatchedIn("TimeEntries", "contractID", contractIds, [{ field: "isNonBillable", op: "eq", value: false }]))
+    .filter((t) => inPeriod(t.dateWorked, cfg));
+  const ticketChargesRaw = (await fetchBatchedIn("TicketCharges", "ticketID", ticketIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]))
+    .filter((c) => inPeriod(c.datePurchased ?? c.createDate, cfg));
+  const contractChargesRaw = (await fetchBatchedIn("ContractCharges", "contractID", contractIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]))
+    .filter((c) => inPeriod(c.datePurchased ?? c.createDate, cfg));
+  const projectChargesRaw = (await fetchBatchedIn("ProjectCharges", "projectID", projectIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }]))
+    .filter((c) => inPeriod(c.datePurchased ?? c.createDate, cfg));
 
   // Precieze posted-detectie op labour: BillingItems met timeEntryID in de kandidaat-ids
   // zelf, niet via de bredere contract-fetch. Als BillingItem.contractID bij afwijkende/
@@ -518,12 +541,15 @@ export async function fetchSummary(cfg) {
   // (Recurring e.d.) en gesloten contracten tellen niet mee. Dit filter raakt alleen
   // de labour-query hieronder, niet de contractInfo-attributiekaart hierboven.
   const billableContractIds = contracts.filter((c) => c.status === 1 && INVOICED_CONTRACT_TYPES.has(c.contractType)).map((c) => c.id);
-  const labourRaw = await fetchBatchedIn("TimeEntries", "contractID", billableContractIds, [{ field: "isNonBillable", op: "eq", value: false }], 200);
+  // Task 12 (N2): periode-begrenzing, zelfde inPeriod-helper als fetchReview. Labour op
+  // dateWorked, charges op (datePurchased ?? createDate); dateloze charges blijven staan.
+  const labourRaw = (await fetchBatchedIn("TimeEntries", "contractID", billableContractIds, [{ field: "isNonBillable", op: "eq", value: false }], 200))
+    .filter((t) => inPeriod(t.dateWorked, cfg));
 
   const chargeFilter = [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }];
-  const ticketChargesRaw = await atFetchAll("TicketCharges", chargeFilter);
-  const contractChargesRaw = await atFetchAll("ContractCharges", chargeFilter);
-  const projectChargesRaw = await atFetchAll("ProjectCharges", chargeFilter);
+  const ticketChargesRaw = (await atFetchAll("TicketCharges", chargeFilter)).filter((c) => inPeriod(c.datePurchased ?? c.createDate, cfg));
+  const contractChargesRaw = (await atFetchAll("ContractCharges", chargeFilter)).filter((c) => inPeriod(c.datePurchased ?? c.createDate, cfg));
+  const projectChargesRaw = (await atFetchAll("ProjectCharges", chargeFilter)).filter((c) => inPeriod(c.datePurchased ?? c.createDate, cfg));
 
   // Posted-exclusie via BillingItem-kruisverwijzing, gebatcht (~300/call). Sequentieel
   // (niet Promise.all) om binnen Autotask' rate-limit van 3 gelijktijdige threads te
@@ -551,6 +577,9 @@ export async function fetchSummary(cfg) {
   // meekunnen in de EEN gebatchte Tickets-fetch hieronder; de eigenlijke
   // rsItems-classificatie/filtering gebeurt verderop, na completeTicketIds.
   const remoteSupportCodeId = await resolveRemoteSupportCodeId();
+  // Task 12 (N5): stil leeg overslaan verbergt een kapotte work-type-lookup; een expliciete
+  // waarschuwing maakt dat zichtbaar in plaats van dat de RS-digest gewoon leeg lijkt.
+  if (remoteSupportCodeId == null) console.error("Waarschuwing: work type 'Remote Support' niet gevonden; RS-digest overgeslagen.");
   const rsRaw = remoteSupportCodeId != null ? await atFetchAll("TimeEntries", [
     { field: "billingCodeID", op: "eq", value: remoteSupportCodeId },
     { field: "isNonBillable", op: "eq", value: false },
@@ -604,7 +633,10 @@ export async function fetchSummary(cfg) {
   for (const t of labourFiltered) {
     const companyId = contractInfo.get(t.contractID)?.companyID ?? 0;
     const checked = checkLabour(t, summaryCfg);
-    items.push({ companyId, companyName: unassignedName(companyId, names), kind: "labour", amountEUR: 0, hours: checked.hours, problems: checked.problems });
+    // Task 12 (N4): Block Hours (4) en Per Ticket (8) zijn vooruitbetaald -> prepaid.
+    const contractType = contractInfo.get(t.contractID)?.type ?? null;
+    const prepaid = contractType === 4 || contractType === 8;
+    items.push({ companyId, companyName: unassignedName(companyId, names), kind: "labour", amountEUR: 0, hours: checked.hours, problems: checked.problems, prepaid });
   }
   for (const c of contractCharges) {
     const companyId = contractInfo.get(c.contractID)?.companyID ?? 0;
@@ -622,14 +654,16 @@ export async function fetchSummary(cfg) {
     items.push({ companyId, companyName: unassignedName(companyId, names), kind: "projectCharge", amountEUR: checked.amountEUR ?? 0, hours: null, problems: checked.problems });
   }
 
-  const { rows, hidden } = buildSummary(items);
+  const { rows, hidden } = buildSummary(items, cfg.rankHourRate);
 
   console.log("KLANT | TE FACTUREREN | SIGNALEN");
   for (const r of rows) {
     const parts = [];
     if (r.chargeEUR > 0) parts.push(`EUR${r.chargeEUR.toFixed(0)}`);
-    if (r.billableHours > 0) parts.push(`${r.billableHours}u`);
-    console.log(`${r.companyName} | ${parts.join(" + ") || "-"} | ${r.signalCount}`);
+    if (r.billableHours > 0) parts.push(`${r.billableHours}u T&M`);
+    let line = parts.join(" + ") || "-";
+    if (r.prepaidHours > 0) line += ` (+${r.prepaidHours}u prepaid)`;
+    console.log(`${r.companyName} | ${line} | ${r.signalCount}`);
   }
   console.log(`(${hidden} klanten zonder te factureren verborgen)`);
 

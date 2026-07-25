@@ -23,6 +23,27 @@ actie is omkeerbaar (non-billable kan weer terug). Geposte entries worden
 door de Autotask API zelf geweigerd, dus een verkeerde zet op een geposte
 entry heeft sowieso geen effect.
 
+## Periode-begrenzing en T&M vs prepaid
+
+`summary` en `review` zijn begrensd op de facturatieperiode uit `config.json`
+(`periodStart`/`periodEnd`, default vorige maand). Labour telt mee op
+`dateWorked`, charges op `datePurchased` (of `createDate` als die leeg is);
+een charge zonder beide datumvelden valt niet stilzwijgend weg en blijft
+staan. Wil je een andere periode zien, pas dan `periodStart`/`periodEnd` in
+`config.json` aan.
+
+`summary` splitst labour-uren in twee groepen:
+- **T&M-uren (te factureren)**: labour op een echt Time & Materials-contract
+  (contractType 1). Dit is nieuwe omzet.
+- **Prepaid-uren**: labour op Block Hours (4) of Per Ticket (8), al vooraf
+  betaald en dus geen nieuwe omzet. Deze staan apart in de tabel als
+  `(+Xu prepaid)` en tellen niet mee in de ranking.
+
+De ranglijst in `summary` sorteert op `chargeEUR + T&M-uren * rankHourRate`
+(config, default 75), zodat een klant met veel echte T&M-uren niet onterecht
+onder een klant met alleen een hoog chargebedrag komt te staan. Pas
+`rankHourRate` in `config.json` aan als het effectieve uurtarief afwijkt.
+
 ## Vereisten
 
 - Ingelogd op Azure CLI (`az login`), secrets komen uit Key Vault `juict-kv-g4fhuo35`.
