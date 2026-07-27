@@ -69,6 +69,12 @@ export function checkCharge(c, kind, cfg) {
   return { kind, id: c.id, companyID: c.companyID, contractID: c.contractID, ticketID: c.ticketID, label: `${kindLabel} ${c.id} - ${c.name ?? "(geen naam)"}`, amountEUR: amount, hours: null, problems };
 }
 
+// Task 15 (v2.10): leesbare ticketreferentie i.p.v. het interne ticket-id.
+// PURE: Autotask UI-detailpagina-URL (geverifieerd, zone 19-host).
+export function ticketUrl(id) {
+  return `https://ww19.autotask.net/Mvc/ServiceDesk/TicketDetail.mvc?ticketId=${id}`;
+}
+
 export function groupItems(items, names) {
   const companies = new Map();
   for (const item of items) {
@@ -187,6 +193,8 @@ export function buildReview(company, tickets, timeEntries, charges, notesByTicke
     if (changeHours > cfg.changeHoursThreshold) hourFlags.push(`change ${changeHours}u > ${cfg.changeHoursThreshold}u`);
     reviewTickets.push({
       ticketID: ticket.id,
+      ticketNumber: ticket.ticketNumber ?? null,
+      url: ticketUrl(ticket.id),
       title: ticket.title ?? null,
       description: ticket.description ?? null,
       notes: mapGet(notesByTicket, ticket.id) ?? [],
@@ -266,7 +274,9 @@ export function buildRemoteSupportReview(items) {
     const agg = byCompany.get(item.companyId);
     agg.count += 1;
     agg.hours += item.hours ?? 0;
-    agg.entries.push({ id: item.id, hours: item.hours, dateWorked: item.dateWorked, summary: item.summary });
+    // ticketID meegenomen uitsluitend om in de print-stap (fetchSummary) de
+    // ticketNumber/URL-referentie te kunnen resolven (Task 15); telt nergens in mee.
+    agg.entries.push({ id: item.id, ticketID: item.ticketID ?? null, hours: item.hours, dateWorked: item.dateWorked, summary: item.summary });
   }
   const result = [...byCompany.values()];
   for (const company of result) {
@@ -643,6 +653,15 @@ async function resolveChangeCodeIds() {
   return rows.filter((r) => r.name === "Minor Change" || r.name === "Major Change").map((r) => r.id);
 }
 
+// Task 15 (v2.10): print-only resolutie van ticketID -> "ticketNumber (url)".
+// Valt terug op het kale id als de ticketNumber niet resolvet (bv. ontbrekend
+// in de gebatchte Tickets-fetch). Puur formattering voor de print-secties
+// hieronder, geen fetch, dus hier lokaal i.p.v. als geëxporteerde pure functie.
+function formatTicketRef(ticketID, ticketNumberMap) {
+  const number = ticketNumberMap.get(ticketID);
+  return number ? `${number} (${ticketUrl(ticketID)})` : `#${ticketID}`;
+}
+
 export async function fetchSummary(cfg) {
   // Task 13: verzamelt niet-fatale ophaalfouten; wordt bovenaan de output als
   // banner getoond (renderWarnings) zodat een gedeeltelijk overzicht opvalt.
@@ -771,6 +790,11 @@ export async function fetchSummary(cfg) {
   ];
   const ticketsRows = await fetchBatchedIn("Tickets", "id", ticketIdsForLookup, [], 300, warnings);
   const ticketCompany = new Map(ticketsRows.map((t) => [t.id, t.companyID]));
+  // Task 15 (v2.10): id -> ticketNumber, uit dezelfde gebatchte Tickets-fetch
+  // hierboven (geen extra call). Gebruikt bij het printen van de urennorm-
+  // sectie en de RS-digest, zodat daar het leesbare ticketnummer + een
+  // klikbare Autotask-URL staat i.p.v. het kale interne ticket-id.
+  const ticketNumberMap = new Map(ticketsRows.map((t) => [t.id, t.ticketNumber ?? null]));
   // Task 10: een ticket is "afgerond" bij status 5 (Complete) of 16 (Autocomplete
   // RMM). Alleen ticket-gebonden items op een afgerond ticket blijven staan.
   const completeTicketIds = new Set(ticketsRows.filter((t) => COMPLETE_TICKET_STATUSES.has(t.status)).map((t) => t.id));
@@ -866,7 +890,13 @@ export async function fetchSummary(cfg) {
     console.log("Remote Support te AI-checken:");
     for (const r of remoteSupportReview) {
       console.log(`${r.companyName} (${r.count} entries, ${r.hours}u)`);
-      for (const e of r.entries) console.log(`  - #${e.id} ${(e.dateWorked ?? "").slice(0, 10)} ${e.hours}u: ${e.summary ?? "(geen summary)"}`);
+      for (const e of r.entries) {
+        // Task 15: ticketnummer + klikbare URL i.p.v. kaal ticket-id. Ticketloze
+        // entries (ticketID null, niet ticket-gebonden labour) vallen terug op
+        // "geen ticket" in plaats van een niet-bestaande ticketref.
+        const ref = e.ticketID != null ? formatTicketRef(e.ticketID, ticketNumberMap) : "geen ticket";
+        console.log(`  - ${ref} #${e.id} ${(e.dateWorked ?? "").slice(0, 10)} ${e.hours}u: ${e.summary ?? "(geen summary)"}`);
+      }
     }
   }
 
@@ -877,7 +907,8 @@ export async function fetchSummary(cfg) {
     console.log("");
     console.log("Tickets boven urennorm:");
     for (const f of hourFlags) {
-      console.log(`  - ${f.companyName} ticket ${f.ticketID}: ${f.hours}u ${f.category} (drempel ${f.threshold}u)`);
+      // Task 15: ticketnummer + klikbare URL i.p.v. kaal ticket-id.
+      console.log(`  - ${f.companyName} ${formatTicketRef(f.ticketID, ticketNumberMap)}: ${f.hours}u ${f.category} (drempel ${f.threshold}u)`);
     }
   }
 

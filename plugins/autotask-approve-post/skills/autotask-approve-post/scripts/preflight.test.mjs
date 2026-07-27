@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, buildHourFlags, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod, safeFetch, renderWarnings, fetchBatchedIn, postedIdsBatched } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, buildHourFlags, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod, safeFetch, renderWarnings, fetchBatchedIn, postedIdsBatched, ticketUrl } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -41,6 +41,12 @@ test("loadConfig: changeHoursThreshold overneembaar uit raw config als getal", (
 });
 test("loadConfig: changeHoursThreshold negeert niet-getal en valt terug op 2", () => {
   assert.equal(loadConfig({ changeHoursThreshold: "3" }, new Date("2026-07-24T10:00:00Z")).changeHoursThreshold, 2);
+});
+
+// ─── ticketUrl (Task 15, v2.10: ticketnummer + klikbare URL i.p.v. ticket-id) ──
+
+test("ticketUrl: geeft de Autotask-ticketdetail-URL voor zone 19", () => {
+  assert.equal(ticketUrl(25629), "https://ww19.autotask.net/Mvc/ServiceDesk/TicketDetail.mvc?ticketId=25629");
 });
 
 // ─── inPeriod (Task 12.1: bron voor de outsidePeriod-FLAG in buildReview, geen fetch-filter meer) ───
@@ -294,6 +300,14 @@ test("buildReview: billedMap + contractInfo bepalen invoiced per time entry en t
   assert.equal(out.totals.invoicedHours, 2); // alleen te1 (2u)
   assert.equal(out.totals.coveredHours, 4); // te2 (3u) + te3 (1u)
   assert.equal(out.totals.billableHours, 6); // bestaand veld blijft ongewijzigd
+});
+
+test("buildReview: elk ticket krijgt ticketNumber en klikbare url (Task 15) i.p.v. alleen het interne id", () => {
+  const { timeEntries, charges, notesByTicket } = reviewFixtures();
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg);
+  const t100 = out.tickets.find((t) => t.ticketID === 100);
+  assert.equal(t100.ticketNumber, "T20260601.0001");
+  assert.equal(t100.url, "https://ww19.autotask.net/Mvc/ServiceDesk/TicketDetail.mvc?ticketId=100");
 });
 
 test("buildReview: availableContracts wordt ongewijzigd doorgegeven in de output", () => {
@@ -652,7 +666,7 @@ test("buildRemoteSupportReview: groepeert per klant met count/hours/entries", ()
   assert.equal(acme.count, 2);
   assert.equal(acme.hours, 3.5);
   assert.deepEqual(acme.entries.map((e) => e.id).sort(), [10, 11]);
-  assert.deepEqual(acme.entries.find((e) => e.id === 10), { id: 10, hours: 2, dateWorked: "2026-06-01T09:00:00", summary: "Onsite geweest bij klant" });
+  assert.deepEqual(acme.entries.find((e) => e.id === 10), { id: 10, ticketID: null, hours: 2, dateWorked: "2026-06-01T09:00:00", summary: "Onsite geweest bij klant" });
   const contoso = out.find((r) => r.companyId === 2);
   assert.equal(contoso.count, 1);
   assert.equal(contoso.hours, 3);
@@ -667,6 +681,12 @@ test("buildRemoteSupportReview: sorteert op count desc", () => {
   ];
   const out = buildRemoteSupportReview(items);
   assert.deepEqual(out.map((r) => r.companyId), [2, 1]);
+});
+
+test("buildRemoteSupportReview: ticketID van het item komt mee in de entry (Task 15: nodig om ticketNumber/URL te resolven bij het printen)", () => {
+  const items = [rs({ companyId: 1, id: 10, ticketID: 500 })];
+  const out = buildRemoteSupportReview(items);
+  assert.equal(out[0].entries[0].ticketID, 500);
 });
 
 test("buildRemoteSupportReview: lege input geeft lege array", () => {

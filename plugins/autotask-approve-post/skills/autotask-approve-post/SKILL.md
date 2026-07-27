@@ -64,6 +64,16 @@ De ranglijst in `summary` sorteert op `chargeEUR + T&M-uren * rankHourRate`
 onder een klant met alleen een hoog chargebedrag komt te staan. Pas
 `rankHourRate` in `config.json` aan als het effectieve uurtarief afwijkt.
 
+## Ticketreferentie (ticketnummer + klikbare URL)
+
+Overal waar een ticket getoond wordt (review, de urennorm-sectie en de Remote
+Support-digest van `summary`) staat het leesbare ticketnummer (bijvoorbeeld
+`T20260622.0039`), plus een klikbare Autotask-URL naar de ticketdetailpagina,
+in plaats van het interne, betekenisloze ticket-id. In `review` staat dit per
+ticket als `ticketNumber` en `url`. Resolvet een ticketnummer een keer niet
+(bijvoorbeeld bij een onvolledige fetch), dan valt de tekstregel terug op het
+kale `#<id>`.
+
 ## Vereisten
 
 - Ingelogd op Azure CLI (`az login`), secrets komen uit Key Vault `juict-kv-g4fhuo35`.
