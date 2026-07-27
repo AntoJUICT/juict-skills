@@ -854,11 +854,14 @@ export async function fetchSummary(cfg) {
   const contractCharges = contractChargesRaw.filter((c) => !postedContractChargeIds.has(c.id)).map(mapCharge);
   const projectCharges = projectChargesRaw.filter((c) => !postedProjectChargeIds.has(c.id)).map(mapCharge);
 
-  // Task 18 (v2.13): onsite- en urennorm-checks kijken verder terug dan de billing-maand
-  // (checkWindowStart..periodEnd) zodat nog-niet-geposte items uit eerdere maanden ook in
-  // het vangnet vallen. De Remote Support-fetch hieronder gebruikt dit bredere venster ook
-  // (dient beide: de volle set voor urennorm "remote", en de op periodStart..periodEnd
-  // gefilterde subset hieronder voor de RS-AI-digest).
+  // Task 18 (v2.13, fix): onsite- en urennorm-checks kijken verder terug dan de billing-maand
+  // EN hebben geen bovengrens: checkWindowStart(cfg) tot heden/toekomst, geen `dateWorked lte`.
+  // Een afgerond, nog-niet-gepost ticket kan een dateWorked NA periodEnd hebben (we draaien
+  // immers na afloop van de billing-maand, bv. een onsite-ticket van 9 juli terwijl periodEnd
+  // 30 juni is); een bovengrens op periodEnd zou zulke pending items ten onrechte buiten het
+  // vangnet houden. De Remote Support-fetch hieronder gebruikt dit open venster ook (dient
+  // beide: de volle set voor urennorm "remote", en de op periodStart..periodEnd teruggefilterde
+  // subset hieronder voor de RS-AI-digest, die WEL strikt de billing-maand blijft).
   const windowStart = checkWindowStart(cfg);
 
   // Remote Support work-type-review digest (Task 9): Remote Support op gedekte
@@ -880,7 +883,6 @@ export async function fetchSummary(cfg) {
     { field: "billingCodeID", op: "eq", value: remoteSupportCodeId },
     { field: "isNonBillable", op: "eq", value: false },
     { field: "dateWorked", op: "gte", value: `${windowStart}T00:00:00` },
-    { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` },
   ])) : [];
 
   // Task 14 (v2.9): urennorm-flags per ticket, Change-kant (Minor Change +
@@ -893,14 +895,13 @@ export async function fetchSummary(cfg) {
     { field: "billingCodeID", op: "in", value: changeCodeIds },
     { field: "isNonBillable", op: "eq", value: false },
     { field: "dateWorked", op: "gte", value: `${windowStart}T00:00:00` },
-    { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` },
   ])) : [];
 
-  // Task 17 (v2.12) + Task 18 (v2.13): onsite zonder voorrijkosten, over het bredere
-  // terugkijk-venster (zelfde reden: nog-niet-geposte onsite-tickets uit eerdere maanden
-  // horen ook in dit vangnet). Beide work-type-lookups alleen als requireTravelForOnsite
-  // aan staat: anders is de hele check uitgeschakeld en is de extra BillingCodes-lookup +
-  // fetch pure overhead.
+  // Task 17 (v2.12) + Task 18 (v2.13, fix): onsite zonder voorrijkosten, over het bredere,
+  // naar boven open terugkijk-venster (zelfde reden als hierboven: nog-niet-geposte
+  // onsite-tickets kunnen zowel uit eerdere maanden komen als na periodEnd geboekt zijn).
+  // Beide work-type-lookups alleen als requireTravelForOnsite aan staat: anders is de hele
+  // check uitgeschakeld en is de extra BillingCodes-lookup + fetch pure overhead.
   const onsiteCodeId = cfg.requireTravelForOnsite
     ? await safeFetch(warnings, "Onsite Support work type lookup", () => resolveOnsiteSupportCodeId(), null)
     : null;
@@ -914,7 +915,6 @@ export async function fetchSummary(cfg) {
     { field: "billingCodeID", op: "eq", value: onsiteCodeId },
     { field: "isNonBillable", op: "eq", value: false },
     { field: "dateWorked", op: "gte", value: `${windowStart}T00:00:00` },
-    { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` },
   ])) : [];
 
   // Company-attributie EN Task-10 ticket-status in EEN gebatchte Tickets-fetch
