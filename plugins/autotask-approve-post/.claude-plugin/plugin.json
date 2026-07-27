@@ -1,6 +1,6 @@
 {
   "name": "autotask-approve-post",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Read-only pre-flight review vóór Autotask Approve & Post: vindt nog-niet-geposte charges en labour, markeert problemen, groepeert per klant/contract/ticket.",
   "author": { "name": "AntoJUICT", "email": "anto@juict.nl" },
   "homepage": "https://github.com/AntoJUICT/juict-skills",
