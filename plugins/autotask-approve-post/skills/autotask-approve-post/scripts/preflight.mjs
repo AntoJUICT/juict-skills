@@ -39,6 +39,11 @@ export function loadConfig(raw, now) {
     // "Projectmanagement") worden apart in een later batch afgehandeld, dus standaard
     // uit dit overzicht. Uitzetten via config.json (excludeProjects: false) toont ze weer.
     excludeProjects: typeof r.excludeProjects === "boolean" ? r.excludeProjects : true,
+    // Task 17 (v2.12): een ticket met Onsite Support-uren hoort een "Reiskosten -
+    // per kilometer"-charge te hebben (voorrijkosten). Uitzetten via config.json
+    // (requireTravelForOnsite: false) schakelt zowel de review-ticketflag als de
+    // summary-sectie uit.
+    requireTravelForOnsite: typeof r.requireTravelForOnsite === "boolean" ? r.requireTravelForOnsite : true,
   };
 }
 
@@ -49,6 +54,20 @@ export function loadConfig(raw, now) {
 export function isProjectLabour(billingCodeID, projectCodeIds) {
   if (!projectCodeIds || projectCodeIds.length === 0) return false;
   return projectCodeIds.includes(billingCodeID);
+}
+
+// Task 17 (v2.12): een ticket met Onsite Support-werk hoort een "Reiskosten -
+// per kilometer"-charge (voorrijkosten) te hebben. PURE: true als minstens een
+// time entry workType "Onsite Support" heeft EN geen enkele charge
+// billingCodeID === travelCodeId heeft. Strikt: een "Starttarief ..."-charge
+// telt hier bewust NIET mee, alleen een exacte match op travelCodeId. Zonder
+// resolved travelCodeId (null/undefined) kan de check niet beoordeeld worden,
+// dus dan altijd false (geen valse flag op een niet-gevonden work type).
+export function ticketMissingTravel(timeEntries, charges, travelCodeId) {
+  if (travelCodeId == null) return false;
+  const hasOnsite = (timeEntries ?? []).some((t) => t.workType === "Onsite Support");
+  if (!hasOnsite) return false;
+  return !(charges ?? []).some((c) => c.billingCodeID === travelCodeId);
 }
 // null/ontbrekende datum -> null (onbeslist); anders true/false op basis van [periodStart, periodEnd].
 function dateInRange(date, cfg) { if (!date) return null; const d = date.slice(0, 10); return d >= cfg.periodStart && d <= cfg.periodEnd; }
@@ -148,7 +167,7 @@ export function isInvoiced(contractID, billingCodeID, contractType, billedMap) {
   return INVOICED_CONTRACT_TYPES.has(contractType); // fallback: geen historie voor dit work type -> contracttype beslist
 }
 
-export function buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg, billedMap = new Map(), contractInfo = new Map(), availableContracts = []) {
+export function buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg, billedMap = new Map(), contractInfo = new Map(), availableContracts = [], travelCodeId = null) {
   const byTicket = new Map(); // ticketID -> { timeEntries: [], charges: [] }
   const ensure = (ticketID) => {
     if (!byTicket.has(ticketID)) byTicket.set(ticketID, { timeEntries: [], charges: [] });
@@ -180,7 +199,10 @@ export function buildReview(company, tickets, timeEntries, charges, notesByTicke
     const amountEUR = checked.amountEUR ?? 0;
     chargeAmountEUR += amountEUR;
     const outsidePeriod = !inPeriod(c.datePurchased ?? c.createDate, cfg);
-    const item = { id: c.id, name: c.name ?? null, amountEUR, kind, problems: checked.problems, outsidePeriod };
+    // Task 17: billingCodeID blijft op het charge-item staan (i.p.v. alleen op de
+    // rauwe input) zodat ticketMissingTravel hieronder per ticket op naam kan
+    // matchen tegen travelCodeId, zonder de rauwe charges opnieuw te filteren.
+    const item = { id: c.id, name: c.name ?? null, amountEUR, kind, problems: checked.problems, outsidePeriod, billingCodeID: c.billingCodeID ?? null };
     if (c.ticketID != null) ensure(c.ticketID).charges.push(item);
     else looseCharges.push(item);
   }
@@ -204,6 +226,11 @@ export function buildReview(company, tickets, timeEntries, charges, notesByTicke
     const hourFlags = [];
     if (remoteHours > cfg.remoteSupportHoursThreshold) hourFlags.push(`remote ${remoteHours}u > ${cfg.remoteSupportHoursThreshold}u`);
     if (changeHours > cfg.changeHoursThreshold) hourFlags.push(`change ${changeHours}u > ${cfg.changeHoursThreshold}u`);
+    // Task 17 (v2.12): onsite zonder voorrijkosten. Reuse van hourFlags i.p.v. een
+    // apart veld, dezelfde signalerende plek als de urennorm-flags hierboven.
+    if (cfg.requireTravelForOnsite && ticketMissingTravel(grouped.timeEntries, grouped.charges, travelCodeId)) {
+      hourFlags.push("onsite zonder voorrijkosten");
+    }
     reviewTickets.push({
       ticketID: ticket.id,
       ticketNumber: ticket.ticketNumber ?? null,
@@ -539,11 +566,20 @@ export async function fetchReview(companyInput, cfg) {
   const ticketsWithItems = [...new Set([...timeEntries.map((t) => t.ticketID), ...charges.map((c) => c.ticketID)].filter((x) => x != null))];
   const notesByTicket = await safeFetch(warnings, "TicketNotes", () => fetchNotesByTicket(ticketsWithItems), new Map());
   const workTypeNames = await safeFetch(warnings, "BillingCodes (work type namen)", () => fetchWorkTypeNames(), new Map());
+  // Task 17 (v2.12): op naam geresolvde "Reiskosten - per kilometer"-billingCode,
+  // voor de onsite/voorrijkosten-ticketflag hieronder. Geen match -> null, dan
+  // degradeert ticketMissingTravel gracieus naar "niet te beoordelen" (geen flag).
+  const travelCodeId = cfg.requireTravelForOnsite
+    ? await safeFetch(warnings, "Travel work type lookup", () => resolveTravelCodeId(), null)
+    : null;
+  if (cfg.requireTravelForOnsite && travelCodeId == null) {
+    console.error("Waarschuwing: work type 'Reiskosten - per kilometer' niet gevonden; onsite/voorrijkosten-check overgeslagen.");
+  }
 
   // review toont ALLE nog-niet-geposte items ongeacht datum, dus labour.outsidePeriod
   // zou hier valse "problemen" opleveren op legitiem oude, nog niet geposte entries.
   const reviewCfg = { ...cfg, enabledRules: cfg.enabledRules.filter((r) => r !== "labour.outsidePeriod") };
-  const reviewOutput = buildReview(company, reviewTicketsList, timeEntries, charges, notesByTicket, workTypeNames, reviewCfg, billedMap, contractInfo, availableContracts);
+  const reviewOutput = buildReview(company, reviewTicketsList, timeEntries, charges, notesByTicket, workTypeNames, reviewCfg, billedMap, contractInfo, availableContracts, travelCodeId);
   reviewOutput.warnings = warnings;
 
   console.log(JSON.stringify(reviewOutput, null, 2));
@@ -668,6 +704,27 @@ const unassignedName = (companyId, names) => companyId === 0 ? "⚠️ Niet toeg
 async function resolveRemoteSupportCodeId() {
   const rows = await atFetchAll("BillingCodes", [{ field: "isActive", op: "eq", value: true }, { field: "billingCodeType", op: "eq", value: 0 }]);
   const match = rows.find((r) => r.name === "Remote Support");
+  return match ? match.id : null;
+}
+
+// Task 17 (v2.12): resolveert de "Onsite Support"-work-type op naam (zelfde
+// robuustheid-redenering als resolveRemoteSupportCodeId hierboven: id-drift
+// tussen zones). Geen match -> null, gebruikt als gracieuze afmelding.
+async function resolveOnsiteSupportCodeId() {
+  const rows = await atFetchAll("BillingCodes", [{ field: "isActive", op: "eq", value: true }, { field: "billingCodeType", op: "eq", value: 0 }]);
+  const match = rows.find((r) => r.name === "Onsite Support");
+  return match ? match.id : null;
+}
+
+// Task 17 (v2.12): resolveert de "Reiskosten - per kilometer"-billingCode
+// (voorrijkosten) op naam. Zelfde robuustheid-redenering: id's kunnen tussen
+// zones verschillen (bevestigd 29683496 op zone 19), dus altijd op naam
+// resolven i.p.v. het id te hardcoden. Geen match -> null, dan degradeert de
+// onsite/voorrijkosten-check gracieus naar "niet te beoordelen" (zie
+// ticketMissingTravel), geen harde fout.
+async function resolveTravelCodeId() {
+  const rows = await atFetchAll("BillingCodes", [{ field: "isActive", op: "eq", value: true }, { field: "billingCodeType", op: "eq", value: 0 }]);
+  const match = rows.find((r) => r.name === "Reiskosten - per kilometer");
   return match ? match.id : null;
 }
 
@@ -816,18 +873,40 @@ export async function fetchSummary(cfg) {
     { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` },
   ])) : [];
 
+  // Task 17 (v2.12): onsite zonder voorrijkosten. Zelfde bounded aanpak als de
+  // Remote Support-/Change-fetches hierboven (binnen periode, niet non-billable).
+  // Beide work-type-lookups alleen als requireTravelForOnsite aan staat: anders
+  // is de hele check uitgeschakeld en is de extra BillingCodes-lookup + fetch
+  // pure overhead.
+  const onsiteCodeId = cfg.requireTravelForOnsite
+    ? await safeFetch(warnings, "Onsite Support work type lookup", () => resolveOnsiteSupportCodeId(), null)
+    : null;
+  const travelCodeId = cfg.requireTravelForOnsite
+    ? await safeFetch(warnings, "Travel work type lookup", () => resolveTravelCodeId(), null)
+    : null;
+  if (cfg.requireTravelForOnsite && (onsiteCodeId == null || travelCodeId == null)) {
+    console.error("Waarschuwing: work type 'Onsite Support' en/of 'Reiskosten - per kilometer' niet gevonden; onsite/voorrijkosten-check overgeslagen.");
+  }
+  const onsiteRaw = cfg.requireTravelForOnsite && onsiteCodeId != null ? await safeFetch(warnings, "Onsite Support TimeEntries", () => atFetchAll("TimeEntries", [
+    { field: "billingCodeID", op: "eq", value: onsiteCodeId },
+    { field: "isNonBillable", op: "eq", value: false },
+    { field: "dateWorked", op: "gte", value: `${cfg.periodStart}T00:00:00` },
+    { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` },
+  ])) : [];
+
   // Company-attributie EN Task-10 ticket-status in EEN gebatchte Tickets-fetch
   // (id op:in), op de unie van alle ticket-ids uit ticketCharges, billable
-  // labour, RS-entries en Change-entries. Geen aparte per-onderdeel fetch,
-  // geen per-id lookups. ticketCharges/projectCharges attribution via
-  // gebatchte Tickets/Projects id op:in-fetches (alleen de betrokken ids, niet
-  // de hele klantenbasis); labour/contractCharges via de al opgehaalde
-  // bulk-Contracts.
+  // labour, RS-entries, Change-entries en Onsite-entries. Geen aparte
+  // per-onderdeel fetch, geen per-id lookups. ticketCharges/projectCharges
+  // attribution via gebatchte Tickets/Projects id op:in-fetches (alleen de
+  // betrokken ids, niet de hele klantenbasis); labour/contractCharges via de
+  // al opgehaalde bulk-Contracts.
   const ticketIdsForLookup = [
     ...ticketCharges.map((c) => c.ticketID),
     ...labour.map((t) => t.ticketID),
     ...rsRaw.map((t) => t.ticketID),
     ...changeRaw.map((t) => t.ticketID),
+    ...onsiteRaw.map((t) => t.ticketID),
   ];
   const ticketsRows = await fetchBatchedIn("Tickets", "id", ticketIdsForLookup, [], 300, warnings);
   const ticketCompany = new Map(ticketsRows.map((t) => [t.id, t.companyID]));
@@ -839,6 +918,18 @@ export async function fetchSummary(cfg) {
   // Task 10: een ticket is "afgerond" bij status 5 (Complete) of 16 (Autocomplete
   // RMM). Alleen ticket-gebonden items op een afgerond ticket blijven staan.
   const completeTicketIds = new Set(ticketsRows.filter((t) => COMPLETE_TICKET_STATUSES.has(t.status)).map((t) => t.id));
+
+  // Task 17 (v2.12): posted-exclusie + afgeronde-tickets-filter op de Onsite
+  // Support-entries, zelfde helpers als de rest van summary. Levert de set
+  // ticket-ids op waar in de periode nog-niet-geposte Onsite Support-uren op
+  // geboekt zijn (ticketloze entries tellen hier niet mee: de check is per
+  // ticket, geen ticket = geen voorrijkosten-verwachting).
+  const postedOnsiteIds = await postedIdsBatched("timeEntryID", onsiteRaw.map((t) => t.id), 300, warnings);
+  const onsiteTicketIds = new Set(
+    keepIfTicketComplete(onsiteRaw.filter((t) => !postedOnsiteIds.has(t.id)), completeTicketIds)
+      .map((t) => t.ticketID)
+      .filter((id) => id != null)
+  );
 
   const postedRsIds = await postedIdsBatched("timeEntryID", rsRaw.map((t) => t.id), 300, warnings);
   const rsItemsAll = rsRaw
@@ -895,6 +986,17 @@ export async function fetchSummary(cfg) {
   // het aparte projecten-batch, dus eruit vóór de aggregatie (buildSummary) hieronder.
   if (cfg.excludeProjects) labourFiltered = labourFiltered.filter((t) => !isProjectLabour(t.billingCodeID, projectCodeIds));
   const ticketChargesFiltered = keepIfTicketComplete(ticketCharges, completeTicketIds);
+
+  // Task 17 (v2.12): welke onsite-ticket-ids hebben GEEN "Reiskosten - per
+  // kilometer"-charge. Hergebruikt de al-opgehaalde ticketChargesFiltered
+  // (geen extra fetch), matcht op billingCodeID === travelCodeId. Zonder
+  // travelCodeId (niet gevonden, of check uitgeschakeld) blijft dit altijd leeg.
+  const travelTicketIds = travelCodeId != null
+    ? new Set(ticketChargesFiltered.filter((c) => c.billingCodeID === travelCodeId).map((c) => c.ticketID))
+    : new Set();
+  const missingTravelTicketIds = cfg.requireTravelForOnsite
+    ? [...onsiteTicketIds].filter((id) => !travelTicketIds.has(id))
+    : [];
 
   const items = [];
   for (const t of labourFiltered) {
@@ -965,7 +1067,19 @@ export async function fetchSummary(cfg) {
     }
   }
 
-  return { rows, hidden, remoteSupportReview, hourFlags, warnings };
+  // Task 17 (v2.12): getoond ongeacht de actionable-filter van buildSummary
+  // hierboven (zelfde redenering als de urennorm-sectie): Anto moet deze
+  // tickets altijd zien, ook als de klant verder niets te factureren heeft.
+  if (missingTravelTicketIds.length) {
+    console.log("");
+    console.log("Onsite zonder voorrijkosten:");
+    for (const ticketID of missingTravelTicketIds) {
+      const companyId = ticketCompany.get(ticketID) ?? 0;
+      console.log(`  - ${unassignedName(companyId, names)} ${formatTicketRef(ticketID, ticketNumberMap)}`);
+    }
+  }
+
+  return { rows, hidden, remoteSupportReview, hourFlags, missingTravelTicketIds, warnings };
 }
 
 // ─────────────────────────────────────────────────────────────────────

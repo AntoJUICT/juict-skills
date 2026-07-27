@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, buildHourFlags, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod, safeFetch, renderWarnings, fetchBatchedIn, postedIdsBatched, ticketUrl, isProjectLabour } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, buildHourFlags, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod, safeFetch, renderWarnings, fetchBatchedIn, postedIdsBatched, ticketUrl, isProjectLabour, ticketMissingTravel } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -67,6 +67,51 @@ test("isProjectLabour: lege project-code-set is altijd false", () => {
 test("isProjectLabour: null/undefined project-code-set is false (guard)", () => {
   assert.equal(isProjectLabour(10, null), false);
   assert.equal(isProjectLabour(10, undefined), false);
+});
+
+// ─── requireTravelForOnsite (Task 17, v2.12: onsite zonder voorrijkosten) ──
+
+test("loadConfig: requireTravelForOnsite default true", () => {
+  assert.equal(loadConfig({}, new Date("2026-07-24T10:00:00Z")).requireTravelForOnsite, true);
+});
+test("loadConfig: requireTravelForOnsite overneembaar uit raw config (false)", () => {
+  assert.equal(loadConfig({ requireTravelForOnsite: false }, new Date("2026-07-24T10:00:00Z")).requireTravelForOnsite, false);
+});
+test("loadConfig: requireTravelForOnsite negeert niet-boolean en valt terug op true", () => {
+  assert.equal(loadConfig({ requireTravelForOnsite: "false" }, new Date("2026-07-24T10:00:00Z")).requireTravelForOnsite, true);
+});
+
+// ─── ticketMissingTravel (pure kern van de onsite/voorrijkosten-check) ──
+
+const TRAVEL_CODE_ID = 29683496;
+
+test("ticketMissingTravel: onsite entry + charges zonder travelCodeId-match geeft true", () => {
+  const timeEntries = [{ workType: "Onsite Support" }];
+  const charges = [{ billingCodeID: 12345 }]; // bv. een Starttarief-charge, telt niet mee
+  assert.equal(ticketMissingTravel(timeEntries, charges, TRAVEL_CODE_ID), true);
+});
+
+test("ticketMissingTravel: onsite entry + een charge MET travelCodeId-match geeft false", () => {
+  const timeEntries = [{ workType: "Onsite Support" }];
+  const charges = [{ billingCodeID: 12345 }, { billingCodeID: TRAVEL_CODE_ID }];
+  assert.equal(ticketMissingTravel(timeEntries, charges, TRAVEL_CODE_ID), false);
+});
+
+test("ticketMissingTravel: geen onsite entry (alleen Remote Support) geeft false, ongeacht charges", () => {
+  const timeEntries = [{ workType: "Remote Support" }];
+  const charges = [];
+  assert.equal(ticketMissingTravel(timeEntries, charges, TRAVEL_CODE_ID), false);
+});
+
+test("ticketMissingTravel: travelCodeId null/undefined kan niet beoordeeld worden, altijd false", () => {
+  const timeEntries = [{ workType: "Onsite Support" }];
+  const charges = [];
+  assert.equal(ticketMissingTravel(timeEntries, charges, null), false);
+  assert.equal(ticketMissingTravel(timeEntries, charges, undefined), false);
+});
+
+test("ticketMissingTravel: lege timeEntries/charges geeft false (geen onsite)", () => {
+  assert.equal(ticketMissingTravel([], [], TRAVEL_CODE_ID), false);
 });
 
 // ─── ticketUrl (Task 15, v2.10: ticketnummer + klikbare URL i.p.v. ticket-id) ──
@@ -393,6 +438,45 @@ test("buildReview: ticket kan zowel remote als change hourFlag hebben", () => {
   const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg);
   const t100 = out.tickets.find((t) => t.ticketID === 100);
   assert.deepEqual(t100.hourFlags.sort(), ["change 2.5u > 2u", "remote 2u > 1.5u"]);
+});
+
+// ─── ticket.hourFlags: onsite zonder voorrijkosten (Task 17, v2.12) ─────
+
+test("buildReview: hourFlags krijgt 'onsite zonder voorrijkosten' bij Onsite Support zonder travelCodeId-charge", () => {
+  const { notesByTicket } = reviewFixtures();
+  const timeEntries = [te({ id: 1, ticketID: 100, billingCodeID: 20, hoursToBill: 1, hoursWorked: 1, summaryNotes: "onsite geweest" })]; // billingCodeID 20 -> "Onsite Support" (workTypeNames)
+  const charges = [{ ...ch({ id: 50, ticketID: 100, billingCodeID: 999 }), kind: "ticketCharge" }]; // geen travelCodeId-match
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg, new Map(), new Map(), [], TRAVEL_CODE_ID);
+  const t100 = out.tickets.find((t) => t.ticketID === 100);
+  assert.deepEqual(t100.hourFlags, ["onsite zonder voorrijkosten"]);
+});
+
+test("buildReview: geen hourFlag als het ticket wel een travelCodeId-charge heeft", () => {
+  const { notesByTicket } = reviewFixtures();
+  const timeEntries = [te({ id: 1, ticketID: 100, billingCodeID: 20, hoursToBill: 1, hoursWorked: 1, summaryNotes: "onsite geweest" })];
+  const charges = [{ ...ch({ id: 50, ticketID: 100, billingCodeID: TRAVEL_CODE_ID }), kind: "ticketCharge" }];
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg, new Map(), new Map(), [], TRAVEL_CODE_ID);
+  const t100 = out.tickets.find((t) => t.ticketID === 100);
+  assert.deepEqual(t100.hourFlags, []);
+});
+
+test("buildReview: geen hourFlag als requireTravelForOnsite uitstaat", () => {
+  const { notesByTicket } = reviewFixtures();
+  const cfgOff = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30", requireTravelForOnsite: false }, new Date("2026-07-24T00:00:00Z"));
+  const timeEntries = [te({ id: 1, ticketID: 100, billingCodeID: 20, hoursToBill: 1, hoursWorked: 1, summaryNotes: "onsite geweest" })];
+  const charges = [{ ...ch({ id: 50, ticketID: 100, billingCodeID: 999 }), kind: "ticketCharge" }];
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfgOff, new Map(), new Map(), [], TRAVEL_CODE_ID);
+  const t100 = out.tickets.find((t) => t.ticketID === 100);
+  assert.deepEqual(t100.hourFlags, []);
+});
+
+test("buildReview: geen hourFlag zonder travelCodeId (default null, niet gevonden/niet meegegeven)", () => {
+  const { notesByTicket } = reviewFixtures();
+  const timeEntries = [te({ id: 1, ticketID: 100, billingCodeID: 20, hoursToBill: 1, hoursWorked: 1, summaryNotes: "onsite geweest" })];
+  const charges = [{ ...ch({ id: 50, ticketID: 100, billingCodeID: 999 }), kind: "ticketCharge" }];
+  const out = buildReview(company, tickets, timeEntries, charges, notesByTicket, workTypeNames, cfg, new Map(), new Map(), []);
+  const t100 = out.tickets.find((t) => t.ticketID === 100);
+  assert.deepEqual(t100.hourFlags, []);
 });
 
 // ─── buildHourFlags (pure kern van de urennorm-flags, Task 14) ──────────

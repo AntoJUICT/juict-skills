@@ -231,6 +231,24 @@ dan 2u Change (Minor Change + Major Change samen) op hetzelfde ticket.
 - Puur signalerend: er wordt niets automatisch gewijzigd of herboekt, net als
   bij de Remote Support work-type-review hierboven.
 
+## Onsite zonder voorrijkosten (Task 17, v2.12)
+
+Een ticket met Onsite Support-uren hoort een "Reiskosten - per kilometer"-charge
+(voorrijkosten) te hebben. Strikt: een "Starttarief ..."-charge telt hier niet
+als voorrijkosten, alleen de exacte "Reiskosten - per kilometer"-charge.
+
+- `review <klant>` zet de flag `"onsite zonder voorrijkosten"` op het ticket
+  zelf (`ticket.hourFlags`), naast de eventuele urennorm-flags.
+- `summary` print, na de sectie "Tickets boven urennorm", een extra sectie
+  "Onsite zonder voorrijkosten:" met per regel de klant en het klikbare
+  ticketnummer. Dit staat ook in het geretourneerde object onder
+  `missingTravelTicketIds`. Deze tickets tonen altijd, ook als de klant verder
+  niets te factureren heeft.
+- Puur signalerend: er wordt niets automatisch aangemaakt of gewijzigd, ik
+  meld het alleen zodat Anto de voorrijkosten-charge zelf toevoegt in Autotask.
+- Instelbaar in `config.json`: `requireTravelForOnsite` (default `true`).
+  Uitzetten schakelt zowel de review-ticketflag als de summary-sectie uit.
+
 ## Beschikbare commando's
 
 Er zijn drie commando's: `summary` (org-brede triage), `review <klant>`
