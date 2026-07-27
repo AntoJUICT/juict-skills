@@ -105,6 +105,14 @@ test("checkWindowStart: jaargrens-overschrijding, periodEnd 2026-01-31, lookback
   const c = loadConfig({ periodStart: "2026-01-01", periodEnd: "2026-01-31", checkLookbackMonths: 3 }, new Date("2026-02-24T00:00:00Z"));
   assert.equal(checkWindowStart(c, new Date("2026-02-24T00:00:00Z")), "2025-10-31");
 });
+test("checkWindowStart: schrikkeldag-overloop, periodEnd 2028-02-29, lookback 12 maanden -> 2027-02-28 (geclampt, niet doorgerold naar maart)", () => {
+  const c = loadConfig({ periodStart: "2028-02-01", periodEnd: "2028-02-29", checkLookbackMonths: 12 }, new Date("2028-03-24T00:00:00Z"));
+  assert.equal(checkWindowStart(c, new Date("2028-03-24T00:00:00Z")), "2027-02-28");
+});
+test("checkWindowStart: kortere doelmaand, periodEnd 2026-05-31, lookback 3 maanden -> 2026-02-28 (geclampt, niet doorgerold naar maart)", () => {
+  const c = loadConfig({ periodStart: "2026-05-01", periodEnd: "2026-05-31", checkLookbackMonths: 3 }, new Date("2026-06-24T00:00:00Z"));
+  assert.equal(checkWindowStart(c, new Date("2026-06-24T00:00:00Z")), "2026-02-28");
+});
 
 // ─── ticketMissingTravel (pure kern van de onsite/voorrijkosten-check) ──
 

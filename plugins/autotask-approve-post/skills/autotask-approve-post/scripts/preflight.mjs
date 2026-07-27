@@ -53,14 +53,23 @@ export function loadConfig(raw, now) {
   };
 }
 
-// Task 18 (v2.13): PURE. Levert de ISO-startdatum van het terugkijk-venster voor de
+// Task 18 (v2.13, fix): PURE. Levert de ISO-startdatum van het terugkijk-venster voor de
 // onsite/urennorm-checks: cfg.periodEnd minus cfg.checkLookbackMonths maanden. Berekend
 // uit cfg.periodEnd (een "YYYY-MM-DD"-string, zelfde UTC-datumstijl als prevMonth
 // hierboven), niet uit `now`/Date.now() (die blijft alleen voor signatuur-consistentie
 // met de rest van de codebase, bv. checkWindowStart(cfg, new Date())).
+// Dag wordt geclampt op de laatste dag van de doelmaand: Date.UTC(y, m, d) met een te
+// hoge d rolt anders stilzwijgend door naar de volgende maand (bv. periodEnd 2028-02-29
+// min 12 maanden zou zonder clamp op 2027-03-01 uitkomen i.p.v. 2027-02-28), wat het
+// venster onopgemerkt versmalt.
 export function checkWindowStart(cfg, now) {
   const [y, m, d] = cfg.periodEnd.split("-").map(Number);
-  return iso(new Date(Date.UTC(y, m - 1 - cfg.checkLookbackMonths, d)));
+  let tm = (m - 1) - cfg.checkLookbackMonths; // 0-based doelmaand, kan negatief zijn
+  const ty = y + Math.floor(tm / 12);
+  tm = ((tm % 12) + 12) % 12;
+  const lastDay = new Date(Date.UTC(ty, tm + 1, 0)).getUTCDate(); // laatste dag doelmaand
+  const td = Math.min(d, lastDay);
+  return iso(new Date(Date.UTC(ty, tm, td)));
 }
 
 // PURE: is deze labour-entry projectwerk? billingCodeID zit in de (op naam
