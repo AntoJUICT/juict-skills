@@ -90,6 +90,11 @@ ticket als `ticketNumber` en `url`. Resolvet een ticketnummer een keer niet
 (bijvoorbeeld bij een onvolledige fetch), dan valt de tekstregel terug op het
 kale `#<id>`.
 
+Presenteer een ticket richting Anto ALTIJD als klikbare markdownlink in de vorm
+`[ticketnummer](url)`, dus nooit binnen een code-blok en niet als kale URL: in
+een code-blok is de link niet aanklikbaar. Bijvoorbeeld
+`[T20260622.0039](https://ww19.autotask.net/Mvc/ServiceDesk/TicketDetail.mvc?ticketId=25629)`.
+
 ## Vereisten
 
 - Ingelogd op Azure CLI (`az login`), secrets komen uit Key Vault `juict-kv-g4fhuo35`.
