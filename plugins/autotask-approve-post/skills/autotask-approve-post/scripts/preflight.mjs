@@ -35,7 +35,20 @@ export function loadConfig(raw, now) {
     // project/meerwerk of verdient anders aandacht. Instelbaar per klant/org.
     remoteSupportHoursThreshold: typeof r.remoteSupportHoursThreshold === "number" ? r.remoteSupportHoursThreshold : 1.5,
     changeHoursThreshold: typeof r.changeHoursThreshold === "number" ? r.changeHoursThreshold : 2,
+    // Task 16 (v2.11): projecten (ProjectCharges + labour op work type "Project"/
+    // "Projectmanagement") worden apart in een later batch afgehandeld, dus standaard
+    // uit dit overzicht. Uitzetten via config.json (excludeProjects: false) toont ze weer.
+    excludeProjects: typeof r.excludeProjects === "boolean" ? r.excludeProjects : true,
   };
+}
+
+// PURE: is deze labour-entry projectwerk? billingCodeID zit in de (op naam
+// geresolvde) set project-work-type-ids ("Project"/"Projectmanagement").
+// Lege/ontbrekende set (geen match gevonden, of excludeProjects staat uit en
+// er is niet geresolved) -> altijd false, nooit stilzwijgend alles wegfilteren.
+export function isProjectLabour(billingCodeID, projectCodeIds) {
+  if (!projectCodeIds || projectCodeIds.length === 0) return false;
+  return projectCodeIds.includes(billingCodeID);
 }
 // null/ontbrekende datum -> null (onbeslist); anders true/false op basis van [periodStart, periodEnd].
 function dateInRange(date, cfg) { if (!date) return null; const d = date.slice(0, 10); return d >= cfg.periodStart && d <= cfg.periodEnd; }
@@ -459,8 +472,15 @@ export async function fetchReview(companyInput, cfg) {
   // extra fetch nodig.
   const completeTicketIds = new Set(tickets.filter((t) => COMPLETE_TICKET_STATUSES.has(t.status)).map((t) => t.id));
 
-  const projects = await safeFetch(warnings, "Projects", () => atFetchAll("Projects", [{ field: "companyID", op: "eq", value: company.id }]));
+  // Task 16 (v2.11): projecten worden apart in een later batch afgehandeld. Bij
+  // cfg.excludeProjects wordt de Projects-fetch (die hier alleen dient om
+  // projectIds te leveren voor de ProjectCharges-fetch verderop) overgeslagen:
+  // geen projectCharge-items betekent ook geen nut in de projectIds zelf.
+  const projects = cfg.excludeProjects ? [] : await safeFetch(warnings, "Projects", () => atFetchAll("Projects", [{ field: "companyID", op: "eq", value: company.id }]));
   const projectIds = projects.map((p) => p.id);
+  // Task 16: op naam geresolvde project-labour-work-types ("Project"/"Projectmanagement"),
+  // alleen nodig als projecten uitgesloten worden.
+  const projectCodeIds = cfg.excludeProjects ? await safeFetch(warnings, "Project work type lookup", () => resolveProjectCodeIds(), []) : [];
 
   // Task 12.1: GEEN periode-filter meer op de fetch (verborg legitieme nog-te-posten
   // items met een datum buiten de maand, bv. "Buitenbundel mei"). review toont weer ALLE
@@ -470,7 +490,9 @@ export async function fetchReview(companyInput, cfg) {
   const labourRaw = await fetchBatchedIn("TimeEntries", "contractID", contractIds, [{ field: "isNonBillable", op: "eq", value: false }], 300, warnings);
   const ticketChargesRaw = await fetchBatchedIn("TicketCharges", "ticketID", ticketIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }], 300, warnings);
   const contractChargesRaw = await fetchBatchedIn("ContractCharges", "contractID", contractIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }], 300, warnings);
-  const projectChargesRaw = await fetchBatchedIn("ProjectCharges", "projectID", projectIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }], 300, warnings);
+  // Task 16: bij cfg.excludeProjects wordt ProjectCharges helemaal niet opgehaald
+  // (geen fetch, geen projectCharge-items), projecten worden apart afgehandeld.
+  const projectChargesRaw = cfg.excludeProjects ? [] : await fetchBatchedIn("ProjectCharges", "projectID", projectIds, [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }], 300, warnings);
 
   // Precieze posted-detectie op labour: BillingItems met timeEntryID in de kandidaat-ids
   // zelf, niet via de bredere contract-fetch. Als BillingItem.contractID bij afwijkende/
@@ -505,7 +527,12 @@ export async function fetchReview(companyInput, cfg) {
   // Raakt uitsluitend ticket-gebonden items (labour met ticketID, ticket-charges);
   // contract-/project-charges en labour zonder ticketID hebben ticketID == null
   // en blijven dus altijd staan via keepIfTicketComplete.
-  const timeEntries = keepIfTicketComplete(timeEntriesAll, completeTicketIds);
+  let timeEntries = keepIfTicketComplete(timeEntriesAll, completeTicketIds);
+  // Task 16: labour op work type "Project"/"Projectmanagement" hoort bij het
+  // aparte projecten-batch, dus eruit vóór buildReview. Tickets die daardoor
+  // zonder time entries EN zonder charges komen te staan vallen vanzelf weg
+  // (buildReview slaat een ticket zonder items over).
+  if (cfg.excludeProjects) timeEntries = timeEntries.filter((t) => !isProjectLabour(t.billingCodeID, projectCodeIds));
   const charges = keepIfTicketComplete(chargesAll, completeTicketIds);
   const reviewTicketsList = tickets.filter((t) => completeTicketIds.has(t.id));
 
@@ -653,6 +680,15 @@ async function resolveChangeCodeIds() {
   return rows.filter((r) => r.name === "Minor Change" || r.name === "Major Change").map((r) => r.id);
 }
 
+// Task 16 (v2.11): resolveert de project-work-types ("Project" en "Projectmanagement")
+// op naam, zelfde robuustheid-redenering als resolveChangeCodeIds hierboven (id-drift
+// tussen zones). Levert geen van beide een match op dan is de project-uitsluiting op
+// labour gracieus leeg (geen harde fout, alleen ProjectCharges blijft dan wel uitgesloten).
+async function resolveProjectCodeIds() {
+  const rows = await atFetchAll("BillingCodes", [{ field: "isActive", op: "eq", value: true }, { field: "billingCodeType", op: "eq", value: 0 }]);
+  return rows.filter((r) => r.name === "Project" || r.name === "Projectmanagement").map((r) => r.id);
+}
+
 // Task 15 (v2.10): print-only resolutie van ticketID -> "ticketNumber (url)".
 // Valt terug op het kale id als de ticketNumber niet resolvet (bv. ontbrekend
 // in de gebatchte Tickets-fetch). Puur formattering voor de print-secties
@@ -722,7 +758,12 @@ export async function fetchSummary(cfg) {
   const chargeFilter = [{ field: "isBillableToCompany", op: "eq", value: true }, { field: "isBilled", op: "eq", value: false }];
   const ticketChargesRaw = await safeFetch(warnings, "TicketCharges", () => atFetchAll("TicketCharges", chargeFilter));
   const contractChargesRaw = await safeFetch(warnings, "ContractCharges", () => atFetchAll("ContractCharges", chargeFilter));
-  const projectChargesRaw = await safeFetch(warnings, "ProjectCharges", () => atFetchAll("ProjectCharges", chargeFilter));
+  // Task 16 (v2.11): bij cfg.excludeProjects wordt ProjectCharges helemaal niet
+  // opgehaald (geen fetch, geen projectCharge-items); projecten worden apart afgehandeld.
+  const projectChargesRaw = cfg.excludeProjects ? [] : await safeFetch(warnings, "ProjectCharges", () => atFetchAll("ProjectCharges", chargeFilter));
+  // Task 16: op naam geresolvde project-labour-work-types ("Project"/"Projectmanagement"),
+  // alleen nodig als projecten uitgesloten worden.
+  const projectCodeIds = cfg.excludeProjects ? await safeFetch(warnings, "Project work type lookup", () => resolveProjectCodeIds(), []) : [];
 
   // Posted-exclusie via BillingItem-kruisverwijzing, gebatcht (~300/call). Sequentieel
   // (niet Promise.all) om binnen Autotask' rate-limit van 3 gelijktijdige threads te
@@ -805,6 +846,10 @@ export async function fetchSummary(cfg) {
     // Alleen gedekte contracten (niet al facturabel meegeteld hierboven):
     // dezelfde INVOICED_CONTRACT_TYPES-classificatie als de rest van summary.
     .filter((t) => !INVOICED_CONTRACT_TYPES.has(contractInfo.get(t.contractID)?.type))
+    // Task 16: consistent met de labour-filter hieronder toegepast, ook al is
+    // dit in de praktijk een no-op (rsRaw is al gefilterd op de Remote
+    // Support-billingCodeID, die nooit in projectCodeIds voorkomt).
+    .filter((t) => !cfg.excludeProjects || !isProjectLabour(t.billingCodeID, projectCodeIds))
     .map((t) => {
       const companyId = contractInfo.get(t.contractID)?.companyID ?? 0;
       return { companyId, companyName: unassignedName(companyId, names), id: t.id, ticketID: t.ticketID ?? null, hours: t.hoursToBill ?? t.hoursWorked ?? 0, dateWorked: t.dateWorked ?? null, summary: t.summaryNotes ?? null };
@@ -825,11 +870,16 @@ export async function fetchSummary(cfg) {
     const companyId = contractInfo.get(t.contractID)?.companyID ?? 0;
     return { ticketID: t.ticketID, companyId, companyName: unassignedName(companyId, names), hours: t.hoursToBill ?? t.hoursWorked ?? 0, category };
   };
+  // Task 16: consistent met de labour-filter, ook al is dit in de praktijk een
+  // no-op (rsRaw/changeRaw zijn al gefilterd op hun eigen work-type-ids, die
+  // nooit in projectCodeIds voorkomen).
   const remoteHourEntries = keepIfTicketComplete(rsRaw.filter((t) => !postedRsIds.has(t.id)), completeTicketIds)
     .filter((t) => t.ticketID != null)
+    .filter((t) => !cfg.excludeProjects || !isProjectLabour(t.billingCodeID, projectCodeIds))
     .map((t) => toHourEntry(t, "remote"));
   const changeHourEntries = keepIfTicketComplete(changeRaw.filter((t) => !postedChangeIds.has(t.id)), completeTicketIds)
     .filter((t) => t.ticketID != null)
+    .filter((t) => !cfg.excludeProjects || !isProjectLabour(t.billingCodeID, projectCodeIds))
     .map((t) => toHourEntry(t, "change"));
   const hourFlags = buildHourFlags([...remoteHourEntries, ...changeHourEntries], cfg);
 
@@ -840,7 +890,10 @@ export async function fetchSummary(cfg) {
   // Task 10: ticket-gebonden items (labour met ticketID, ticket-charges) alleen
   // houden als hun ticket afgerond is. Contract-/project-charges en labour
   // zonder ticketID hebben ticketID == null en blijven dus altijd staan.
-  const labourFiltered = keepIfTicketComplete(labour, completeTicketIds);
+  let labourFiltered = keepIfTicketComplete(labour, completeTicketIds);
+  // Task 16 (v2.11): labour op work type "Project"/"Projectmanagement" hoort bij
+  // het aparte projecten-batch, dus eruit vóór de aggregatie (buildSummary) hieronder.
+  if (cfg.excludeProjects) labourFiltered = labourFiltered.filter((t) => !isProjectLabour(t.billingCodeID, projectCodeIds));
   const ticketChargesFiltered = keepIfTicketComplete(ticketCharges, completeTicketIds);
 
   const items = [];

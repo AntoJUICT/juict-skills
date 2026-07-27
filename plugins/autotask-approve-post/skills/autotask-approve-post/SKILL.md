@@ -64,6 +64,22 @@ De ranglijst in `summary` sorteert op `chargeEUR + T&M-uren * rankHourRate`
 onder een klant met alleen een hoog chargebedrag komt te staan. Pas
 `rankHourRate` in `config.json` aan als het effectieve uurtarief afwijkt.
 
+## Projecten uitgesloten (standaard)
+
+Projecten worden later apart in een eigen batch afgehandeld, dus `summary` en
+`review` sluiten ze standaard uit. Dit betreft twee dingen:
+
+- Alle `ProjectCharges` worden helemaal niet opgehaald (geen items, geen
+  bijtelling in `chargeAmountEUR`/de triage-tabel).
+- Labour met work type "Project" of "Projectmanagement" wordt uit de
+  time entries gefilterd, vóór de rest van de verwerking. Een ticket dat
+  daardoor zonder time entries en zonder charges overblijft, valt helemaal
+  uit het overzicht weg.
+
+Dit gedrag zit achter `excludeProjects` in `config.json` (default `true`).
+Wil je projecten toch meenemen (bijvoorbeeld tijdens het projecten-batch
+zelf), zet dan `excludeProjects: false` in `config.json`.
+
 ## Ticketreferentie (ticketnummer + klikbare URL)
 
 Overal waar een ticket getoond wordt (review, de urennorm-sectie en de Remote

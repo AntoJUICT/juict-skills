@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, buildHourFlags, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod, safeFetch, renderWarnings, fetchBatchedIn, postedIdsBatched, ticketUrl } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, buildHourFlags, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod, safeFetch, renderWarnings, fetchBatchedIn, postedIdsBatched, ticketUrl, isProjectLabour } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -41,6 +41,32 @@ test("loadConfig: changeHoursThreshold overneembaar uit raw config als getal", (
 });
 test("loadConfig: changeHoursThreshold negeert niet-getal en valt terug op 2", () => {
   assert.equal(loadConfig({ changeHoursThreshold: "3" }, new Date("2026-07-24T10:00:00Z")).changeHoursThreshold, 2);
+});
+
+// ─── excludeProjects (Task 16, v2.11: projecten standaard uit review/summary) ──
+
+test("loadConfig: excludeProjects default true", () => {
+  assert.equal(loadConfig({}, new Date("2026-07-24T10:00:00Z")).excludeProjects, true);
+});
+test("loadConfig: excludeProjects overneembaar uit raw config (false)", () => {
+  assert.equal(loadConfig({ excludeProjects: false }, new Date("2026-07-24T10:00:00Z")).excludeProjects, false);
+});
+test("loadConfig: excludeProjects negeert niet-boolean en valt terug op true", () => {
+  assert.equal(loadConfig({ excludeProjects: "false" }, new Date("2026-07-24T10:00:00Z")).excludeProjects, true);
+});
+
+test("isProjectLabour: billingCodeID in de project-code-set is true", () => {
+  assert.equal(isProjectLabour(10, [10, 20]), true);
+});
+test("isProjectLabour: billingCodeID niet in de project-code-set is false", () => {
+  assert.equal(isProjectLabour(99, [10, 20]), false);
+});
+test("isProjectLabour: lege project-code-set is altijd false", () => {
+  assert.equal(isProjectLabour(10, []), false);
+});
+test("isProjectLabour: null/undefined project-code-set is false (guard)", () => {
+  assert.equal(isProjectLabour(10, null), false);
+  assert.equal(isProjectLabour(10, undefined), false);
 });
 
 // ─── ticketUrl (Task 15, v2.10: ticketnummer + klikbare URL i.p.v. ticket-id) ──
