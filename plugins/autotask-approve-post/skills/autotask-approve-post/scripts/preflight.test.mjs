@@ -1,7 +1,7 @@
 // preflight.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, buildHourFlags, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod, safeFetch, renderWarnings, fetchBatchedIn, postedIdsBatched, ticketUrl, isProjectLabour, ticketMissingTravel } from "./preflight.mjs";
+import { loadConfig, checkLabour, checkCharge, groupItems, buildReview, buildNonBillablePatches, setNonBillable, shouldConfirm, buildBilledMap, isInvoiced, postedIdsFromRows, buildSummary, buildRemoteSupportReview, buildHourFlags, keepIfTicketComplete, COMPLETE_TICKET_STATUSES, inPeriod, safeFetch, renderWarnings, fetchBatchedIn, postedIdsBatched, ticketUrl, isProjectLabour, ticketMissingTravel, checkWindowStart } from "./preflight.mjs";
 
 const cfg = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30" }, new Date("2026-07-24T00:00:00Z"));
 const te = (o = {}) => ({ id: 1, ticketID: 100, taskID: null, contractID: 5, resourceID: 7, roleID: 3, billingCodeID: 20, hoursWorked: 2, hoursToBill: 2, isNonBillable: false, billingApprovalDateTime: null, dateWorked: "2026-06-15T09:00:00", summaryNotes: "Werk", companyID: 999, ...o });
@@ -79,6 +79,31 @@ test("loadConfig: requireTravelForOnsite overneembaar uit raw config (false)", (
 });
 test("loadConfig: requireTravelForOnsite negeert niet-boolean en valt terug op true", () => {
   assert.equal(loadConfig({ requireTravelForOnsite: "false" }, new Date("2026-07-24T10:00:00Z")).requireTravelForOnsite, true);
+});
+
+// ─── checkLookbackMonths / checkWindowStart (Task 18, v2.13: onsite/urennorm-checks over een ruim terugkijk-venster) ──
+
+test("loadConfig: checkLookbackMonths default 12", () => {
+  assert.equal(loadConfig({}, new Date("2026-07-24T10:00:00Z")).checkLookbackMonths, 12);
+});
+test("loadConfig: checkLookbackMonths overneembaar uit raw config als getal", () => {
+  assert.equal(loadConfig({ checkLookbackMonths: 6 }, new Date("2026-07-24T10:00:00Z")).checkLookbackMonths, 6);
+});
+test("loadConfig: checkLookbackMonths negeert niet-getal en valt terug op 12", () => {
+  assert.equal(loadConfig({ checkLookbackMonths: "6" }, new Date("2026-07-24T10:00:00Z")).checkLookbackMonths, 12);
+});
+
+test("checkWindowStart: periodEnd 2026-06-30, lookback 12 maanden -> 2025-06-30", () => {
+  const c = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30", checkLookbackMonths: 12 }, new Date("2026-07-24T00:00:00Z"));
+  assert.equal(checkWindowStart(c, new Date("2026-07-24T00:00:00Z")), "2025-06-30");
+});
+test("checkWindowStart: periodEnd 2026-06-30, lookback 6 maanden -> 2025-12-30", () => {
+  const c = loadConfig({ periodStart: "2026-06-01", periodEnd: "2026-06-30", checkLookbackMonths: 6 }, new Date("2026-07-24T00:00:00Z"));
+  assert.equal(checkWindowStart(c, new Date("2026-07-24T00:00:00Z")), "2025-12-30");
+});
+test("checkWindowStart: jaargrens-overschrijding, periodEnd 2026-01-31, lookback 3 maanden -> 2025-10-31", () => {
+  const c = loadConfig({ periodStart: "2026-01-01", periodEnd: "2026-01-31", checkLookbackMonths: 3 }, new Date("2026-02-24T00:00:00Z"));
+  assert.equal(checkWindowStart(c, new Date("2026-02-24T00:00:00Z")), "2025-10-31");
 });
 
 // ─── ticketMissingTravel (pure kern van de onsite/voorrijkosten-check) ──

@@ -44,7 +44,23 @@ export function loadConfig(raw, now) {
     // (requireTravelForOnsite: false) schakelt zowel de review-ticketflag als de
     // summary-sectie uit.
     requireTravelForOnsite: typeof r.requireTravelForOnsite === "boolean" ? r.requireTravelForOnsite : true,
+    // Task 18 (v2.13): de onsite-zonder-voorrijkosten- en urennorm-checks in
+    // summary kijken verder terug dan de billing-maand (checkWindowStart hieronder),
+    // zodat nog-niet-geposte items uit eerdere maanden ook in het vangnet vallen.
+    // Instelbaar per klant/org via config.json; de Remote Support-AI-digest blijft
+    // wel op de billing-maand (zie fetchSummary).
+    checkLookbackMonths: typeof r.checkLookbackMonths === "number" ? r.checkLookbackMonths : 12,
   };
+}
+
+// Task 18 (v2.13): PURE. Levert de ISO-startdatum van het terugkijk-venster voor de
+// onsite/urennorm-checks: cfg.periodEnd minus cfg.checkLookbackMonths maanden. Berekend
+// uit cfg.periodEnd (een "YYYY-MM-DD"-string, zelfde UTC-datumstijl als prevMonth
+// hierboven), niet uit `now`/Date.now() (die blijft alleen voor signatuur-consistentie
+// met de rest van de codebase, bv. checkWindowStart(cfg, new Date())).
+export function checkWindowStart(cfg, now) {
+  const [y, m, d] = cfg.periodEnd.split("-").map(Number);
+  return iso(new Date(Date.UTC(y, m - 1 - cfg.checkLookbackMonths, d)));
 }
 
 // PURE: is deze labour-entry projectwerk? billingCodeID zit in de (op naam
@@ -838,13 +854,20 @@ export async function fetchSummary(cfg) {
   const contractCharges = contractChargesRaw.filter((c) => !postedContractChargeIds.has(c.id)).map(mapCharge);
   const projectCharges = projectChargesRaw.filter((c) => !postedProjectChargeIds.has(c.id)).map(mapCharge);
 
+  // Task 18 (v2.13): onsite- en urennorm-checks kijken verder terug dan de billing-maand
+  // (checkWindowStart..periodEnd) zodat nog-niet-geposte items uit eerdere maanden ook in
+  // het vangnet vallen. De Remote Support-fetch hieronder gebruikt dit bredere venster ook
+  // (dient beide: de volle set voor urennorm "remote", en de op periodStart..periodEnd
+  // gefilterde subset hieronder voor de RS-AI-digest).
+  const windowStart = checkWindowStart(cfg);
+
   // Remote Support work-type-review digest (Task 9): Remote Support op gedekte
   // (niet-facturabele) contracten wordt door de triage hierboven genegeerd,
   // want die kijkt alleen naar billableContractIds. Toch kan het work type zelf
   // fout gekozen zijn (bv. eigenlijk Onsite/Meerwerk/Project/Change/buiten
   // kantooruren). Dat is AI-werk (Claude beoordeelt de summary-tekst later),
   // dus hier alleen bounded ophalen + groeperen per klant, geen classificatie.
-  // Bounded: alleen de Remote Support-billingCode, binnen de periode, niet
+  // Bounded: alleen de Remote Support-billingCode, binnen het terugkijk-venster, niet
   // non-billable; posted-exclusie via dezelfde gebatchte BillingItem-lookup.
   // rsRaw wordt hier alvast opgehaald (ongefilterd) zodat de ticket-ids ervan
   // meekunnen in de EEN gebatchte Tickets-fetch hieronder; de eigenlijke
@@ -856,28 +879,28 @@ export async function fetchSummary(cfg) {
   const rsRaw = remoteSupportCodeId != null ? await safeFetch(warnings, "Remote Support TimeEntries", () => atFetchAll("TimeEntries", [
     { field: "billingCodeID", op: "eq", value: remoteSupportCodeId },
     { field: "isNonBillable", op: "eq", value: false },
-    { field: "dateWorked", op: "gte", value: `${cfg.periodStart}T00:00:00` },
+    { field: "dateWorked", op: "gte", value: `${windowStart}T00:00:00` },
     { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` },
   ])) : [];
 
   // Task 14 (v2.9): urennorm-flags per ticket, Change-kant (Minor Change +
   // Major Change). Zelfde bounded aanpak als de Remote Support-fetch hierboven
-  // (binnen periode, niet non-billable); de remote-kant van de urennorm-flags
-  // hergebruikt rsRaw hierboven, geen dubbele fetch.
+  // (binnen het terugkijk-venster, niet non-billable); de remote-kant van de
+  // urennorm-flags hergebruikt rsRaw hierboven, geen dubbele fetch.
   const changeCodeIds = await safeFetch(warnings, "Change work type lookup", () => resolveChangeCodeIds(), []);
   if (changeCodeIds.length === 0) console.error("Waarschuwing: work types 'Minor Change'/'Major Change' niet gevonden; Change-urennorm overgeslagen.");
   const changeRaw = changeCodeIds.length ? await safeFetch(warnings, "Change TimeEntries", () => atFetchAll("TimeEntries", [
     { field: "billingCodeID", op: "in", value: changeCodeIds },
     { field: "isNonBillable", op: "eq", value: false },
-    { field: "dateWorked", op: "gte", value: `${cfg.periodStart}T00:00:00` },
+    { field: "dateWorked", op: "gte", value: `${windowStart}T00:00:00` },
     { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` },
   ])) : [];
 
-  // Task 17 (v2.12): onsite zonder voorrijkosten. Zelfde bounded aanpak als de
-  // Remote Support-/Change-fetches hierboven (binnen periode, niet non-billable).
-  // Beide work-type-lookups alleen als requireTravelForOnsite aan staat: anders
-  // is de hele check uitgeschakeld en is de extra BillingCodes-lookup + fetch
-  // pure overhead.
+  // Task 17 (v2.12) + Task 18 (v2.13): onsite zonder voorrijkosten, over het bredere
+  // terugkijk-venster (zelfde reden: nog-niet-geposte onsite-tickets uit eerdere maanden
+  // horen ook in dit vangnet). Beide work-type-lookups alleen als requireTravelForOnsite
+  // aan staat: anders is de hele check uitgeschakeld en is de extra BillingCodes-lookup +
+  // fetch pure overhead.
   const onsiteCodeId = cfg.requireTravelForOnsite
     ? await safeFetch(warnings, "Onsite Support work type lookup", () => resolveOnsiteSupportCodeId(), null)
     : null;
@@ -890,7 +913,7 @@ export async function fetchSummary(cfg) {
   const onsiteRaw = cfg.requireTravelForOnsite && onsiteCodeId != null ? await safeFetch(warnings, "Onsite Support TimeEntries", () => atFetchAll("TimeEntries", [
     { field: "billingCodeID", op: "eq", value: onsiteCodeId },
     { field: "isNonBillable", op: "eq", value: false },
-    { field: "dateWorked", op: "gte", value: `${cfg.periodStart}T00:00:00` },
+    { field: "dateWorked", op: "gte", value: `${windowStart}T00:00:00` },
     { field: "dateWorked", op: "lte", value: `${cfg.periodEnd}T23:59:59` },
   ])) : [];
 
@@ -934,6 +957,10 @@ export async function fetchSummary(cfg) {
   const postedRsIds = await postedIdsBatched("timeEntryID", rsRaw.map((t) => t.id), 300, warnings);
   const rsItemsAll = rsRaw
     .filter((t) => !postedRsIds.has(t.id))
+    // Task 18 (v2.13): rsRaw is nu opgehaald over het brede terugkijk-venster (voor de
+    // urennorm "remote"-kant hieronder); de RS-AI-digest zelf blijft op de billing-maand,
+    // dus hier terugfilteren naar periodStart..periodEnd vóór buildRemoteSupportReview.
+    .filter((t) => inPeriod(t.dateWorked, cfg))
     // Alleen gedekte contracten (niet al facturabel meegeteld hierboven):
     // dezelfde INVOICED_CONTRACT_TYPES-classificatie als de rest van summary.
     .filter((t) => !INVOICED_CONTRACT_TYPES.has(contractInfo.get(t.contractID)?.type))

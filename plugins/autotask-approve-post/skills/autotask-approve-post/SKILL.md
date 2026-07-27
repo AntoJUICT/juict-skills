@@ -52,6 +52,17 @@ Ik gebruik die flag om items ouder dan de periode te markeren als "ouder dan
 referentieperiode veranderen, pas dan `periodStart`/`periodEnd` in
 `config.json` aan.
 
+De onsite-zonder-voorrijkosten- en urennorm-checks in `summary` (Task 18,
+v2.13) kijken niet alleen naar de billing-maand, maar over een ruim
+terugkijk-venster: `periodEnd` minus `checkLookbackMonths` maanden (default
+12, instelbaar in `config.json`). Zo blijft dit een volledig vangnet over
+maandgrenzen heen, ook voor afgeronde, nog-niet-geposte onsite-tickets of
+urennorm-overschrijdingen die al in een eerdere maand zijn geboekt. De Remote
+Support-AI-digest ("Remote Support te AI-checken") blijft wel op de
+billing-maand staan: die uren worden apart teruggefilterd naar
+`periodStart`/`periodEnd` voordat de digest wordt opgebouwd, zodat de
+leeslijst voor Claude niet groeit met alles uit het bredere venster.
+
 `summary` splitst labour-uren in twee groepen:
 - **T&M-uren (te factureren)**: labour op een echt Time & Materials-contract
   (contractType 1). Dit is nieuwe omzet.
