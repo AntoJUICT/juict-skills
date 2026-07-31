@@ -24,6 +24,20 @@ test("marketplace.json bevat een itglue-api entry die naar de plugin-map wijst",
   assert.ok(existsSync(resolve(repoRoot, "plugins/itglue-api")), "plugin-map bestaat niet");
 });
 
+// De README is de voorpagina van een publieke repo. De tabel daar liep achter op marketplace.json
+// (itglue-api en autotask-approve-post ontbraken), en een gemiste checklist-stap merkt niemand.
+// Deze controle wel.
+test("README noemt elke plugin uit marketplace.json", () => {
+  const markt = JSON.parse(readFileSync(resolve(repoRoot, ".claude-plugin/marketplace.json"), "utf-8"));
+  const readme = readFileSync(resolve(repoRoot, "README.md"), "utf-8");
+  for (const plugin of markt.plugins) {
+    assert.ok(
+      readme.includes(`\`${plugin.name}\``),
+      `${plugin.name} staat in marketplace.json maar niet in README.md: werk de tabel "Skills in deze marketplace" bij`
+    );
+  }
+});
+
 test("SKILL.md heeft frontmatter met name en description", () => {
   const pad = resolve(repoRoot, "plugins/itglue-api/skills/itglue-api/SKILL.md");
   const inhoud = readFileSync(pad, "utf-8");

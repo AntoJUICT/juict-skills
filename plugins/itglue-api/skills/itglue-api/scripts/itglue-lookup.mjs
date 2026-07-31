@@ -235,6 +235,40 @@ export function passwordDeeplink(orgId, passwordId, portal = PORTAL_URL) {
   return `${String(portal).replace(/\/+$/, "")}/${orgId}/passwords/${passwordId}`;
 }
 
+// Extra grens bovenop assertPathAllowed, uitsluitend voor het vrije pad van het get-subcommando.
+// De rest van deze CLI laat van een password-item alleen naam en deeplink door
+// (passwordTreffers). Een vrij pad zou daar langs kunnen: "get passwords?filter[organization_id]=7"
+// print de ruwe attributes van elk password-item. Dat omzeilt precies de naam-en-link-whitelist die
+// de rest van de skill afdwingt, dezelfde reden dat --raw geblokkeerd is op password-link. Elk pad
+// dat de passwords-resource raakt gaat er daarom uit, ongeacht wat er vandaag wel of niet in die
+// attributes staat: het beleid hangt niet af van wat de API teruggeeft.
+//
+// De controle gebruikt dezelfde normalisatie als de guard (padVoorControle op de geparseerde
+// pathname en op de ruwe invoer), zodat een gecodeerde of gesplitste vorm hier niet langs glipt.
+// assertPathAllowed loopt eerst: die weigert al de absolute URL, de gecodeerde letter in het pad en
+// de individuele password-resource, dus wat hier aankomt is een schoon relatief pad.
+const GEBLOKKEERD_GET_PASSWORDS =
+  "Geblokkeerd: get mag de passwords-resource niet opvragen, ook de collectie niet. Een vrij pad " +
+  "zou hier de ruwe attributes van password-items printen en daarmee de whitelist omzeilen die " +
+  "alleen naam en deeplink doorlaat (dezelfde reden dat --raw geblokkeerd is op password-link). " +
+  "Gebruik password-link als je een wachtwoord-item zoekt.";
+
+export function assertGetPadToegestaan(pad) {
+  assertPathAllowed(pad);
+  const p = String(pad ?? "");
+  const invoer = invoerZoalsParserDieZiet(p);
+  const teControleren = [
+    padVoorControle(new URL(p, CONTROLE_BASIS).pathname),
+    padVoorControle(invoer.split(/[?#]/)[0]),
+  ];
+  for (const kandidaat of teControleren) {
+    if (kandidaat.toLowerCase().split("/").filter(Boolean).includes("passwords")) {
+      throw new Error(GEBLOKKEERD_GET_PASSWORDS);
+    }
+  }
+  return p;
+}
+
 // Bewust een whitelist: er komen alleen naam en link uit, wat de input ook bevat.
 export function passwordTreffers(items, orgId, zoekterm, portal = PORTAL_URL) {
   const term = String(zoekterm ?? "").toLowerCase();
@@ -300,7 +334,20 @@ export async function igFetch(
       throw new Error(`IT Glue API fout ${res.status}: ${tekst}`);
     }
 
-    return res.json();
+    // Bewust eerst de tekst lezen en daarna zelf parsen, in plaats van res.json() los te laten. Een
+    // 200 met een niet-JSON body komt in het echt voor (een proxy of gateway die een HTML-foutpagina
+    // teruggeeft) en res.json() gooit daar een kale SyntaxError op: zonder status, zonder resource,
+    // en met een ongeredacteerd fragment van de body in de melding. Dat laatste breekt de belofte dat
+    // elke responsbody door redactSecrets gaat voordat hij in een Error terechtkomt.
+    const tekst = await res.text();
+    try {
+      return JSON.parse(tekst);
+    } catch {
+      const fragment = redactSecrets(String(tekst ?? ""), key).slice(0, 300);
+      throw new Error(
+        `IT Glue API gaf geen JSON terug op ${pad} (status ${res.status}). Eerste deel van de body: ${fragment}`
+      );
+    }
   }
 }
 
@@ -353,8 +400,8 @@ export function getApiKey() {
 // geeft daar gewoon een lege collectie voor terug, geen 404. De uitvoer wordt dan "Geen
 // resultaten." zonder expliciete melding dat het organisatie-id niet bestaat. Bewust zo gelaten:
 // een extra verificatiecall (GET /organizations/{id}) zou de belofte "numerieke input doet geen
-// zoekcall" doorbreken en kost een extra round-trip voor het normale pad (bestaand id). Zie
-// task-4-report.md voor de afweging.
+// zoekcall" doorbreken en kost een extra round-trip voor het normale pad (een bestaand id). Wie een
+// niet-bestaand id vermoedt, controleert dat met: get "organizations?page[size]=1000".
 export async function resolveOrg(zoekterm, opts) {
   const term = String(zoekterm ?? "").trim();
   if (!term) throw new Error("Geef een organisatie op (naam of id).");
@@ -363,6 +410,22 @@ export async function resolveOrg(zoekterm, opts) {
   const orgs = await fetchAllItGlue("organizations", { ...opts, filters: { name: term } });
   const { match, kandidaten } = pickExactOrg(orgs, term);
   if (match) return match;
+
+  // Nul treffers is hier het normale pad, niet de uitzondering: filter[name] matcht geen
+  // deelstrings, dus wie een deelnaam typt krijgt een lege data-array zonder foutmelding. Een kopje
+  // "Kandidaten:" met niets eronder plus het advies "gebruik het id" zou dan verwijzen naar een id
+  // dat deze melding zelf niet kan leveren. Daarom een aparte tak met de route die wel werkt.
+  if (kandidaten.length === 0) {
+    throw new Error(
+      `Geen organisatie gevonden voor "${term}". Dat betekent niet dat de organisatie niet bestaat: ` +
+        "filter[name] van IT Glue matcht geen deelstrings en wil de volledige naam, en geeft anders " +
+        "een lege lijst zonder foutmelding.\n" +
+        "Twee routes naar het id:\n" +
+        `  1. Zoek de organisatie op ${PORTAL_URL} en lees het id uit de URL van de organisatiepagina.\n` +
+        '  2. Haal de lijst op met: node itglue-lookup.mjs get "organizations?page[size]=1000"\n' +
+        "Herhaal het commando daarna met dat id in plaats van de naam."
+    );
+  }
 
   const lijst = kandidaten
     .slice(0, 15)
@@ -374,17 +437,50 @@ export async function resolveOrg(zoekterm, opts) {
   );
 }
 
-export const SUBCOMMANDS = ["org", "configs", "contacts", "docs", "assets", "password-link"];
+export const SUBCOMMANDS = ["org", "configs", "contacts", "docs", "assets", "password-link", "get"];
 
-// Subcommando's waarvoor --raw een resource heeft. password-link staat hier bewust niet in: een
-// ruwe dump van password-items zou de naam-en-link-whitelist omzeilen. Komt er een subcommando bij,
-// dan hoort het hier expliciet bij te komen; rawDoel() gooit liever dan te gokken.
+// Subcommando's waarvoor --raw een resource heeft. Komt er een subcommando bij, dan hoort het hier
+// of in GEEN_RAW_SUBCOMMANDS te komen; rawDoel() gooit liever dan te gokken.
 export const RAW_SUBCOMMANDS = ["org", "configs", "contacts", "docs", "assets"];
+
+// De tegenhanger: subcommando's die bewust geen --raw hebben, met de reden. password-link omdat een
+// ruwe dump van password-items de naam-en-link-whitelist zou omzeilen, get omdat dat al de ruwe body
+// print en een tweede ruwe modus daar niets toevoegt. De test die deze twee lijsten naast
+// SUBCOMMANDS legt, vangt een nieuw subcommando dat in geen van beide staat.
+export const GEEN_RAW_SUBCOMMANDS = ["password-link", "get"];
+
+export function assertSubcommando(subcommando) {
+  if (!SUBCOMMANDS.includes(subcommando)) {
+    throw new Error(`Onbekend subcommando "${subcommando ?? ""}". Geldig: ${SUBCOMMANDS.join(", ")}.`);
+  }
+  return subcommando;
+}
+
+// Vrije GET op een relatief pad, zodat de afvinkinstructies in REFERENCE.md uitvoerbaar zijn zonder
+// zelf een script met de key te schrijven. Het pad gaat door assertPathAllowed én door de extra
+// passwords-grens van assertGetPadToegestaan, en de uitvoer gaat in runCli() door redactSecrets.
+// Het pad wordt byte-identiek verstuurd, dus met letterlijke blokhaken: daarmee is dit ook de manier
+// om de %5B/%5D-aanname te meten tegenover wat --raw verstuurt.
+export async function runGet(argv, opts) {
+  const [, ...rest] = argv;
+  const pad = String(rest[0] ?? "").trim();
+  if (!pad) {
+    throw new Error(
+      'Geef een relatief pad op, bijvoorbeeld: get "flexible_asset_types" of ' +
+        'get "locations?filter[organization_id]=7". Zet het pad tussen quotes, anders eet je shell de ' +
+        "blokhaken en de &."
+    );
+  }
+  assertGetPadToegestaan(pad);
+  return igFetch(pad, opts);
+}
 
 export async function runSubcommand(argv, opts) {
   const [subcommando, ...rest] = argv;
-  if (!SUBCOMMANDS.includes(subcommando)) {
-    throw new Error(`Onbekend subcommando "${subcommando ?? ""}". Geldig: ${SUBCOMMANDS.join(", ")}.`);
+  assertSubcommando(subcommando);
+
+  if (subcommando === "get") {
+    return { soort: "get", body: await runGet(argv, opts) };
   }
 
   if (subcommando === "org") {
@@ -400,6 +496,15 @@ export async function runSubcommand(argv, opts) {
         status: o.attributes?.["organization-status-name"] ?? "",
       })),
     };
+  }
+
+  // Vóór resolveOrg, zodat een ontbrekende zoekterm geen zoekcall op de organisatie kost.
+  if (subcommando === "password-link" && !String(rest[1] ?? "").trim()) {
+    throw new Error(
+      "password-link vereist een zoekterm. Zonder term zou dit de naam en link van alle " +
+        "password-items van deze organisatie tonen, en dat is meer dan nodig om één item te vinden. " +
+        'Geef een deel van de itemnaam mee, bijvoorbeeld: password-link 7 "firewall".'
+    );
   }
 
   const org = await resolveOrg(rest[0], opts);
@@ -439,7 +544,10 @@ export async function runSubcommand(argv, opts) {
     };
   }
 
-  // password-link: collectie ophalen om het item te vinden, daarna alleen naam en link.
+  // password-link: collectie ophalen om het item te vinden, daarna alleen naam en link. De zoekterm
+  // is hierboven al verplicht gesteld: zonder term zou dit de naam en link van élk password-item van
+  // de organisatie dumpen. Geen waarde, maar itemnamen vertellen zelf al welke systemen en accounts
+  // er zijn, en de GEBRUIK-tekst schrijft de term ook als verplicht.
   const items = await fetchAllItGlue("passwords", { ...opts, filters });
   return { soort: "password-link", rijen: passwordTreffers(items, org.id, zoekterm) };
 }
@@ -455,9 +563,7 @@ export const RAW_PAGE_SIZE = 2;
 // page[size]=RAW_PAGE_SIZE, terwijl de subcommando's met 100 per pagina doorpagineren.
 export async function rawDoel(argv, opts) {
   const [subcommando, ...rest] = argv;
-  if (!SUBCOMMANDS.includes(subcommando)) {
-    throw new Error(`Onbekend subcommando "${subcommando ?? ""}". Geldig: ${SUBCOMMANDS.join(", ")}.`);
-  }
+  assertSubcommando(subcommando);
 
   // Geen ruwe dump van password-items. De rest van dit script laat van een password-item alleen
   // naam en deeplink door (passwordTreffers), en --raw zou dat filter juist omzeilen: precies de
@@ -467,6 +573,15 @@ export async function rawDoel(argv, opts) {
       "Geblokkeerd: --raw is niet toegestaan op password-link. Een ruwe dump van password-items " +
         "omzeilt de whitelist die alleen naam en deeplink doorlaat. Gebruik password-link zonder " +
         "--raw, of inspecteer een andere resource."
+    );
+  }
+
+  // get print zelf al de ruwe body van precies het pad dat je meegeeft. Een --raw eroverheen zou
+  // alleen verwarren over welke paginagrootte er dan verstuurd wordt.
+  if (subcommando === "get") {
+    throw new Error(
+      "--raw heeft geen zin op get: get print de ruwe JSON:API-body van het pad dat je meegeeft al. " +
+        "Zet page[size] en page[number] desgewenst zelf in het pad."
     );
   }
 
@@ -565,7 +680,7 @@ const KOLOMMEN = {
   "password-link": ["naam", "link"],
 };
 
-const GEBRUIK = `Gebruik: node itglue-lookup.mjs <subcommando> <organisatie> [zoekterm] [--json|--raw]
+export const GEBRUIK = `Gebruik: node itglue-lookup.mjs <subcommando> <organisatie> [zoekterm] [--json|--raw]
 
   org <naam>                     organisaties zoeken op naam
   configs <org> [zoekterm]       configuraties (servers, netwerk, endpoints)
@@ -573,47 +688,63 @@ const GEBRUIK = `Gebruik: node itglue-lookup.mjs <subcommando> <organisatie> [zo
   docs <org> [zoekterm]          documenten met deeplink
   assets <org> [asset-type-id]   flexible assets
   password-link <org> <term>     naam en deeplink van een wachtwoord-item
+  get "<relatief-pad>"           ruwe GET op een relatief pad, voor endpoints zonder
+                                 eigen subcommando (bijv. get "flexible_asset_types").
+                                 Zet het pad tussen quotes vanwege de blokhaken en de &.
+                                 De passwords-resource is hier geblokkeerd; gebruik
+                                 password-link.
 
   --json   de verwerkte rijen als JSON in plaats van een tabel
   --raw    de ruwe JSON:API-body van de eerste pagina, inclusief meta en links.
            Voor het verifieren van de responsvorm: welke meta-sleutel de volgende
            pagina aangeeft, hoe de attribuutsleutels heten, hoeveel items er zijn.
            Paginagrootte staat op ${RAW_PAGE_SIZE} zodat er echt een volgende pagina is.
-           Niet toegestaan op password-link.
+           Niet toegestaan op password-link en niet op get.
 
 Read-only. Wachtwoordwaarden worden nooit opgehaald: password-link geeft
 alleen de naam van het item en een link naar IT Glue.`;
 
-async function main() {
-  const meegegeven = process.argv.slice(2);
+// Als aparte functie met injecteerbare key-ophaler en logger, zodat de volgorde van validatie en
+// key-ophalen testbaar is zonder az aan te roepen. De subcommando-validatie staat bewust vóór
+// keyOphaler(): anders doet "node itglue-lookup.mjs bogus" eerst een az-call en zegt daarna pas dat
+// het subcommando niet bestaat.
+export async function runCli(meegegeven, { keyOphaler = getApiKey, log = console.log } = {}) {
   const argv = meegegeven.filter((a) => a !== "--json" && a !== "--raw");
   const alsJson = meegegeven.includes("--json");
   const alsRaw = meegegeven.includes("--raw");
   if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
-    console.log(GEBRUIK);
+    log(GEBRUIK);
     return;
   }
 
-  const key = getApiKey();
+  assertSubcommando(argv[0]);
+
+  const key = await keyOphaler();
 
   if (alsRaw) {
     // redactSecrets als vangnet: de key hoort niet in een responsbody te staan, maar een ruwe dump
     // die we ongefilterd naar de console schrijven is precies de plek om dat niet aan te nemen.
     const body = await runRaw(argv, { key });
-    console.log(redactSecrets(JSON.stringify(body, null, 2), key));
+    log(redactSecrets(JSON.stringify(body, null, 2), key));
     return;
   }
 
-  const { soort, rijen } = await runSubcommand(argv, { key });
-  if (alsJson) {
-    console.log(JSON.stringify(rijen, null, 2));
+  const { soort, rijen, body } = await runSubcommand(argv, { key });
+  if (soort === "get") {
+    // get print altijd de ruwe body, ook zonder --json: er zijn geen verwerkte rijen. Zelfde
+    // vangnet als bij --raw.
+    log(redactSecrets(JSON.stringify(body, null, 2), key));
     return;
   }
-  console.log(formatTabel(rijen, KOLOMMEN[soort]));
+  if (alsJson) {
+    log(JSON.stringify(rijen, null, 2));
+    return;
+  }
+  log(formatTabel(rijen, KOLOMMEN[soort]));
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  main().catch((err) => {
+  runCli(process.argv.slice(2)).catch((err) => {
     console.error(err.message);
     process.exitCode = 1;
   });

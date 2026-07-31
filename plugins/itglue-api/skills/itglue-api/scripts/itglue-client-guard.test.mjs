@@ -323,17 +323,26 @@ test("netwerklaag: verboden pad doet geen enkel request en maxPages remt echt", 
     // zou deze test blijven hangen in plaats van rood worden.
     const NOODREM = 25;
     let calls = [];
+    let inits = [];
     let volgendePagina = null;
-    globalThis.fetch = async (url) => {
+    // Op "html" geeft de mock een niet-JSON body terug op status 200: het gateway-geval.
+    let bodySoort = "json";
+    globalThis.fetch = async (url, init) => {
       calls.push(String(url));
+      inits.push(init);
       if (calls.length > NOODREM) {
         throw new Error(`noodrem: meer dan ${NOODREM} requests, de rem in fetchAllItGlue doet niets`);
       }
+      const tekst =
+        bodySoort === "html"
+          ? "<html>502 Bad Gateway niet-echt-alleen-voor-deze-test</html>"
+          : JSON.stringify({ data: [], meta: volgendePagina ? { "next-page": volgendePagina } : {} });
       return {
         status: 200,
         ok: true,
         headers: new Headers(),
-        json: async () => ({ data: [], meta: volgendePagina ? { "next-page": volgendePagina } : {} }),
+        text: async () => tekst,
+        json: async () => JSON.parse(tekst),
       };
     };
     delete process.env.AZURE_KEYVAULT_URL;
@@ -359,9 +368,34 @@ test("netwerklaag: verboden pad doet geen enkel request en maxPages remt echt", 
     // Legitiem pad: wel een request, met de juiste header en zonder muterend verb.
     volgendePagina = null;
     calls = [];
+    inits = [];
     await client.itglueFetch("/organizations?filter[name]=JUICT");
     assert.equal(calls.length, 1, "een legitiem pad hoort gewoon opgehaald te worden");
     assert.match(calls[0], /^https:\/\/api\.eu\.itglue\.com\/organizations\?/);
+
+    // Timeout: zonder AbortSignal houdt een hangende IT Glue-verbinding een Next.js-route
+    // onbeperkt vast. De signal moet dus echt meegaan met het request.
+    assert.ok(inits[0]?.signal, "itglueFetch geeft geen AbortSignal mee: een hangend request loopt nooit af");
+    assert.equal(typeof inits[0].signal.aborted, "boolean", "de signal hoort een echte AbortSignal te zijn");
+    assert.equal(inits[0].signal.aborted, false, "de signal mag niet al afgebroken zijn bij het versturen");
+
+    // Een 200 met een niet-JSON body (proxy of gateway) mag geen kale SyntaxError worden: de melding
+    // hoort status en resource te noemen, en de body-tekst gaat door de redactie.
+    bodySoort = "html";
+    calls = [];
+    await assert.rejects(
+      () => client.itglueFetch("/organizations"),
+      (err) => {
+        assert.ok(!(err instanceof SyntaxError), "een kale SyntaxError zegt niets over status of resource");
+        assert.match(err.message, /geen JSON/i);
+        assert.match(err.message, /status 200/);
+        assert.match(err.message, /organizations/);
+        assert.match(err.message, /\[REDACTED\]/, "de key in de body hoort geredacteerd te zijn");
+        assert.ok(!err.message.includes("niet-echt-alleen-voor-deze-test"));
+        return true;
+      }
+    );
+    bodySoort = "json";
 
     // maxPages: de mock blijft een volgende pagina beloven, dus alleen de rem stopt dit.
     volgendePagina = 2;
@@ -437,8 +471,49 @@ test("client heeft geen hardcoded key of vault-secretwaarde", () => {
   }
 });
 
+test("client parseert de body zelf, met een vangnet op een niet-JSON respons", () => {
+  const body = functieBlok(clientBron, "export async function itglueFetch");
+  assert.match(body, /await response\.text\(\)/, "de body hoort als tekst gelezen te worden");
+  assert.match(body, /JSON\.parse\(tekst\)/, "de client hoort de tekst zelf te parsen");
+  assert.match(body, /geen JSON terug/, "een niet-JSON body hoort een eigen, begrijpelijke fout te geven");
+  assert.match(body, /redactKey\(String\(tekst/, "het fragment in die fout hoort geredacteerd te zijn");
+});
+
+test("client heeft een timeout per request", () => {
+  const body = functieBlok(clientBron, "export async function itglueFetch");
+  assert.match(body, /AbortSignal\.timeout\(timeoutMs\)/, "zonder timeout blijft een hangend request hangen");
+  assert.match(clientBron, /DEFAULT_TIMEOUT_MS/);
+  assert.match(clientBron, /ITGLUE_TIMEOUT_MS/, "de timeout hoort met een env var te overrulen zijn");
+  // fetchAllItGlue moet de timeout doorgeven, anders geldt hij niet voor de gepagineerde calls.
+  const alles = functieBlok(clientBron, "export async function fetchAllItGlue");
+  assert.match(alles, /\{ timeoutMs \}/, "fetchAllItGlue geeft timeoutMs niet door aan itglueFetch");
+});
+
+test("client heeft een whitelist voor password-items, net als de CLI", () => {
+  // Zonder deze functie krijgt een project dat fetchAllItGlue("passwords", ...) aanroept de ruwe
+  // attributes, en leunt de belofte alleen op de padguard en op het gedrag van de API.
+  const body = functieBlok(clientBron, "export function passwordTreffers");
+  assert.match(body, /passwordDeeplink\(/, "een treffer hoort een deeplink te krijgen");
+  // Alleen het object dat de map oplevert telt, niet de parameterlijst erboven.
+  const mapBlok = body.slice(body.indexOf(".map("));
+  assert.ok(mapBlok.length > 0, "passwordTreffers hoort de items te mappen naar een eigen object");
+  const velden = [...mapBlok.matchAll(/^\s+([a-z][a-z-]*):/gm)].map(([, v]) => v);
+  assert.deepEqual(
+    [...new Set(velden)].sort(),
+    ["link", "naam"],
+    `passwordTreffers hoort alleen naam en link op te leveren, vond: ${velden.join(", ")}`
+  );
+});
+
 test("client exporteert de afgesproken functies en legt het pad-contract vast", () => {
-  for (const naam of ["assertPathAllowed", "passwordDeeplink", "buildFilterQuery", "itglueFetch", "fetchAllItGlue"]) {
+  for (const naam of [
+    "assertPathAllowed",
+    "passwordDeeplink",
+    "passwordTreffers",
+    "buildFilterQuery",
+    "itglueFetch",
+    "fetchAllItGlue",
+  ]) {
     assert.match(clientBron, new RegExp(`export (async )?function ${naam}\\b`), `${naam} wordt niet geexporteerd`);
   }
   // Het contract hoort in de JSDoc te staan: alleen relatieve paden, en pagineren via page[number]

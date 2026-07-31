@@ -16,8 +16,12 @@ import {
   runSubcommand,
   rawDoel,
   runRaw,
+  runGet,
+  runCli,
+  assertGetPadToegestaan,
   RAW_PAGE_SIZE,
   RAW_SUBCOMMANDS,
+  GEEN_RAW_SUBCOMMANDS,
   SUBCOMMANDS,
 } from "./itglue-lookup.mjs";
 
@@ -524,10 +528,51 @@ test("fetchAllItGlue: loopt pagina's door tot next-page leeg is", async () => {
 });
 
 test("fetchAllItGlue: stopt bij maxPages en meldt dat", async () => {
-  const fetchImpl = async () => nepRespons({ body: { data: [{ id: "x" }], meta: { "next-page": 99 } } });
+  // Noodrem in de mock: haalt iemand de maxPages-controle weg, dan zou fetchAllItGlue hier eindeloos
+  // door blijven pagineren en zou deze test 120 seconden hangen in plaats van rood te worden. Met de
+  // rem in de mock wordt het meteen een duidelijke fout. Dezelfde constructie staat in
+  // itglue-client-guard.test.mjs voor de TypeScript-client.
+  const NOODREM = 25;
+  const opgevraagd = [];
+  const fetchImpl = async (url) => {
+    opgevraagd.push(String(url));
+    if (opgevraagd.length > NOODREM) {
+      throw new Error(`noodrem: meer dan ${NOODREM} requests, de rem in fetchAllItGlue doet niets`);
+    }
+    return nepRespons({ body: { data: [{ id: "x" }], meta: { "next-page": 99 } } });
+  };
   await assert.rejects(
     () => fetchAllItGlue("configurations", { key: "k", maxPages: 3, fetchImpl }),
     /maxPages/
+  );
+  assert.equal(opgevraagd.length, 3, `verwachtte 3 requests voor maxPages 3, kreeg ${opgevraagd.length}`);
+});
+
+test("igFetch: een niet-JSON body op status 200 geeft een bruikbare fout", async () => {
+  // Een gateway die HTML teruggeeft op een 200 is het echte geval hier. res.json() zou een kale
+  // SyntaxError gooien: zonder status, zonder resource, en met een ongeredacteerd stuk body erin.
+  const html = "<html>502 Bad Gateway (key ITG.geheim in de logregel)</html>";
+  const fetchImpl = async () => ({
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    json: async () => {
+      throw new SyntaxError(`Unexpected token '<', ${JSON.stringify(html.slice(0, 10))}... is not valid JSON`);
+    },
+    text: async () => html,
+  });
+
+  await assert.rejects(
+    () => igFetch("/organizations?page[size]=1", { key: "ITG.geheim", fetchImpl }),
+    (err) => {
+      assert.ok(!(err instanceof SyntaxError), "een kale SyntaxError zegt niets over status of resource");
+      assert.match(err.message, /geen JSON/i);
+      assert.match(err.message, /status 200/);
+      assert.match(err.message, /organizations/, "de resource hoort in de melding te staan");
+      assert.match(err.message, /\[REDACTED\]/);
+      assert.ok(!err.message.includes("ITG.geheim"), "de key mag nooit in een foutmelding staan");
+      return true;
+    }
   );
 });
 
@@ -556,7 +601,11 @@ test("resolveOrg: numerieke input wordt als id gebruikt zonder zoekcall", async 
   assert.equal(org.id, "7");
 });
 
-test("resolveOrg: geen unieke match geeft een fout met de kandidaten", async () => {
+// De twee takken van "geen unieke match" horen echt verschillende meldingen te geven. Bij meerdere
+// treffers kan de melding de ids leveren, bij nul treffers niet, en dan is "gebruik het id" zonder
+// verdere uitleg een doodlopend advies: filter[name] matcht geen deelstrings, dus nul treffers is
+// hier het normale pad.
+test("resolveOrg: meerdere treffers geven een kandidatenlijst met ids", async () => {
   const respons = {
     data: [
       { id: "1", attributes: { name: "Jansen Techniek" } },
@@ -567,8 +616,32 @@ test("resolveOrg: geen unieke match geeft een fout met de kandidaten", async () 
   await assert.rejects(
     () => resolveOrg("jansen", { key: "k", fetchImpl: fakeApi({ "/organizations": respons }) }),
     (err) => {
+      assert.match(err.message, /Kandidaten:/);
       assert.match(err.message, /Jansen Techniek/);
       assert.match(err.message, /Jansen Bouw/);
+      // De ids moeten erbij staan, anders is het advies "herhaal met het id" niet uitvoerbaar.
+      assert.match(err.message, /\b1\b/);
+      assert.match(err.message, /\b2\b/);
+      return true;
+    }
+  );
+});
+
+test("resolveOrg: nul treffers legt filter[name] uit en noemt een route die wel werkt", async () => {
+  const leeg = { data: [], meta: { "next-page": null } };
+  await assert.rejects(
+    () => resolveOrg("Rouwenhorst", { key: "k", fetchImpl: fakeApi({ "/organizations": leeg }) }),
+    (err) => {
+      // Geen leeg kopje: een "Kandidaten:"-kop zonder regels eronder is precies de oude fout.
+      assert.ok(
+        !/Kandidaten:/.test(err.message),
+        `bij nul treffers hoort geen kandidaten-kopje: ${err.message}`
+      );
+      assert.match(err.message, /filter\[name\]/);
+      assert.match(err.message, /deelstrings/);
+      // De twee routes uit REFERENCE.md: de portal, en het get-subcommando dat echt bestaat.
+      assert.match(err.message, /itglue\.com/);
+      assert.match(err.message, /get "organizations\?page\[size\]=1000"/);
       return true;
     }
   );
@@ -622,6 +695,22 @@ test("runSubcommand: password-link geeft uitsluitend naam en link", async () => 
   assert.equal(soort, "password-link");
   assert.deepEqual(rijen, [{ naam: "Firewall beheerder", link: "https://juict.eu.itglue.com/7/passwords/42" }]);
   assert.ok(!JSON.stringify(rijen).includes("GeheimNietTonen"));
+});
+
+test("runSubcommand: password-link zonder zoekterm doet geen request", async () => {
+  let gebeld = false;
+  await assert.rejects(
+    () =>
+      runSubcommand(["password-link", "7"], {
+        key: "k",
+        fetchImpl: async () => {
+          gebeld = true;
+          return nepRespons({ body: ORG_RESPONS });
+        },
+      }),
+    /zoekterm/i
+  );
+  assert.equal(gebeld, false, "zonder zoekterm hoort er niets opgevraagd te worden");
 });
 
 test("runSubcommand: onbekend subcommando geeft een fout met de geldige opties", async () => {
@@ -801,12 +890,186 @@ test("rawDoel: onbekend subcommando geeft dezelfde fout als runSubcommand", asyn
 
 // Twee kanten van dezelfde drift. Hierboven staat per subcommando welke resource eruit moet komen;
 // deze twee zorgen dat er geen subcommando kan bestaan dat rawDoel() niet expliciet afhandelt.
-test("RAW_SUBCOMMANDS dekt elk subcommando behalve password-link", () => {
+test("RAW_SUBCOMMANDS en GEEN_RAW_SUBCOMMANDS dekken samen elk subcommando", () => {
   assert.deepEqual(
-    [...RAW_SUBCOMMANDS, "password-link"].sort(),
+    [...RAW_SUBCOMMANDS, ...GEEN_RAW_SUBCOMMANDS].sort(),
     [...SUBCOMMANDS].sort(),
     "elk subcommando hoort of een --raw-resource te hebben, of expliciet geweigerd te worden"
   );
+});
+
+test("rawDoel: get wordt geweigerd, want get print de ruwe body al", async () => {
+  let gebeld = false;
+  await assert.rejects(
+    () =>
+      rawDoel(["get", "flexible_asset_types"], {
+        key: "k",
+        fetchImpl: async () => {
+          gebeld = true;
+          return nepRespons();
+        },
+      }),
+    /--raw heeft geen zin op get/
+  );
+  assert.equal(gebeld, false, "een geweigerde --raw mag geen enkel request veroorzaken");
+});
+
+// get: het subcommando dat de "doe een losse GET"-instructies in REFERENCE.md uitvoerbaar maakt.
+test("get: haalt een relatief pad op en geeft de ruwe body terug", async () => {
+  const body = { data: [{ id: "12", type: "flexible-asset-types", attributes: { name: "Backup" } }] };
+  const opgevraagd = [];
+  const uit = await runGet(["get", "flexible_asset_types"], {
+    key: "k",
+    fetchImpl: async (url) => {
+      opgevraagd.push(url);
+      return nepRespons({ body });
+    },
+  });
+  assert.deepEqual(uit, body);
+  assert.deepEqual(opgevraagd, ["https://api.eu.itglue.com/flexible_asset_types"]);
+});
+
+test("get: stuurt het pad byte-identiek door, dus met letterlijke blokhaken", async () => {
+  // Precies waarom get bruikbaar is als meetgereedschap: --raw verstuurt %5B/%5D via
+  // URLSearchParams, get verstuurt wat je typt. Zo zijn de twee vormen naast elkaar te leggen.
+  let gezien = null;
+  await runGet(["get", "locations?filter[organization_id]=7"], {
+    key: "k",
+    fetchImpl: async (url) => {
+      gezien = url;
+      return nepRespons({ body: { data: [] } });
+    },
+  });
+  assert.equal(gezien, "https://api.eu.itglue.com/locations?filter[organization_id]=7");
+});
+
+test("get: een verboden pad veroorzaakt geen enkel request", async () => {
+  const verboden = [
+    // De individuele password-resource: assertPathAllowed blokkeert die al.
+    "/passwords/12345",
+    "/pass%77ords/12345",
+    "/passwords?show_password=true",
+    // Absolute URL's: de key gaat als header mee, dus een vreemde host is exfiltratie.
+    "https://evil.example/organizations",
+    "https://api.eu.itglue.com/organizations",
+    "//evil.example/organizations",
+    // De passwords-collectie: door assertPathAllowed heen, maar via get zou dit de ruwe attributes
+    // printen en daarmee de naam-en-link-whitelist omzeilen. Daarom de extra grens in
+    // assertGetPadToegestaan.
+    "passwords?filter[organization_id]=7",
+    "/passwords",
+    "/passwords/",
+    "/organizations/7/relationships/passwords",
+    "/PASSWORDS?filter[organization_id]=7",
+    "/passwords%2F",
+    "//passwords",
+  ];
+  for (const pad of verboden) {
+    let gebeld = false;
+    await assert.rejects(
+      () =>
+        runGet(["get", pad], {
+          key: "k",
+          fetchImpl: async () => {
+            gebeld = true;
+            return nepRespons();
+          },
+        }),
+      /Geblokkeerd/,
+      `get ${JSON.stringify(pad)} hoort geweigerd te worden`
+    );
+    assert.equal(gebeld, false, `get ${JSON.stringify(pad)} veroorzaakte alsnog een request`);
+  }
+});
+
+test("assertGetPadToegestaan: laat de paden door die de afvinkinstructies nodig hebben", () => {
+  const toegestaan = [
+    "flexible_asset_types",
+    "locations?filter[organization_id]=7",
+    "password_categories",
+    "organizations?page[size]=1000",
+    "organizations?page[size]=2000",
+    "configurations?filter[organization_id]=7&page[size]=2&page[number]=2",
+  ];
+  for (const pad of toegestaan) {
+    assert.equal(assertGetPadToegestaan(pad), pad, `${pad} hoort met get op te vragen te zijn`);
+  }
+});
+
+test("get: zonder pad een duidelijke fout, geen request", async () => {
+  let gebeld = false;
+  await assert.rejects(
+    () =>
+      runGet(["get"], {
+        key: "k",
+        fetchImpl: async () => {
+          gebeld = true;
+          return nepRespons();
+        },
+      }),
+    /relatief pad/
+  );
+  assert.equal(gebeld, false);
+});
+
+test("runSubcommand: get levert de body onder soort 'get'", async () => {
+  const { soort, body } = await runSubcommand(["get", "configuration_types"], {
+    key: "k",
+    fetchImpl: async () => nepRespons({ body: { data: [{ id: "1" }] } }),
+  });
+  assert.equal(soort, "get");
+  assert.deepEqual(body, { data: [{ id: "1" }] });
+});
+
+// De CLI-laag zelf: volgorde van validatie en key-ophalen, en wat er op de console komt.
+test("runCli: valideert het subcommando voordat de key wordt opgehaald", async () => {
+  // Anders doet "node itglue-lookup.mjs bogus" eerst een az-call en zegt daarna pas dat het
+  // subcommando niet bestaat. De keyOphaler gooit hier, dus als hij toch wordt aangeroepen komt die
+  // fout eruit in plaats van de validatiefout.
+  await assert.rejects(
+    () =>
+      runCli(["bogus"], {
+        keyOphaler: () => {
+          throw new Error("de key werd opgehaald voordat het subcommando gevalideerd was");
+        },
+        log: () => {},
+      }),
+    /Onbekend subcommando/
+  );
+});
+
+test("runCli: --help vraagt geen key op en noemt get", async () => {
+  const regels = [];
+  await runCli(["--help"], {
+    keyOphaler: () => {
+      throw new Error("--help hoort geen key op te halen");
+    },
+    log: (r) => regels.push(r),
+  });
+  assert.equal(regels.length, 1);
+  assert.match(regels[0], /get "<relatief-pad>"/, "get hoort in de GEBRUIK-tekst te staan");
+  assert.match(regels[0], /password-link/);
+});
+
+test("runCli: get print de body als JSON en redacteert de key", async () => {
+  // runCli geeft alleen de key door aan igFetch, geen fetchImpl, dus hier een tijdelijke globale
+  // fetch. De body bevat de key: die hoort er geredacteerd uit te komen, ook al hoort hij er niet in
+  // te zitten. Dat is precies waarom het vangnet er is.
+  const echteFetch = globalThis.fetch;
+  const regels = [];
+  try {
+    globalThis.fetch = async () =>
+      nepRespons({ body: { data: [{ id: "1", attributes: { naam: "ITG.geheim" } }] } });
+    await runCli(["get", "configuration_types"], {
+      keyOphaler: () => "ITG.geheim",
+      log: (r) => regels.push(r),
+    });
+  } finally {
+    globalThis.fetch = echteFetch;
+  }
+  assert.equal(regels.length, 1);
+  assert.ok(!regels[0].includes("ITG.geheim"), "de key mag niet in de uitvoer staan");
+  assert.deepEqual(JSON.parse(regels[0]), { data: [{ id: "1", attributes: { naam: "[REDACTED]" } }] });
 });
 
 test("rawDoel: een subcommando zonder resource-mapping gooit in plaats van door te vallen", async () => {

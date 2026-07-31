@@ -23,6 +23,14 @@ import { getSecret } from "./azure-keyvault";
 const BASE_URL = process.env.ITGLUE_BASE_URL ?? "https://api.eu.itglue.com";
 const PORTAL_URL = process.env.ITGLUE_PORTAL_URL ?? "https://juict.eu.itglue.com";
 
+// Timeout per request. Zonder timeout blijft een hangende IT Glue-verbinding in een Next.js-route
+// het request onbeperkt vasthouden, en dan loopt de hele route pas af op de platform-timeout. 20
+// seconden is ruim voor een gewone JSON:API-call en kort genoeg om een gebruiker niet te laten
+// wachten. Per call te overrulen met de optie timeoutMs, globaal met ITGLUE_TIMEOUT_MS.
+export const DEFAULT_TIMEOUT_MS = Number(process.env.ITGLUE_TIMEOUT_MS) > 0
+  ? Number(process.env.ITGLUE_TIMEOUT_MS)
+  : 20_000;
+
 // IT Glue rate-limit: houd het rustig en serieel bij bulkwerk.
 const MAX_CONCURRENT = 2;
 let activeSlots = 0;
@@ -236,6 +244,39 @@ export function passwordDeeplink(
   return `${PORTAL_URL.replace(/\/+$/, "")}/${orgId}/passwords/${passwordId}`;
 }
 
+export interface PasswordTreffer {
+  naam: string;
+  link: string;
+}
+
+/**
+ * Whitelist voor password-items, de tegenhanger van passwordTreffers() in itglue-lookup.mjs.
+ *
+ * fetchAllItGlue("passwords", ...) levert de ruwe items van het collectie-endpoint. Haal die altijd
+ * hier langs voordat er iets naar een UI, een log of een transcript gaat: er komen uitsluitend een
+ * naam en een deeplink uit, wat de input ook bevat. Dat is dezelfde bescherming als in de CLI, en het
+ * is beleid en geen technische claim over wat het endpoint teruggeeft.
+ */
+export function passwordTreffers(
+  items: Array<ItGlueResource<Record<string, unknown>>> | null | undefined,
+  orgId: string | number,
+  zoekterm?: string
+): PasswordTreffer[] {
+  const term = String(zoekterm ?? "").toLowerCase();
+  return (items ?? [])
+    .filter((item) => {
+      if (!term) return true;
+      return String(item?.attributes?.["name"] ?? "").toLowerCase().includes(term);
+    })
+    .map((item) => ({
+      naam: String(item?.attributes?.["name"] ?? "(naamloos)"),
+      link: passwordDeeplink(
+        (item?.attributes?.["organization-id"] as string | number | undefined) ?? orgId,
+        item?.id
+      ),
+    }));
+}
+
 let cachedKey: string | null = null;
 
 /**
@@ -299,7 +340,7 @@ export function buildFilterQuery(
 // HTTP-verb, want onze API-key is bewust read-only tegen IT Glue.
 export async function itglueFetch<T>(
   path: string,
-  { retries = 3 }: { retries?: number } = {}
+  { retries = 3, timeoutMs = DEFAULT_TIMEOUT_MS }: { retries?: number; timeoutMs?: number } = {}
 ): Promise<T> {
   assertPathAllowed(path);
   const key = await getApiKey();
@@ -316,6 +357,8 @@ export async function itglueFetch<T>(
           "x-api-key": key,
           "Content-Type": "application/vnd.api+json",
         },
+        // Per poging een verse timeout: een retry na een 429 hoort zijn eigen budget te krijgen.
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } finally {
       releaseSlot();
@@ -333,7 +376,22 @@ export async function itglueFetch<T>(
       throw new Error(`IT Glue API fout ${response.status}: ${tekst}`);
     }
 
-    return (await response.json()) as T;
+    // Bewust eerst de tekst lezen en daarna zelf parsen, in plaats van response.json() los te laten.
+    // Een 200 met een niet-JSON body komt in het echt voor (een proxy of gateway die een
+    // HTML-foutpagina teruggeeft) en response.json() gooit daar een kale SyntaxError op: zonder
+    // status, zonder resource, en met een ongeredacteerd fragment van de body in de melding. Dat
+    // laatste breekt de belofte dat elke responsbody door de redactie gaat voordat hij in een Error
+    // terechtkomt.
+    const tekst = await response.text();
+    try {
+      return JSON.parse(tekst) as T;
+    } catch {
+      const fragment = redactKey(String(tekst ?? ""), key).slice(0, 300);
+      throw new Error(
+        `IT Glue API gaf geen JSON terug op ${pad} (status ${response.status}). ` +
+          `Eerste deel van de body: ${fragment}`
+      );
+    }
   }
 }
 
@@ -345,10 +403,12 @@ export async function fetchAllItGlue<A = Record<string, unknown>>(
     filters = {},
     pageSize = 100,
     maxPages = 50,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
   }: {
     filters?: Record<string, string | number | null | undefined>;
     pageSize?: number;
     maxPages?: number;
+    timeoutMs?: number;
   } = {}
 ): Promise<Array<ItGlueResource<A>>> {
   const alles: Array<ItGlueResource<A>> = [];
@@ -360,7 +420,8 @@ export async function fetchAllItGlue<A = Record<string, unknown>>(
       );
     }
     const body = await itglueFetch<ItGlueListBody<ItGlueResource<A>>>(
-      `${resource}${buildFilterQuery(filters, { pageSize, pageNumber })}`
+      `${resource}${buildFilterQuery(filters, { pageSize, pageNumber })}`,
+      { timeoutMs }
     );
     alles.push(...(body.data ?? []));
     if (!body.meta?.["next-page"]) return alles;
