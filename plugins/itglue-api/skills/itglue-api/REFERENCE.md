@@ -43,7 +43,7 @@ az keyvault secret show --vault-name juict-shared-kv --name itglue-api-key --que
 
 Let op: `juict-shared-kv` werkt met access policies en niet met RBAC. Een managed identity die deze key moet lezen koppel je dus met `az keyvault set-policy`, anders faalt de resolve terwijl de RBAC-rol er wel op lijkt te staan.
 
-Lokaal kun je `ITGLUE_API_KEY` als env var zetten; de meegeleverde scripts pakken die eerst en vallen daarna terug op Key Vault. Zet de key nooit in een `.env` die gecommit wordt, en echo hem nooit naar de console.
+Lokaal kun je `ITGLUE_API_KEY` als env var zetten. De CLI pakt die eerst en valt daarna terug op Key Vault via `az`. In de TypeScript-client is de precedentie omgekeerd: staat `AZURE_KEYVAULT_URL` gezet, dan komt de key altijd uit de vault en wordt `ITGLUE_API_KEY` genegeerd, ook als die gevuld is. Zet de key nooit in een `.env` die gecommit wordt, en echo hem nooit naar de console.
 
 | Env var | Betekenis | Default |
 |---|---|---|
