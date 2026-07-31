@@ -11,6 +11,9 @@ import {
   BASE_URL,
   igFetch,
   fetchAllItGlue,
+  resolveOrg,
+  formatTabel,
+  runSubcommand,
 } from "./itglue-lookup.mjs";
 
 test("normalizeOrgName: strippt rechtsvorm, leestekens en dubbele spaties", () => {
@@ -520,5 +523,145 @@ test("fetchAllItGlue: stopt bij maxPages en meldt dat", async () => {
   await assert.rejects(
     () => fetchAllItGlue("configurations", { key: "k", maxPages: 3, fetchImpl }),
     /maxPages/
+  );
+});
+
+const ORG_RESPONS = { data: [{ id: "7", attributes: { name: "JUICT B.V." } }], meta: { "next-page": null } };
+
+function fakeApi(routes) {
+  return async (url) => {
+    const pad = url.replace("https://api.eu.itglue.com", "");
+    for (const [patroon, body] of Object.entries(routes)) {
+      if (pad.startsWith(patroon)) return nepRespons({ body });
+    }
+    return nepRespons({ status: 404, body: { errors: [{ detail: `geen route voor ${pad}` }] } });
+  };
+}
+
+test("resolveOrg: vindt de organisatie op genormaliseerde naam", async () => {
+  const org = await resolveOrg("juict bv", { key: "k", fetchImpl: fakeApi({ "/organizations": ORG_RESPONS }) });
+  assert.equal(org.id, "7");
+});
+
+test("resolveOrg: numerieke input wordt als id gebruikt zonder zoekcall", async () => {
+  const fetchImpl = async () => {
+    throw new Error("er had geen request mogen uitgaan");
+  };
+  const org = await resolveOrg("7", { key: "k", fetchImpl });
+  assert.equal(org.id, "7");
+});
+
+test("resolveOrg: geen unieke match geeft een fout met de kandidaten", async () => {
+  const respons = {
+    data: [
+      { id: "1", attributes: { name: "Jansen Techniek" } },
+      { id: "2", attributes: { name: "Jansen Bouw" } },
+    ],
+    meta: { "next-page": null },
+  };
+  await assert.rejects(
+    () => resolveOrg("jansen", { key: "k", fetchImpl: fakeApi({ "/organizations": respons }) }),
+    (err) => {
+      assert.match(err.message, /Jansen Techniek/);
+      assert.match(err.message, /Jansen Bouw/);
+      return true;
+    }
+  );
+});
+
+test("runSubcommand: configs geeft naam, type, ip en status", async () => {
+  const configs = {
+    data: [
+      {
+        id: "100",
+        attributes: {
+          name: "SRV-DC01",
+          "configuration-type-name": "Server",
+          "primary-ip": "10.0.0.5",
+          "configuration-status-name": "Active",
+          "operating-system-name": "Windows Server 2022",
+        },
+      },
+    ],
+    meta: { "next-page": null },
+  };
+  const { soort, rijen } = await runSubcommand(["configs", "juict bv"], {
+    key: "k",
+    fetchImpl: fakeApi({ "/organizations": ORG_RESPONS, "/configurations": configs }),
+  });
+  assert.equal(soort, "configs");
+  assert.equal(rijen[0].naam, "SRV-DC01");
+  assert.equal(rijen[0].type, "Server");
+  assert.equal(rijen[0].ip, "10.0.0.5");
+});
+
+test("runSubcommand: password-link geeft uitsluitend naam en link", async () => {
+  const passwords = {
+    data: [
+      {
+        id: "42",
+        attributes: {
+          name: "Firewall beheerder",
+          username: "admin",
+          password: "GeheimNietTonen",
+          "organization-id": 7,
+        },
+      },
+    ],
+    meta: { "next-page": null },
+  };
+  const { soort, rijen } = await runSubcommand(["password-link", "juict bv", "firewall"], {
+    key: "k",
+    fetchImpl: fakeApi({ "/organizations": ORG_RESPONS, "/passwords": passwords }),
+  });
+  assert.equal(soort, "password-link");
+  assert.deepEqual(rijen, [{ naam: "Firewall beheerder", link: "https://juict.eu.itglue.com/7/passwords/42" }]);
+  assert.ok(!JSON.stringify(rijen).includes("GeheimNietTonen"));
+});
+
+test("runSubcommand: onbekend subcommando geeft een fout met de geldige opties", async () => {
+  await assert.rejects(
+    () => runSubcommand(["wachtwoord-ophalen", "juict"], { key: "k", fetchImpl: async () => nepRespons() }),
+    /Onbekend subcommando/
+  );
+});
+
+test("runSubcommand: ontbrekend argument geeft een duidelijke fout", async () => {
+  await assert.rejects(() => runSubcommand(["configs"], { key: "k" }), /organisatie/i);
+});
+
+test("formatTabel: lijnt kolommen uit en zet een kop", () => {
+  const uit = formatTabel([{ naam: "A", type: "Server" }, { naam: "BBBB", type: "Switch" }], ["naam", "type"]);
+  const regels = uit.split("\n");
+  assert.match(regels[0], /^naam\s+type$/);
+  assert.equal(regels.length, 3);
+});
+
+test("formatTabel: lege invoer geeft een nette melding", () => {
+  assert.match(formatTabel([], ["naam"]), /geen resultaten/i);
+});
+
+// Extra t.o.v. de brief: assets en docs gebruiken resources (flexible_assets, documents) die nog
+// niet tegen de echte API geverifieerd zijn. Een 404 daarop moet een begrijpelijke fout geven in
+// plaats van stil een lege lijst, zodat een latere verificatieronde meteen ziet wat er mis is.
+test("runSubcommand: 404 op assets geeft een duidelijke fout, geen lege lijst", async () => {
+  await assert.rejects(
+    () =>
+      runSubcommand(["assets", "juict bv"], {
+        key: "k",
+        fetchImpl: fakeApi({ "/organizations": ORG_RESPONS }),
+      }),
+    /IT Glue API fout 404/
+  );
+});
+
+test("runSubcommand: 404 op docs geeft een duidelijke fout, geen lege lijst", async () => {
+  await assert.rejects(
+    () =>
+      runSubcommand(["docs", "juict bv"], {
+        key: "k",
+        fetchImpl: fakeApi({ "/organizations": ORG_RESPONS }),
+      }),
+    /IT Glue API fout 404/
   );
 });

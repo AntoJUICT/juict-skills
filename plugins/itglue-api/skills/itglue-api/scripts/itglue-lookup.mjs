@@ -6,6 +6,9 @@
 // password-access, en een wachtwoord in een transcript is een incident. Bij een
 // wachtwoordvraag levert dit script alleen de naam van het item en een deeplink.
 
+import { execSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
+
 export const BASE_URL = process.env.ITGLUE_BASE_URL ?? "https://api.eu.itglue.com";
 export const PORTAL_URL = process.env.ITGLUE_PORTAL_URL ?? "https://juict.eu.itglue.com";
 
@@ -319,4 +322,208 @@ export async function fetchAllItGlue(
     const volgende = body?.meta?.["next-page"] ?? null;
     if (!volgende) return alles;
   }
+}
+
+const VAULT = "juict-shared-kv";
+const SECRET = "itglue-api-key";
+
+let _key = null;
+export function getApiKey() {
+  if (_key) return _key;
+  if (process.env.ITGLUE_API_KEY) {
+    _key = process.env.ITGLUE_API_KEY;
+    return _key;
+  }
+  // VAULT en SECRET zijn vaste constanten (geen user-input) → geen injectierisico.
+  _key = execSync(`az keyvault secret show --vault-name ${VAULT} --name ${SECRET} --query value -o tsv`, {
+    encoding: "utf-8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+  if (!_key) throw new Error(`Key Vault secret '${SECRET}' in '${VAULT}' is leeg of niet leesbaar`);
+  return _key;
+}
+
+// Numerieke invoer wordt direct als organisatie-id gebruikt, zonder zoekcall: geen unieke naam
+// nodig als je het id al weet. Bestaat dat id niet, dan komt dat pas aan het licht bij de
+// vervolgcall (configs/contacts/docs/assets/passwords): die filtert op organization_id en IT Glue
+// geeft daar gewoon een lege collectie voor terug, geen 404. De uitvoer wordt dan "Geen
+// resultaten." zonder expliciete melding dat het organisatie-id niet bestaat. Bewust zo gelaten:
+// een extra verificatiecall (GET /organizations/{id}) zou de belofte "numerieke input doet geen
+// zoekcall" doorbreken en kost een extra round-trip voor het normale pad (bestaand id). Zie
+// task-4-report.md voor de afweging.
+export async function resolveOrg(zoekterm, opts) {
+  const term = String(zoekterm ?? "").trim();
+  if (!term) throw new Error("Geef een organisatie op (naam of id).");
+  if (/^\d+$/.test(term)) return { id: term, attributes: { name: `organisatie ${term}` } };
+
+  const orgs = await fetchAllItGlue("organizations", { ...opts, filters: { name: term } });
+  const { match, kandidaten } = pickExactOrg(orgs, term);
+  if (match) return match;
+
+  const lijst = kandidaten
+    .slice(0, 15)
+    .map((o) => `  ${o.id}  ${o.attributes?.name ?? "(naamloos)"}`)
+    .join("\n");
+  throw new Error(
+    `Geen unieke organisatie voor "${term}". Kandidaten:\n${lijst}\n` +
+      "Herhaal het commando met het id in plaats van de naam."
+  );
+}
+
+const SUBCOMMANDS = ["org", "configs", "contacts", "docs", "assets", "password-link"];
+
+export async function runSubcommand(argv, opts) {
+  const [subcommando, ...rest] = argv;
+  if (!SUBCOMMANDS.includes(subcommando)) {
+    throw new Error(`Onbekend subcommando "${subcommando ?? ""}". Geldig: ${SUBCOMMANDS.join(", ")}.`);
+  }
+
+  if (subcommando === "org") {
+    const term = String(rest[0] ?? "").trim();
+    if (!term) throw new Error("Geef een organisatie op (naam of id).");
+    const orgs = await fetchAllItGlue("organizations", { ...opts, filters: { name: term } });
+    return {
+      soort: "org",
+      rijen: orgs.map((o) => ({
+        id: o.id,
+        naam: o.attributes?.name ?? "(naamloos)",
+        type: o.attributes?.["organization-type-name"] ?? "",
+        status: o.attributes?.["organization-status-name"] ?? "",
+      })),
+    };
+  }
+
+  const org = await resolveOrg(rest[0], opts);
+  const zoekterm = String(rest[1] ?? "").toLowerCase();
+  const filters = { organization_id: org.id };
+
+  if (subcommando === "configs") {
+    const items = await fetchAllItGlue("configurations", { ...opts, filters });
+    return { soort: "configs", rijen: filterOpNaam(items, zoekterm).map(configRij) };
+  }
+
+  if (subcommando === "contacts") {
+    const items = await fetchAllItGlue("contacts", { ...opts, filters });
+    return { soort: "contacts", rijen: filterOpNaam(items, zoekterm, contactNaam).map(contactRij) };
+  }
+
+  if (subcommando === "docs") {
+    const items = await fetchAllItGlue("documents", { ...opts, filters });
+    return { soort: "docs", rijen: filterOpNaam(items, zoekterm).map((d) => docRij(d, org.id)) };
+  }
+
+  if (subcommando === "assets") {
+    const assetFilters = { organization_id: org.id };
+    if (rest[1]) assetFilters["flexible-asset-type-id"] = rest[1];
+    const items = await fetchAllItGlue("flexible_assets", { ...opts, filters: assetFilters });
+    return {
+      soort: "assets",
+      rijen: items.map((a) => ({
+        id: a.id,
+        naam: a.attributes?.name ?? "(naamloos)",
+        type: a.attributes?.["flexible-asset-type-name"] ?? "",
+      })),
+    };
+  }
+
+  // password-link: collectie ophalen om het item te vinden, daarna alleen naam en link.
+  const items = await fetchAllItGlue("passwords", { ...opts, filters });
+  return { soort: "password-link", rijen: passwordTreffers(items, org.id, zoekterm) };
+}
+
+function filterOpNaam(items, zoekterm, naamVan = (i) => i?.attributes?.name ?? "") {
+  if (!zoekterm) return items;
+  return items.filter((i) => String(naamVan(i)).toLowerCase().includes(zoekterm));
+}
+
+function contactNaam(contact) {
+  const a = contact?.attributes ?? {};
+  return a.name ?? [a["first-name"], a["last-name"]].filter(Boolean).join(" ");
+}
+
+function configRij(c) {
+  const a = c?.attributes ?? {};
+  return {
+    id: c.id,
+    naam: a.name ?? "(naamloos)",
+    type: a["configuration-type-name"] ?? "",
+    ip: a["primary-ip"] ?? "",
+    os: a["operating-system-name"] ?? "",
+    status: a["configuration-status-name"] ?? "",
+  };
+}
+
+function contactRij(c) {
+  const a = c?.attributes ?? {};
+  const mails = Array.isArray(a["contact-emails"])
+    ? a["contact-emails"].map((m) => m.value).filter(Boolean).join(", ")
+    : "";
+  return {
+    id: c.id,
+    naam: contactNaam(c) || "(naamloos)",
+    functie: a.title ?? "",
+    email: mails,
+    type: a["contact-type-name"] ?? "",
+  };
+}
+
+function docRij(d, orgId) {
+  return {
+    id: d.id,
+    naam: d?.attributes?.name ?? "(naamloos)",
+    link: `${PORTAL_URL.replace(/\/+$/, "")}/${orgId}/docs/${d.id}`,
+  };
+}
+
+export function formatTabel(rijen, kolommen) {
+  if (!rijen || rijen.length === 0) return "Geen resultaten.";
+  const breedtes = kolommen.map((k) =>
+    Math.max(k.length, ...rijen.map((r) => String(r[k] ?? "").length))
+  );
+  const regel = (waarden) =>
+    waarden.map((w, i) => String(w ?? "").padEnd(breedtes[i])).join("  ").trimEnd();
+  return [regel(kolommen), ...rijen.map((r) => regel(kolommen.map((k) => r[k])))].join("\n");
+}
+
+const KOLOMMEN = {
+  org: ["id", "naam", "type", "status"],
+  configs: ["id", "naam", "type", "ip", "os", "status"],
+  contacts: ["id", "naam", "functie", "email", "type"],
+  docs: ["id", "naam", "link"],
+  assets: ["id", "naam", "type"],
+  "password-link": ["naam", "link"],
+};
+
+const GEBRUIK = `Gebruik: node itglue-lookup.mjs <subcommando> <organisatie> [zoekterm] [--json]
+
+  org <naam>                     organisaties zoeken op naam
+  configs <org> [zoekterm]       configuraties (servers, netwerk, endpoints)
+  contacts <org> [zoekterm]      contacten
+  docs <org> [zoekterm]          documenten met deeplink
+  assets <org> [asset-type-id]   flexible assets
+  password-link <org> <term>     naam en deeplink van een wachtwoord-item
+
+Read-only. Wachtwoordwaarden worden nooit opgehaald: password-link geeft
+alleen de naam van het item en een link naar IT Glue.`;
+
+async function main() {
+  const argv = process.argv.slice(2).filter((a) => a !== "--json");
+  const alsJson = process.argv.includes("--json");
+  if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
+    console.log(GEBRUIK);
+    return;
+  }
+  const { soort, rijen } = await runSubcommand(argv, { key: getApiKey() });
+  if (alsJson) {
+    console.log(JSON.stringify(rijen, null, 2));
+    return;
+  }
+  console.log(formatTabel(rijen, KOLOMMEN[soort]));
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main().catch((err) => {
+    console.error(err.message);
+    process.exitCode = 1;
+  });
 }
