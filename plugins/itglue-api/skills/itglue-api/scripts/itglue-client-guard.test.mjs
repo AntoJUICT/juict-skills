@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, rmSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve, join } from "node:path";
@@ -21,10 +21,12 @@ import { dirname, resolve, join } from "node:path";
 //    in de .ts horen te staan. Sloopt iemand een laag uit de .ts, dan mist het bijbehorende
 //    fragment en wordt de test rood. Loopt de .mjs weg onder de test, dan valt de extractie zelf
 //    om (de fragmentlijst wordt ook tegen de .mjs getoetst).
-// 2. Gedragscontrole. Het guard-blok uit de .ts is zelfstandige code zonder imports. Node 22.18+
-//    en 24 strippen types zelf, dus we schrijven dat blok naar een tijdelijk .ts-bestand en
-//    voeren de echte aanvalsvectoren uit tegen de echte functie. Op oudere Node valt dit stuk
-//    weg als skip; de spiegelcontrole blijft dan overeind.
+// 2. Gedragscontrole. Node 22.18+ en 24 strippen types zelf, dus de .ts is uit te voeren zonder
+//    build. Twee keer: het guard-blok apart (zelfstandige code zonder imports) tegen de echte
+//    aanvalsvectoren, en de hele module met een stub voor ./azure-keyvault en een gemockte fetch,
+//    zodat ook de koppeling tussen de netwerklaag en de blokkade onder test staat. Op oudere Node
+//    valt alleen dit spoor weg als skip, en uitsluitend op de twee bekende type-stripping-codes:
+//    elke andere importfout is een echte fout. Zie importeerTypeScript().
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -70,6 +72,35 @@ const clientPlat = plat(clientGuard);
 
 function telVoorkomens(code, naam) {
   return (code.match(new RegExp(`\\b${naam}\\b`, "g")) ?? []).length;
+}
+
+// Knipt de tekst van een functie uit de bron: van de kopregel tot de volgende top-level export.
+// Genoeg om te toetsen wat er in de body gebeurt en in welke volgorde.
+function functieBlok(bron, kop) {
+  const start = bron.indexOf(kop);
+  assert.notEqual(start, -1, `itglue-client.ts mist "${kop}"`);
+  const volgende = bron.indexOf("\nexport ", start + kop.length);
+  return bron.slice(start, volgende === -1 ? bron.length : volgende);
+}
+
+// Alleen deze twee codes betekenen "deze Node kan geen TypeScript laden". Al het andere hoort de
+// test rood te maken. Zonder die scheiding wordt elke reden waarom de code niet laadt (een
+// ReferenceError omdat het geextraheerde guard-blok niet zelfstandig is, een verkeerd
+// importpad) stil een skip, en dan verdwijnt de gedragscontrole uit een groene CI-run.
+const TYPE_STRIPPING_FOUTEN = new Set([
+  "ERR_UNKNOWN_FILE_EXTENSION",
+  "ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING",
+]);
+
+async function importeerTypeScript(pad) {
+  try {
+    return { mod: await import(pathToFileURL(pad).href) };
+  } catch (err) {
+    if (TYPE_STRIPPING_FOUTEN.has(err?.code)) {
+      return { skipReden: `deze Node kan een .ts niet laden (${err.code})` };
+    }
+    throw err;
+  }
 }
 
 test("guard: elke constante uit de .mjs-blokkade staat identiek in de client", () => {
@@ -174,18 +205,21 @@ test("guard: het blok voert de aanvalsvectoren uit taak 2 daadwerkelijk uit", as
 
   const blok = guardBlok(clientBron, "itglue-client.ts");
   const tijdelijk = join(tmpdir(), `itglue-guard-${process.pid}-${Date.now()}.ts`);
-  let guard;
+  // Het wegschrijven staat buiten de try: dat hoort niet tot het skip-scenario, en een fout daarin
+  // is een echte fout.
+  writeFileSync(tijdelijk, blok, "utf-8");
+  let uitkomst;
   try {
-    writeFileSync(tijdelijk, blok, "utf-8");
-    guard = await import(pathToFileURL(tijdelijk).href);
-  } catch (err) {
-    // Node zonder type-stripping (< 22.18) kan een .ts niet laden. Dan blijft alleen de
-    // spiegelcontrole hierboven over; die dekt de aanwezigheid van alle lagen al.
-    t.skip(`deze Node kan het TS-blok niet laden (${err.code ?? err.message}); spiegelcontrole dekt de rest`);
-    return;
+    uitkomst = await importeerTypeScript(tijdelijk);
   } finally {
     rmSync(tijdelijk, { force: true });
   }
+  if (uitkomst.skipReden) {
+    // Alleen oude Node. De spiegelcontrole hierboven dekt de aanwezigheid van alle lagen dan nog.
+    t.skip(`${uitkomst.skipReden}; spiegelcontrole dekt de rest`);
+    return;
+  }
+  const guard = uitkomst.mod;
 
   assert.equal(typeof guard.assertPathAllowed, "function", "assertPathAllowed wordt niet geexporteerd");
 
@@ -238,15 +272,136 @@ test("guard: het blok voert de aanvalsvectoren uit taak 2 daadwerkelijk uit", as
   }
 });
 
-test("client doet geen schrijfacties", () => {
-  for (const methode of ["POST", "PUT", "PATCH", "DELETE"]) {
-    assert.ok(
-      !new RegExp(`\\b${methode}\\b`).test(clientBron),
-      `${methode} hoort niet in een read-only client, ook niet als voorbeeld in commentaar`
+// De blokkade kan perfect zijn en toch nergens aan hangen. Deze twee controles staan er los van de
+// gedragscontrole hieronder, zodat de koppeling ook gedekt blijft als die op oude Node overslaat.
+test("itglueFetch roept de blokkade aan voordat er iets over de lijn gaat", () => {
+  const body = functieBlok(clientBron, "export async function itglueFetch");
+  assert.ok(
+    body.includes("assertPathAllowed(path);"),
+    "itglueFetch roept assertPathAllowed(path) niet aan: de blokkade hangt dan aan niets"
+  );
+  const guardOp = body.indexOf("assertPathAllowed(path);");
+  const fetchOp = body.indexOf("fetch(url");
+  assert.ok(fetchOp !== -1, "itglueFetch doet nergens een fetch(url, ...)");
+  assert.ok(guardOp < fetchOp, "de blokkade hoort voor het request te staan, niet erna");
+});
+
+test("fetchAllItGlue heeft een rem op het aantal pagina's", () => {
+  const body = functieBlok(clientBron, "export async function fetchAllItGlue");
+  assert.match(body, /pageNumber > maxPages/, "de maxPages-rem is verdwenen: dit kan eindeloos doorlopen");
+  assert.match(body, /throw new Error\(/, "de maxPages-rem moet gooien, niet stil stoppen");
+});
+
+test("netwerklaag: verboden pad doet geen enkel request en maxPages remt echt", async (t) => {
+  // De hele module uitvoeren kan alleen met een stub voor ./azure-keyvault (die trekt twee
+  // @azure-packages binnen die deze repo niet heeft) en met een expliciete .ts-extensie op de
+  // import, want Node's type-stripping doet geen extensieloze resolutie. Vindt de test die import
+  // niet meer, dan faalt hij hier: stil overslaan is geen optie.
+  const werkmap = mkdtempSync(join(tmpdir(), "itglue-client-"));
+  const echteFetch = globalThis.fetch;
+  const echteVault = process.env.AZURE_KEYVAULT_URL;
+  const echteKey = process.env.ITGLUE_API_KEY;
+  try {
+    writeFileSync(
+      join(werkmap, "azure-keyvault.ts"),
+      "export async function getSecret(naam: string): Promise<string> {\n  return `stub-${naam}`;\n}\n",
+      "utf-8"
     );
+    const herschreven = clientBron.replace('from "./azure-keyvault"', 'from "./azure-keyvault.ts"');
+    assert.notEqual(herschreven, clientBron, 'de import van "./azure-keyvault" staat niet meer in de client');
+    const clientPad = join(werkmap, "itglue-client.ts");
+    writeFileSync(clientPad, herschreven, "utf-8");
+
+    const uitkomst = await importeerTypeScript(clientPad);
+    if (uitkomst.skipReden) {
+      t.skip(`${uitkomst.skipReden}; de brontekst-controles hierboven dekken de koppeling`);
+      return;
+    }
+    const client = uitkomst.mod;
+
+    // Noodrem in de mock: zonder de maxPages-controle zou fetchAllItGlue eindeloos doorlopen en
+    // zou deze test blijven hangen in plaats van rood worden.
+    const NOODREM = 25;
+    let calls = [];
+    let volgendePagina = null;
+    globalThis.fetch = async (url) => {
+      calls.push(String(url));
+      if (calls.length > NOODREM) {
+        throw new Error(`noodrem: meer dan ${NOODREM} requests, de rem in fetchAllItGlue doet niets`);
+      }
+      return {
+        status: 200,
+        ok: true,
+        headers: new Headers(),
+        json: async () => ({ data: [], meta: volgendePagina ? { "next-page": volgendePagina } : {} }),
+      };
+    };
+    delete process.env.AZURE_KEYVAULT_URL;
+    process.env.ITGLUE_API_KEY = "niet-echt-alleen-voor-deze-test";
+
+    await assert.rejects(
+      () => client.itglueFetch("/passwords/12345"),
+      /Geblokkeerd/,
+      "itglueFetch hoort een verboden pad te weigeren"
+    );
+    assert.deepEqual(calls, [], "een verboden pad mag geen enkel request veroorzaken");
+
+    await assert.rejects(() => client.itglueFetch("https://evil.example/organizations"), /Geblokkeerd/);
+    assert.deepEqual(calls, [], "een absolute URL naar een vreemde host mag de key niet weglekken");
+
+    // Een paar omzeilingen ook hier, via de echte netwerklaag: zo staat de blokkade niet alleen als
+    // los blok onder test maar ook zoals de client hem daadwerkelijk gebruikt.
+    for (const pad of ["/pass%77ords/12345", "/passwords%2F12345", "/passwords?show_password=true"]) {
+      await assert.rejects(() => client.itglueFetch(pad), /Geblokkeerd/, `${pad} kwam door de netwerklaag`);
+    }
+    assert.deepEqual(calls, [], "geen van de omzeilingen mag een request veroorzaken");
+
+    // Legitiem pad: wel een request, met de juiste header en zonder muterend verb.
+    volgendePagina = null;
+    calls = [];
+    await client.itglueFetch("/organizations?filter[name]=JUICT");
+    assert.equal(calls.length, 1, "een legitiem pad hoort gewoon opgehaald te worden");
+    assert.match(calls[0], /^https:\/\/api\.eu\.itglue\.com\/organizations\?/);
+
+    // maxPages: de mock blijft een volgende pagina beloven, dus alleen de rem stopt dit.
+    volgendePagina = 2;
+    calls = [];
+    await assert.rejects(
+      () => client.fetchAllItGlue("organizations", { maxPages: 3 }),
+      /maxPages \(3\)/,
+      "fetchAllItGlue hoort te stoppen zodra maxPages voorbij is"
+    );
+    assert.equal(calls.length, 3, `verwachtte 3 requests voor maxPages 3, kreeg ${calls.length}`);
+  } finally {
+    globalThis.fetch = echteFetch;
+    if (echteVault === undefined) delete process.env.AZURE_KEYVAULT_URL;
+    else process.env.AZURE_KEYVAULT_URL = echteVault;
+    if (echteKey === undefined) delete process.env.ITGLUE_API_KEY;
+    else process.env.ITGLUE_API_KEY = echteKey;
+    rmSync(werkmap, { recursive: true, force: true });
   }
-  const methodes = [...clientBron.matchAll(/method:\s*"([^"]*)"/g)].map(([, m]) => m);
-  assert.deepEqual([...new Set(methodes)], ["GET"], "de client mag alleen GET-requests doen");
+});
+
+test("client doet geen schrijfacties", () => {
+  // Over beide .ts-bestanden, want de constraint gaat over elke regel code, en
+  // case-insensitive: 'method: "post"' is net zo goed een schrijfactie.
+  const bestanden = { "itglue-client.ts": clientBron, "azure-keyvault.ts": lees("azure-keyvault.ts") };
+  for (const [naam, bron] of Object.entries(bestanden)) {
+    for (const methode of ["POST", "PUT", "PATCH", "DELETE"]) {
+      assert.ok(
+        !new RegExp(`\\b${methode}\\b`, "i").test(bron),
+        `${naam}: ${methode} hoort niet in read-only code, ook niet als voorbeeld in commentaar`
+      );
+    }
+    const methodes = [...bron.matchAll(/method:\s*"([^"]*)"/gi)].map(([, m]) => m);
+    for (const m of methodes) {
+      assert.equal(m, "GET", `${naam}: alleen GET is toegestaan, vond method: "${m}"`);
+    }
+  }
+  assert.ok(
+    clientBron.includes('method: "GET"'),
+    "itglueFetch hoort GET expliciet mee te geven, zodat read-only in de code zichtbaar is"
+  );
 });
 
 test("client haalt nooit een wachtwoordwaarde op", () => {

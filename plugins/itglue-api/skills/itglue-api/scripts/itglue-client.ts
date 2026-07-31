@@ -234,6 +234,15 @@ export function passwordDeeplink(
 
 let cachedKey: string | null = null;
 
+/**
+ * Haalt de API-key op, eenmalig per proces.
+ *
+ * Precedentie: staat AZURE_KEYVAULT_URL gezet, dan komt de key altijd uit Key Vault en wordt
+ * ITGLUE_API_KEY genegeerd, ook als die gevuld is. Heb je lokaal geen toegang tot de vault, haal
+ * AZURE_KEYVAULT_URL dan uit je .env; anders krijg je een DefaultAzureCredential-fout in plaats van
+ * de env-var fallback. In itglue-lookup.mjs (de CLI) is het net omgekeerd: daar gaat de env var
+ * voor, omdat die zonder Azure-login moet kunnen draaien.
+ */
 async function getApiKey(): Promise<string> {
   if (cachedKey) return cachedKey;
   if (process.env.AZURE_KEYVAULT_URL) {
