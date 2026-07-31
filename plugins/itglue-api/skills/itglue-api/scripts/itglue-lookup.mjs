@@ -66,6 +66,11 @@ const GEBLOKKEERD_HOST =
   "Geblokkeerd: alleen een relatief pad op onze eigen IT Glue API is toegestaan. Dit pad bevat " +
   "een scheme of een host, en de netwerklaag stuurt de API-key als header mee: een request naar " +
   "een andere host zou die key weggeven.";
+const GEBLOKKEERD_TEKENS =
+  "Geblokkeerd: het pad bevat tekens die we niet vertrouwen. In het pad zelf zijn alleen letters, " +
+  "cijfers, underscore, streepje, punt en slash toegestaan. Een percent-escape in het pad kan bij " +
+  "de server naar een heel ander endpoint decoderen (%77 wordt w, dus /pass%77ords/1 komt daar uit " +
+  "op de verboden /passwords/1). Filterwaarden horen in de query en die valt buiten deze controle.";
 
 // Extra normalisatie bovenop de geparseerde pathname, alleen voor de controle en nooit voor het
 // teruggegeven pad: %2f/%2F en %5c/%5C zijn gecodeerde scheidingstekens die de WHATWG URL-parser
@@ -106,6 +111,17 @@ function invoerZoalsParserDieZiet(pad) {
 const HEEFT_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 const BEGINT_MET_AUTHORITY = /^[/\\]{2}/;
 
+// Whitelist op de geparseerde pathname, naast de bestaande lagen. De normalisatie in
+// padVoorControle() pakt alleen gecodeerde scheidingstekens (%2F, %5C), niet gecodeerde letters,
+// terwijl een server die percent-decodeert voor het routeren "%77" net zo goed naar "w" decodeert:
+// "/pass%77ords/12345" komt daar dus uit op de verboden /passwords/12345. In plaats van elke
+// letter apart op de zwarte lijst te zetten, keuren we het pad alleen goed als het uitsluitend
+// tekens bevat die een legitiem IT Glue-pad nodig heeft. Endpointnamen zijn ASCII met underscores,
+// ids zijn numeriek (of een uuid met streepjes), dus een percent-escape is in het pad nooit nodig.
+// Filterwaarden met een spatie, "%", "&" of ":" staan altijd in de query, en die zit niet in
+// url.pathname: geverifieerd dat de parser die volledig in url.search laat.
+const TOEGESTANE_PADTEKENS = /^[A-Za-z0-9_\-./]*$/;
+
 // Gezaghebbende controle: bouwt de URL exact zoals de netwerklaag straks doet (new URL(pad, base))
 // en toetst op wat fetch() daadwerkelijk gebruikt. Dat vangt automatisch alles wat de WHATWG
 // URL-parser normaliseert of stript: tab/newline/CR worden overal uit de invoer verwijderd
@@ -119,6 +135,18 @@ function heeftVerbodenPasswordSegment(pathname) {
   return index !== -1 && index < segmenten.length - 1;
 }
 
+/**
+ * Controleert of dit pad opgevraagd mag worden. Bij goedkeuring komt het pad byte-identiek terug.
+ *
+ * Contract: deze functie accepteert alleen een relatief pad, bijvoorbeeld
+ * "/passwords?filter[organization_id]=7". Een absolute URL wordt geweigerd, ook als de host onze
+ * eigen API is, zodat een ingesloten host de controle nooit kan omleiden en ITGLUE_BASE_URL de
+ * guard niet kan verzwakken. De netwerklaag plakt BASE_URL er zelf voor.
+ *
+ * Gevolg voor paginatie: IT Glue is JSON:API en levert "links.next" als absolute URL. Die
+ * rechtstreeks door deze guard halen geeft een harde fout op elke gepagineerde call. Pagineer
+ * daarom met "page[number]" (zie buildQuery) in plaats van met een doorgegeven links.next.
+ */
 export function assertPathAllowed(path) {
   const p = String(path ?? "");
 
@@ -164,6 +192,14 @@ export function assertPathAllowed(path) {
   // Laag 2: de gezaghebbende segmentcontrole op de pathname zoals de parser die oplevert.
   if (heeftVerbodenPasswordSegment(url.pathname)) {
     throw new Error(GEBLOKKEERD_PASSWORD);
+  }
+
+  // Laag 3: whitelist op de tekens in de geparseerde pathname. Dit vangt de gecodeerde letter, die
+  // de vaste string-replaces van laag 1 principieel niet kunnen zien ("/pass%77ords/12345" leest
+  // voor ons niet als passwords, voor een percent-decoderende server wel). De query blijft hier
+  // buiten, dus filterwaarden met een spatie of een losse "%" raken deze controle niet.
+  if (!TOEGESTANE_PADTEKENS.test(url.pathname)) {
+    throw new Error(GEBLOKKEERD_TEKENS);
   }
 
   // show_password: op de gedecodeerde parameternamen (zodat bijv. show%5Fpassword ook telt) en voor

@@ -125,6 +125,39 @@ test("assertPathAllowed: een control character binnen een escape omzeilt de blok
   assert.throws(() => assertPathAllowed("/pass\twords%\t2F12345"), /Geblokkeerd/);
 });
 
+test("assertPathAllowed: een percent-gecodeerde letter in het pad wordt geweigerd", () => {
+  // Zelfde premisse als bij de gecodeerde slash: een server die percent-decodeert voordat hij
+  // routeert, decodeert "%77" net zo goed naar "w" en komt dus alsnog op /passwords/12345 uit. De
+  // vaste string-replaces voor %2F en %5C kunnen dat principieel niet zien, dus dekt de
+  // teken-whitelist op de geparseerde pathname dit af.
+  assert.throws(() => assertPathAllowed("/pass%77ords/12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/%70asswords/12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/passw%6Frds/12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/PASSWORD%53/12345"), /Geblokkeerd/);
+  // Ook de gecodeerde vorm van een heel onschuldig lijkend pad gaat eruit: geen enkel legitiem
+  // IT Glue-pad heeft een percent-escape in het pad nodig, dus we hoeven hier niet te gokken.
+  assert.throws(() => assertPathAllowed("/configu%72ations"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/pass%\t77ords/12345"), /Geblokkeerd/);
+});
+
+test("assertPathAllowed: de query valt buiten de padwhitelist", () => {
+  // De whitelist loopt over url.pathname, en de parser stopt alles na de "?" in url.search. Eerst
+  // dat feit zelf vastleggen, zodat duidelijk is waarom een spatie of een losse "%" in een
+  // filterwaarde de whitelist niet raakt.
+  assert.equal(new URL("/organizations?filter[name]=JUICT B.V.", BASE_URL).pathname, "/organizations");
+  assert.equal(new URL("/configurations?filter[name]=100%", BASE_URL).pathname, "/configurations");
+  // En dan het gedrag: byte-identiek terug, zonder decodeerfout.
+  for (const pad of [
+    "/organizations?filter[name]=JUICT B.V.",
+    "/configurations?filter[name]=100%",
+    "/configurations?filter[name]=a&b",
+    "/configurations?filter[name]=a:b",
+    "/configurations?filter[name]=100% korting",
+  ]) {
+    assert.equal(assertPathAllowed(pad), pad, `${JSON.stringify(pad)} moet toegestaan blijven`);
+  }
+});
+
 test("assertPathAllowed: een pad met scheme of host wordt geweigerd", () => {
   // De netwerklaag stuurt de API-key als header mee op wat dit pad ook oplevert, dus een pad dat
   // naar een andere host wijst is key-exfiltratie. Alleen een zuiver relatief pad op onze eigen
@@ -239,6 +272,14 @@ test("assertPathAllowed: elke bekende omzeiling wordt geweigerd", () => {
     // is nooit legitiem.
     "/passwords/../configurations",
     "/passwords/%2e%2e/configurations",
+    // ronde 5: percent-gecodeerde letters binnen het woord "passwords". De oracle vindt deze
+    // onschuldig (de parser decodeert %77 niet), maar een percent-decoderende server routeert ze
+    // alsnog naar /passwords/12345.
+    "/pass%77ords/12345",
+    "/%70asswords/12345",
+    "/passw%6Frds/12345",
+    "/PASSWORD%53/12345",
+    "/pass%\t77ords/12345",
   ];
 
   for (const pad of pogingen) {
