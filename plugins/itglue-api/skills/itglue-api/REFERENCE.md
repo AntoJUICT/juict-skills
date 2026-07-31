@@ -104,7 +104,9 @@ Wat je in die output wilt zien: welke sleutel in `meta` naar de volgende pagina 
 
 IT Glue stuurt als JSON:API ook een `links`-object mee met een absolute `links.next`. Gebruik die niet. De guard in onze scripts accepteert uitsluitend relatieve paden (zie "Padregels"), dus pagineer altijd zelf met `page[number]`.
 
-De blokhaken in `page[size]` en `filter[...]` worden door `URLSearchParams` percent-gecodeerd naar `%5B` en `%5D`. Dat is voor de server gelijkwaardig aan de letterlijke haken 📄, en dat is een aanname die het controleren waard is: al onze metingen zijn met letterlijke haken gedaan, terwijl de scripts de gecodeerde vorm versturen.
+De blokhaken in `page[size]` en `filter[...]` worden door `URLSearchParams` percent-gecodeerd naar `%5B` en `%5D`. Of IT Glue die vorm net zo leest als letterlijke haken is een aanname 📄: al onze metingen zijn met letterlijke haken gedaan, terwijl de scripts de gecodeerde vorm versturen.
+
+Let op hoe je die aanname controleert, want een call die slaagt bewijst hier niets. Herkent de server de parameters niet, dan negeert hij ze en krijg je een 200 met de default paginagrootte en een ongefilterde lijst. Het bewijs zit in de inhoud van de `--raw`-uitvoer: `data` moet exact twee items bevatten, want dan is `page[size]=2` gehonoreerd, en elk item moet bij de opgevraagde organisatie horen (`organization-id` in de attributes), want dan is het filter gehonoreerd. Zie je meer dan twee items, of een item van een andere organisatie, dan worden de gecodeerde haken genegeerd. Kies er wel een organisatie bij met minstens drie configuraties, anders zegt een korte `data` niets.
 
 ## Filters
 
@@ -215,7 +217,7 @@ De 📄-markers in de tekst hierboven zijn leidend; deze tabel is niet uitputten
 | Bestaat `/locations` met het org-filter | een losse GET op `/locations?filter[organization_id]=<id>` |
 | Bestaat `/password_categories` | een losse GET op `/password_categories` |
 | Wat er boven `page[size]=1000` gebeurt | een losse GET op `/organizations?page[size]=2000`: kapt hij af op 1000, geeft hij een fout, of komt alles terug |
-| Accepteert IT Glue `%5B`/`%5D` net als letterlijke haken | elke geslaagde `--raw`-call is het bewijs, want die verstuurt de gecodeerde vorm |
+| Accepteert IT Glue `%5B`/`%5D` net als letterlijke haken | `node itglue-lookup.mjs configs <org-id> --raw` op een organisatie met minstens drie configuraties, en dan de inhoud narekenen: `data` moet exact twee items hebben en elk item moet die `organization-id` dragen. Meer items of een vreemde organisatie betekent dat de haken genegeerd worden. Een 200 op zich is geen bewijs |
 | Eist IT Glue het `Content-Type`-header op een GET | een losse GET zonder dat header |
 | Komt `retry-after` mee bij een 429 | pas zichtbaar onder load; noteer het zodra je een 429 ziet |
 

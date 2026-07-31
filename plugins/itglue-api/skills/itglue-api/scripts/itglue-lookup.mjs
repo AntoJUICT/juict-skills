@@ -374,7 +374,12 @@ export async function resolveOrg(zoekterm, opts) {
   );
 }
 
-const SUBCOMMANDS = ["org", "configs", "contacts", "docs", "assets", "password-link"];
+export const SUBCOMMANDS = ["org", "configs", "contacts", "docs", "assets", "password-link"];
+
+// Subcommando's waarvoor --raw een resource heeft. password-link staat hier bewust niet in: een
+// ruwe dump van password-items zou de naam-en-link-whitelist omzeilen. Komt er een subcommando bij,
+// dan hoort het hier expliciet bij te komen; rawDoel() gooit liever dan te gokken.
+export const RAW_SUBCOMMANDS = ["org", "configs", "contacts", "docs", "assets"];
 
 export async function runSubcommand(argv, opts) {
   const [subcommando, ...rest] = argv;
@@ -445,7 +450,9 @@ export async function runSubcommand(argv, opts) {
 export const RAW_PAGE_SIZE = 2;
 
 // Welke resource en filters horen bij een subcommando. Apart van runSubcommand() zodat --raw
-// exact dezelfde call doet als het subcommando zelf, in plaats van een eigen pad te verzinnen.
+// dezelfde resource en dezelfde filters gebruikt als het subcommando zelf, in plaats van een eigen
+// pad te verzinnen. De paginatie wijkt bewust wel af: --raw haalt alleen pagina 1 op met
+// page[size]=RAW_PAGE_SIZE, terwijl de subcommando's met 100 per pagina doorpagineren.
 export async function rawDoel(argv, opts) {
   const [subcommando, ...rest] = argv;
   if (!SUBCOMMANDS.includes(subcommando)) {
@@ -474,8 +481,17 @@ export async function rawDoel(argv, opts) {
   if (subcommando === "configs") return { resource: "configurations", filters };
   if (subcommando === "contacts") return { resource: "contacts", filters };
   if (subcommando === "docs") return { resource: "documents", filters };
-  if (rest[1]) filters["flexible_asset_type_id"] = rest[1];
-  return { resource: "flexible_assets", filters };
+  if (subcommando === "assets") {
+    if (rest[1]) filters["flexible_asset_type_id"] = rest[1];
+    return { resource: "flexible_assets", filters };
+  }
+
+  // Geen stille doorval. Voorheen viel alles wat hierboven niet matchte door naar flexible_assets,
+  // waardoor een toekomstig zevende subcommando ongemerkt de verkeerde resource zou opvragen: een
+  // 200 met de verkeerde inhoud in plaats van een fout. Liever hard stoppen.
+  throw new Error(
+    `Subcommando "${subcommando}" heeft geen resource voor --raw. Geldig met --raw: ${RAW_SUBCOMMANDS.join(", ")}.`
+  );
 }
 
 // Haalt de ruwe JSON:API-body van de EERSTE pagina op, inclusief meta en links. Geen paginatie:

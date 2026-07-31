@@ -46,6 +46,8 @@ Gevolg: `org <deelnaam>` kan leeg terugkomen terwijl de organisatie bestaat, en 
 
 Dit is de rode draad bij IT Glue: fouten komen vaak als een lege lijst met status 200, niet als een foutcode. Een lege lijst is dus geen bewijs dat er niets is.
 
+Diezelfde stilte werkt ook de andere kant op. Herkent de server een parameter niet, dan negeert hij hem en krijg je een 200 met een ongefilterde lijst op de default paginagrootte. Een geslaagde call is daarom nooit op zichzelf bewijs dat je filter of je paginagrootte is aangekomen; reken de inhoud na.
+
 **Documenten komen leeg terug via het relationships-pad.** `GET /organizations/{id}/relationships/documents` gaf 200 met nul items, ook terwijl er documenten in de portal stonden (gemeten 2026-07-21). Of de top-level variant `GET /documents?filter[organization_id]=` het beter doet is niet gemeten; die gebruikt het `docs`-subcommando en staat in REFERENCE.md nog als openstaand punt. Ga er tot die tijd van uit dat handleidingen uitlezen via de API niet werkt, maar schrijf het niet af zonder de tweede route te hebben geprobeerd.
 
 **Controleer bij een verdacht lege of korte lijst altijd drie dingen:** staat de filternaam in snake_case, is dat filter op zichzelf voldoende (zie flexible assets), en klopt het aantal items met wat `meta` zegt. Dat laatste zie je met `--raw`. Pas als die drie kloppen is "leeg" echt leeg.

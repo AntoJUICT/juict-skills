@@ -17,6 +17,8 @@ import {
   rawDoel,
   runRaw,
   RAW_PAGE_SIZE,
+  RAW_SUBCOMMANDS,
+  SUBCOMMANDS,
 } from "./itglue-lookup.mjs";
 
 test("normalizeOrgName: strippt rechtsvorm, leestekens en dubbele spaties", () => {
@@ -795,4 +797,35 @@ test("rawDoel: koppelt elk toegestaan subcommando aan de juiste resource", async
 
 test("rawDoel: onbekend subcommando geeft dezelfde fout als runSubcommand", async () => {
   await assert.rejects(() => rawDoel(["wachtwoord-dumpen", "juict"], { key: "k" }), /Onbekend subcommando/);
+});
+
+// Twee kanten van dezelfde drift. Hierboven staat per subcommando welke resource eruit moet komen;
+// deze twee zorgen dat er geen subcommando kan bestaan dat rawDoel() niet expliciet afhandelt.
+test("RAW_SUBCOMMANDS dekt elk subcommando behalve password-link", () => {
+  assert.deepEqual(
+    [...RAW_SUBCOMMANDS, "password-link"].sort(),
+    [...SUBCOMMANDS].sort(),
+    "elk subcommando hoort of een --raw-resource te hebben, of expliciet geweigerd te worden"
+  );
+});
+
+test("rawDoel: een subcommando zonder resource-mapping gooit in plaats van door te vallen", async () => {
+  // Een nieuw subcommando simuleren: dit is precies de situatie waarin de oude doorval stil
+  // flexible_assets zou opvragen. De array wordt daarna weer teruggezet.
+  SUBCOMMANDS.push("verzonnen-subcommando");
+  try {
+    await assert.rejects(
+      () =>
+        rawDoel(["verzonnen-subcommando", "7"], {
+          key: "k",
+          fetchImpl: async () => {
+            throw new Error("er had geen request mogen uitgaan");
+          },
+        }),
+      /geen resource voor --raw/
+    );
+  } finally {
+    SUBCOMMANDS.pop();
+  }
+  assert.ok(!SUBCOMMANDS.includes("verzonnen-subcommando"), "de subcommando-lijst moet weer schoon zijn");
 });
