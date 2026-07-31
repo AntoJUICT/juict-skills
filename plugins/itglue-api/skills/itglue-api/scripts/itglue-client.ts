@@ -132,8 +132,12 @@ const TOEGESTANE_PADTEKENS = /^[A-Za-z0-9_\-./]*$/;
 // URL-parser normaliseert of stript: tab/newline/CR worden overal uit de invoer verwijderd
 // (spec-gedrag, ook midden in "passwords"), en een letterlijke backslash wordt naar "/" omgezet,
 // zonder dat wij zelf een zwarte lijst van zulke tekens moeten bijhouden.
+// Een punt-suffix wordt van elk segment afgeknipt voordat we vergelijken. Een server die ".json"
+// als format-suffix leest (Rails-idioom) routeert "/passwords.json/12345" naar dezelfde resource als
+// "/passwords/12345", terwijl een vergelijking op het hele segment die twee als verschillend ziet.
+// Legitieme IT Glue-paden hebben geen punt in een padsegment, dus dit knipt nooit iets nuttigs weg.
 function heeftVerbodenPasswordSegment(pathname: string): boolean {
-  const segmenten = pathname.toLowerCase().split("/").filter(Boolean);
+  const segmenten = pathname.toLowerCase().split("/").filter(Boolean).map((s) => s.split(".")[0]);
   const index = segmenten.indexOf("passwords");
   // Alleen een segment na "passwords" is verboden: "/passwords", "/passwords/" (collectie) en
   // ".../relationships/passwords" (passwords is dan het laatste segment) blijven toegestaan.

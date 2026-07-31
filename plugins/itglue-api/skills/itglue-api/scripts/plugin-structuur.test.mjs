@@ -27,13 +27,17 @@ test("marketplace.json bevat een itglue-api entry die naar de plugin-map wijst",
 // De README is de voorpagina van een publieke repo. De tabel daar liep achter op marketplace.json
 // (itglue-api en autotask-approve-post ontbraken), en een gemiste checklist-stap merkt niemand.
 // Deze controle wel.
-test("README noemt elke plugin uit marketplace.json", () => {
+//
+// Bewust op de tabelrij en niet op de naam ergens in het bestand: pluginnamen staan ook in de
+// Vereisten-lijst onderaan, dus met een losse "bevat de naam"-controle bleef deze test groen terwijl
+// de rij uit de tabel verdwenen was. De rij begint met de naam tussen backticks in de eerste kolom.
+test("README heeft een tabelrij voor elke plugin uit marketplace.json", () => {
   const markt = JSON.parse(readFileSync(resolve(repoRoot, ".claude-plugin/marketplace.json"), "utf-8"));
   const readme = readFileSync(resolve(repoRoot, "README.md"), "utf-8");
   for (const plugin of markt.plugins) {
     assert.ok(
-      readme.includes(`\`${plugin.name}\``),
-      `${plugin.name} staat in marketplace.json maar niet in README.md: werk de tabel "Skills in deze marketplace" bij`
+      readme.includes(`| \`${plugin.name}\` |`),
+      `${plugin.name} staat in marketplace.json maar heeft geen tabelrij in README.md: werk de tabel "Skills in deze marketplace" bij`
     );
   }
 });

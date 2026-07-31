@@ -134,8 +134,12 @@ const TOEGESTANE_PADTEKENS = /^[A-Za-z0-9_\-./]*$/;
 // URL-parser normaliseert of stript: tab/newline/CR worden overal uit de invoer verwijderd
 // (spec-gedrag, ook midden in "passwords"), en een letterlijke backslash wordt naar "/" omgezet,
 // zonder dat wij zelf een zwarte lijst van zulke tekens moeten bijhouden.
+// Een punt-suffix wordt van elk segment afgeknipt voordat we vergelijken. Een server die ".json"
+// als format-suffix leest (Rails-idioom) routeert "/passwords.json/12345" naar dezelfde resource als
+// "/passwords/12345", terwijl een vergelijking op het hele segment die twee als verschillend ziet.
+// Legitieme IT Glue-paden hebben geen punt in een padsegment, dus dit knipt nooit iets nuttigs weg.
 function heeftVerbodenPasswordSegment(pathname) {
-  const segmenten = pathname.toLowerCase().split("/").filter(Boolean);
+  const segmenten = pathname.toLowerCase().split("/").filter(Boolean).map((s) => s.split(".")[0]);
   const index = segmenten.indexOf("passwords");
   // Alleen een segment ná "passwords" is verboden: "/passwords", "/passwords/" (collectie) en
   // ".../relationships/passwords" (passwords is dan het laatste segment) blijven toegestaan.
@@ -247,24 +251,60 @@ export function passwordDeeplink(orgId, passwordId, portal = PORTAL_URL) {
 // pathname en op de ruwe invoer), zodat een gecodeerde of gesplitste vorm hier niet langs glipt.
 // assertPathAllowed loopt eerst: die weigert al de absolute URL, de gecodeerde letter in het pad en
 // de individuele password-resource, dus wat hier aankomt is een schoon relatief pad.
+//
+// De grens loopt over het pad én over de include-parameter in de query. "organizations/7" met
+// "include=passwords" heeft geen passwords-segment in het pad, maar zou de items wel in het
+// included-deel van de body zetten, en get print die body ruw. Andere queryparameters blijven buiten
+// deze controle: een filterwaarde die het woord bevat verandert niet welke resource terugkomt.
 const GEBLOKKEERD_GET_PASSWORDS =
   "Geblokkeerd: get mag de passwords-resource niet opvragen, ook de collectie niet. Een vrij pad " +
   "zou hier de ruwe attributes van password-items printen en daarmee de whitelist omzeilen die " +
   "alleen naam en deeplink doorlaat (dezelfde reden dat --raw geblokkeerd is op password-link). " +
   "Gebruik password-link als je een wachtwoord-item zoekt.";
+const GEBLOKKEERD_GET_INCLUDE =
+  "Geblokkeerd: get mag de passwords-resource ook niet via een include-parameter binnenhalen. " +
+  "Een include zet de gerelateerde items in het included-deel van de respons, en get print die " +
+  "ruwe body: daarmee zou de whitelist die alleen naam en deeplink doorlaat alsnog omzeild zijn. " +
+  "Gebruik password-link als je een wachtwoord-item zoekt.";
+
+// Toetst de include-parameter uit de query op de passwords-resource. Alleen include, want dat is de
+// parameter die andere resources aan de respons toevoegt; een filterwaarde die het woord bevat zegt
+// niets over wat er terugkomt en blijft dus toegestaan. Waarden kunnen komma-gescheiden zijn
+// (include=passwords,configurations) en een geneste relatie schrijft JSON:API met een punt
+// (include=organization.passwords), dus elk deel gaat er apart door. searchParams decodeert
+// percent-escapes al, dus include=pass%77ords komt hier als "passwords" aan.
+function heeftPasswordsInclude(url) {
+  for (const [sleutel, waarde] of url.searchParams) {
+    if (!sleutel.trim().toLowerCase().startsWith("include")) continue;
+    const delen = String(waarde)
+      .toLowerCase()
+      .split(",")
+      .flatMap((deel) => deel.split("."));
+    if (delen.some((deel) => deel.trim() === "passwords")) return true;
+  }
+  return false;
+}
 
 export function assertGetPadToegestaan(pad) {
   assertPathAllowed(pad);
   const p = String(pad ?? "");
   const invoer = invoerZoalsParserDieZiet(p);
+  const controleUrl = new URL(p, CONTROLE_BASIS);
   const teControleren = [
-    padVoorControle(new URL(p, CONTROLE_BASIS).pathname),
+    padVoorControle(controleUrl.pathname),
     padVoorControle(invoer.split(/[?#]/)[0]),
   ];
   for (const kandidaat of teControleren) {
-    if (kandidaat.toLowerCase().split("/").filter(Boolean).includes("passwords")) {
+    // Punt-suffix eraf per segment, om dezelfde reden als in heeftVerbodenPasswordSegment: een
+    // server die ".json" als format-suffix leest routeert "passwords.json" naar de collectie,
+    // terwijl een vergelijking op het hele segment dat als een andere resource ziet.
+    const segmenten = kandidaat.toLowerCase().split("/").filter(Boolean).map((s) => s.split(".")[0]);
+    if (segmenten.includes("passwords")) {
       throw new Error(GEBLOKKEERD_GET_PASSWORDS);
     }
+  }
+  if (heeftPasswordsInclude(controleUrl)) {
+    throw new Error(GEBLOKKEERD_GET_INCLUDE);
   }
   return p;
 }
@@ -691,8 +731,8 @@ export const GEBRUIK = `Gebruik: node itglue-lookup.mjs <subcommando> <organisat
   get "<relatief-pad>"           ruwe GET op een relatief pad, voor endpoints zonder
                                  eigen subcommando (bijv. get "flexible_asset_types").
                                  Zet het pad tussen quotes vanwege de blokhaken en de &.
-                                 De passwords-resource is hier geblokkeerd; gebruik
-                                 password-link.
+                                 De passwords-resource is hier geblokkeerd, in het pad
+                                 en in een include-parameter; gebruik password-link.
 
   --json   de verwerkte rijen als JSON in plaats van een tabel
   --raw    de ruwe JSON:API-body van de eerste pagina, inclusief meta en links.

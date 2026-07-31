@@ -294,6 +294,13 @@ test("assertPathAllowed: elke bekende omzeiling wordt geweigerd", () => {
     "/passw%6Frds/12345",
     "/PASSWORD%53/12345",
     "/pass%\t77ords/12345",
+    // ronde 6: punt-suffix op het segment. Een server die ".json" als format leest komt hier alsnog
+    // op de individuele password-resource uit; de oracle vindt het onschuldig omdat "passwords.json"
+    // voor de parser een ander segment is dan "passwords".
+    "/passwords.json/12345",
+    "/passwords.JSON/12345",
+    "/passwords./12345",
+    "/organizations/7/relationships/passwords.json/12345",
   ];
 
   for (const pad of pogingen) {
@@ -963,6 +970,24 @@ test("get: een verboden pad veroorzaakt geen enkel request", async () => {
     "/PASSWORDS?filter[organization_id]=7",
     "/passwords%2F",
     "//passwords",
+    // Punt-suffix: een server die ".json" als format leest routeert dit naar de
+    // passwords-collectie, terwijl een vergelijking op het hele segment "passwords.json" als een
+    // andere resource ziet. Daarom knipt de controle het punt-deel van elk segment af.
+    "passwords.json",
+    "passwords.JSON",
+    "passwords.xml",
+    "passwords.",
+    "/./passwords.json",
+    "organizations/7/passwords.json",
+    "organizations/7/relationships/passwords.json",
+    // include: het pad raakt de passwords-resource niet, maar de respons zou de items alsnog in
+    // het included-deel meenemen en get print die body ruw.
+    "organizations/7?include=passwords",
+    "organizations/7?include=passwords,configurations",
+    "organizations/7?include=configurations,passwords",
+    "organizations/7?INCLUDE=Passwords",
+    "organizations/7?include=organization.passwords",
+    "organizations/7?include=pass%77ords",
   ];
   for (const pad of verboden) {
     let gebeld = false;
@@ -987,9 +1012,15 @@ test("assertGetPadToegestaan: laat de paden door die de afvinkinstructies nodig 
     "flexible_asset_types",
     "locations?filter[organization_id]=7",
     "password_categories",
+    "configuration_types",
     "organizations?page[size]=1000",
     "organizations?page[size]=2000",
     "configurations?filter[organization_id]=7&page[size]=2&page[number]=2",
+    // De include-controle kijkt alleen naar de passwords-resource, dus een andere include blijft
+    // gewoon werken. Idem voor een filterwaarde die het woord bevat: die verandert niet welke
+    // resource er terugkomt.
+    "organizations/7?include=configurations",
+    "configurations?filter[name]=passwords-server",
   ];
   for (const pad of toegestaan) {
     assert.equal(assertGetPadToegestaan(pad), pad, `${pad} hoort met get op te vragen te zijn`);

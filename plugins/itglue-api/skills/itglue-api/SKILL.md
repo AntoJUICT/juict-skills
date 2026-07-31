@@ -19,9 +19,9 @@ Bij een wachtwoordvraag lever je de naam van het item en de deeplink:
 https://juict.eu.itglue.com/<organization-id>/passwords/<password-id>
 ```
 
-Die vorm is 📄 en niet gemeten: hij komt uit onze eigen code en niet uit een meting. Klopt hij niet, dan is het antwoord op elke wachtwoordvraag een dode link, dus hij staat als openstaand punt in de tabel onderaan REFERENCE.md. Vink hem af door één zo'n link in de portal te openen.
+Die vorm is 📄 gecorroboreerd en niet zelf gemeten: hij is in gebruik in het JUICT-project `huntress-bulk-onboarding`, dat het organisatie-id uit zo'n portal-URL haalt en dat in een test met echte 16-cijferige IT Glue-id's vastlegt. Dat is onderbouwing van buiten deze skill, geen kale aanname, maar een eigen observatie in de portal is het niet. Klopt de vorm niet, dan is het antwoord op elke wachtwoordvraag een dode link, dus hij staat nog als openstaand punt in de tabel onderaan REFERENCE.md. Vink hem af door één zo'n link in de portal te openen. De documenten-deeplink `https://juict.eu.itglue.com/<org-id>/docs/<document-id>` heeft die onderbouwing niet en blijft een kale 📄.
 
-Het collectie-endpoint mag je wel gebruiken om het juiste item op naam te vinden; dat is precies wat `password-link` doet. Daar hoort een zoekterm bij en die is verplicht: zonder term zou het commando naam en link van élk password-item van de organisatie tonen, en itemnamen vertellen zelf al genoeg. `--raw` is om dezelfde reden geblokkeerd op `password-link`, en het vrije `get`-subcommando mag de passwords-resource helemaal niet aanspreken: allebei zouden ze de whitelist omzeilen die alleen naam en link doorlaat.
+Het collectie-endpoint mag je wel gebruiken om het juiste item op naam te vinden; dat is precies wat `password-link` doet. Daar hoort een zoekterm bij en die is verplicht: zonder term zou het commando naam en link van élk password-item van de organisatie tonen, en itemnamen vertellen zelf al genoeg. `--raw` is om dezelfde reden geblokkeerd op `password-link`, en het vrije `get`-subcommando mag de passwords-resource helemaal niet aanspreken, niet in het pad en niet via een `include`-parameter: allebei zouden ze de whitelist omzeilen die alleen naam en link doorlaat.
 
 Voor TOTP geldt hetzelfde eindresultaat om een andere reden: de seed zit niet in de API, alleen `otp-enabled` als boolean. Een onbemande TOTP-flow op basis van IT Glue kan dus niet.
 
@@ -64,13 +64,13 @@ Bij `configs`, `contacts`, `docs`, `assets` en `password-link` mag de organisati
 
 Let op dat het tweede argument van `assets` een asset-type-id is en geen zoekterm. IT Glue geeft een lege collectie als je alleen op organisatie filtert, dus haal de type-ids eerst op met `node itglue-lookup.mjs get "flexible_asset_types"`.
 
-De deeplink die `docs` per document meegeeft heeft de vorm `https://juict.eu.itglue.com/<org-id>/docs/<document-id>`. Die vorm is 📄 en niet gemeten, net als de password-deeplink; hij staat als openstaand punt in REFERENCE.md.
+De deeplink die `docs` per document meegeeft heeft de vorm `https://juict.eu.itglue.com/<org-id>/docs/<document-id>`. Die vorm is een kale 📄: anders dan de password-deeplink komt hij alleen uit onze eigen code en is er geen ander project dat hem gebruikt. Hij staat als openstaand punt in REFERENCE.md.
 
 Drie vlaggen en een vrij pad:
 
 - `--json` geeft de verwerkte rijen als JSON in plaats van een tabel.
 - `--raw` print de ruwe JSON:API-body van de eerste pagina, inclusief `meta` en `links`, met paginagrootte 2 zodat er bij drie items of meer echt een volgende pagina bestaat. Dit is de manier om de responsvorm en de paginatie-sleutel te controleren. `--raw` werkt op `org`, `configs`, `contacts`, `docs` en `assets`, en is geblokkeerd op `password-link` en op `get`.
-- `get "<relatief-pad>"` doet een GET op een pad zonder eigen subcommando en print de geredacteerde body. Dit is het gereedschap voor de openstaande punten in REFERENCE.md die om "een losse GET" vragen, bijvoorbeeld `get "locations?filter[organization_id]=7"` of `get "password_categories"`. Zet het pad tussen quotes, anders eet je shell de blokhaken en de `&`. Het pad gaat door `assertPathAllowed()` en daarna door een extra grens: elk pad dat de passwords-resource raakt wordt geweigerd, ook de collectie, want een vrij pad zou daar de ruwe attributes printen en de naam-en-link-whitelist omzeilen. Het pad gaat byte-identiek de deur uit, dus met letterlijke blokhaken; daarmee is `get` ook de manier om te meten of IT Glue `%5B`/`%5D` net zo leest als letterlijke haken.
+- `get "<relatief-pad>"` doet een GET op een pad zonder eigen subcommando en print de geredacteerde body. Dit is het gereedschap voor de openstaande punten in REFERENCE.md die om "een losse GET" vragen, bijvoorbeeld `get "locations?filter[organization_id]=7"` of `get "password_categories"`. Zet het pad tussen quotes, anders eet je shell de blokhaken en de `&`. Het pad gaat door `assertPathAllowed()` en daarna door een extra grens: elk pad dat de passwords-resource raakt wordt geweigerd, ook de collectie, want een vrij pad zou daar de ruwe attributes printen en de naam-en-link-whitelist omzeilen. Die grens loopt over het pad en over de `include`-parameter. Elk padsegment gaat zonder punt-suffix door de vergelijking (`passwords.json` telt dus als `passwords`), en een `include` die de passwords-resource noemt wordt geweigerd, ook komma-gescheiden tussen andere waarden (`include=passwords,configurations`), als geneste relatie (`include=organization.passwords`) en met andere casing. De rest van de query blijft buiten die controle: een filterwaarde waarin het woord voorkomt (`filter[name]=passwords-server`) verandert niet welke resource terugkomt en blijft gewoon werken. Het pad gaat byte-identiek de deur uit, dus met letterlijke blokhaken; daarmee is `get` ook de manier om te meten of IT Glue `%5B`/`%5D` net zo leest als letterlijke haken.
 
 ## In een project gebruiken
 
@@ -133,7 +133,7 @@ Een geslaagde call is bij IT Glue geen bewijs. Herkent de server een parameter n
 - `scripts/itglue-client.ts`: kopieerbare client voor projecten (`itglueFetch`, `fetchAllItGlue`, `buildFilterQuery`, `passwordDeeplink`, `passwordTreffers`, `assertPathAllowed`).
 - `scripts/itglue-client-guard.test.mjs`: vergelijkt de blokkade in de client met die in de CLI en wordt rood zodra ze uit elkaar lopen of er een laag verdwijnt.
 - `scripts/azure-keyvault.ts`: `getSecret()` met 1u-cache en `DefaultAzureCredential`.
-- `scripts/plugin-structuur.test.mjs`: controleert plugin.json, de marketplace-entry en de frontmatter van dit bestand.
+- `scripts/plugin-structuur.test.mjs`: controleert plugin.json, de marketplace-entry, de frontmatter van dit bestand en of elke plugin uit marketplace.json een tabelrij heeft in de README van de repo.
 - `REFERENCE.md`: endpoint- en datareferentie met verificatiestatus en de tabel met openstaande punten.
 - `LESSONS.md`: valkuilen en lessons learned, met datum.
 

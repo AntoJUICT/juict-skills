@@ -236,6 +236,12 @@ test("guard: het blok voert de aanvalsvectoren uit taak 2 daadwerkelijk uit", as
     "/PASSWORDS/12345",
     "/passwords/../configurations",
     "/organizations/7/relationships/passwords/12345",
+    // Punt-suffix: een server die ".json" als format leest routeert dit naar dezelfde individuele
+    // resource, terwijl een vergelijking op het hele segment "passwords.json" anders vindt.
+    "/passwords.json/12345",
+    "/passwords.JSON/12345",
+    "/passwords./12345",
+    "/organizations/7/relationships/passwords.json/12345",
     "https://api.eu.itglue.com/passwords/12345",
     "https://api.eu.itglue.com/organizations",
     "https://evil.example/organizations",

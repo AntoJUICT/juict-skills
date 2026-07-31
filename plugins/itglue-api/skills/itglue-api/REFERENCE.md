@@ -8,6 +8,7 @@ Markering per regel:
 |---|---|
 | ✅ met datum | Live gemeten tegen de EU-API op die datum. |
 | 📄 | Uit de documentatie of uit onze eigen code, nog niet live gemeten. |
+| 📄 gecorroboreerd | Niet zelf gemeten, maar dezelfde vorm is in gebruik in een ander werkend JUICT-project. De bron staat erbij, en er staat bij wat er dan nog open blijft. |
 
 **Waar de ✅-regels vandaan komen.** Alle metingen in dit bestand komen uit ad-hoc werk van 2026-07-21 en 2026-07-31, buiten deze skill om, met losse calls en letterlijke blokhaken in de query. De CLI en de client in deze skill hebben zelf nog nooit een live call gedaan: de geplande verificatieronde van 2026-07-31 kon niet lopen omdat het ophalen van de API-key in die omgeving geweigerd werd. Twee dingen volgen daaruit. Geen enkele ✅-regel is gemeten in exact de vorm die de CLI verstuurt, want `URLSearchParams` codeert de blokhaken naar `%5B` en `%5D`. En een ✅ zegt dat het endpoint bestond en zich zo gedroeg, niet dat het subcommando dat het gebruikt end-to-end gedraaid heeft.
 
@@ -177,10 +178,11 @@ node itglue-lookup.mjs get "locations?filter[organization_id]=7"
 node itglue-lookup.mjs get "organizations?page[size]=1000"
 ```
 
-Zet het pad tussen quotes, anders eet je shell de blokhaken en de `&`. Vier dingen om te weten:
+Zet het pad tussen quotes, anders eet je shell de blokhaken en de `&`. Vijf dingen om te weten:
 
 - Het pad gaat door dezelfde `assertPathAllowed()` als elke andere call, dus een absolute URL wordt geweigerd (zie "Padregels") en de individuele password-resource ook.
 - Daarbovenop weigert `get` élk pad dat de passwords-resource raakt, ook de collectie. Een vrij pad zou daar de ruwe attributes van password-items printen en zo de whitelist omzeilen die in de rest van de skill alleen naam en link doorlaat. Zoek je een wachtwoord-item, gebruik `password-link`.
+- Die extra grens loopt over het pad én over de `include`-parameter. Elk padsegment wordt zonder punt-suffix vergeleken, dus `passwords.json` of `passwords.` telt als `passwords`: een server die `.json` als formaat leest zou die vorm anders naar dezelfde resource kunnen routeren. En een `include` die de passwords-resource noemt gaat eruit, ook komma-gescheiden tussen andere waarden (`include=passwords,configurations`), als geneste relatie (`include=organization.passwords`) en in andere casing, want een include zet de gerelateerde items in het `included`-deel van de body die `get` ruw print. Andere queryparameters blijven buiten die controle: `configurations?filter[name]=passwords-server` verandert niet welke resource terugkomt en is dus toegestaan.
 - De uitvoer is de ruwe body, door dezelfde redactie als `--raw`. `--raw` zelf heeft geen zin op `get` en wordt daar geweigerd.
 - Het pad gaat byte-identiek de deur uit, dus met de letterlijke blokhaken die je typt. Daarmee is `get` het gereedschap om de `%5B`/`%5D`-aanname te meten: leg de uitvoer van `get "configurations?filter[organization_id]=<id>&page[size]=2"` naast die van `configs <org-id> --raw`, die de gecodeerde vorm verstuurt.
 
@@ -196,7 +198,9 @@ Wat wel mag: het collectie-endpoint aanspreken om het juiste item te vinden op n
 https://juict.eu.itglue.com/<org-id>/passwords/<password-id>
 ```
 
-Die vorm is 📄 en niet gemeten: hij komt uit onze eigen code, niet uit een meting. Dat is een ongemakkelijke plek voor een ongemeten aanname, want klopt het pad niet, dan is het antwoord op elke wachtwoordvraag een dode link. Het staat als openstaand punt in de tabel onderaan, samen met de documenten-deeplink `https://juict.eu.itglue.com/<org-id>/docs/<document-id>` die het `docs`-subcommando per rij meegeeft.
+Die vorm is 📄 gecorroboreerd: wij hebben hem niet in de portal nagekeken, maar hij is in gebruik in een ander JUICT-project dat werkt. In `huntress-bulk-onboarding` leest `extractOrgIdFromPasswordUrl()` (`src/itglue.ts`) het organisatie-id uit precies deze vorm, en de bijbehorende test (`test/itglue.test.ts`, regel 172) doet dat met echte 16-cijferige IT Glue-id's. Die URL komt daar uit de `--password-url`-vlag, waar iemand hem uit de portal plakt, dus de vorm komt niet alleen uit onze eigen code. Wat nog open staat: dat een door `password-link` gegenereerde link ook echt op het bedoelde item uitkomt, hebben we zelf niet gezien. Daarom staat het punt nog in de tabel onderaan.
+
+De documenten-deeplink `https://juict.eu.itglue.com/<org-id>/docs/<document-id>` die het `docs`-subcommando per rij meegeeft staat er zwakker voor: die vorm is in dat project niet terug te vinden en blijft een kale 📄.
 
 `password-link` vereist een zoekterm. Dat is een keuze en geen API-beperking: zonder term zou het commando naam en link van élk password-item van de organisatie tonen. Dat is geen waarde, maar itemnamen vertellen zelf al welke systemen en accounts er zijn.
 
@@ -210,13 +214,13 @@ De individuele resource `/passwords/<id>` is codematig geblokkeerd in `scripts/i
 
 Alle IT Glue-calls in deze skill lopen door `assertPathAllowed()`. Die functie keurt een pad goed of gooit; er is geen doorlaatstand. Dit weigert hij:
 
-- Elke vorm die de URL-parser als `/passwords/<id>` ziet. Dat is niet alleen het letterlijke pad, maar ook de varianten met een dubbele slash, met `%2F` of `%5C` als scheidingsteken, met een backslash, met een tab, newline of carriage return ertussen, en met percent-gecodeerde letters in het woord zelf (`/pass%77ords/1` decodeert bij de server naar het verboden pad).
+- Elke vorm die de URL-parser als `/passwords/<id>` ziet. Dat is niet alleen het letterlijke pad, maar ook de varianten met een dubbele slash, met `%2F` of `%5C` als scheidingsteken, met een backslash, met een tab, newline of carriage return ertussen, met percent-gecodeerde letters in het woord zelf (`/pass%77ords/1` decodeert bij de server naar het verboden pad), en met een punt-suffix op het segment (`/passwords.json/1`, `/passwords./1`): padsegmenten worden zonder dat suffix vergeleken, omdat een server die `.json` als formaat leest bij dezelfde resource uit kan komen.
 - Elke querystring met `show_password` erin, ook percent-gecodeerd.
 - Elke absolute URL, ook als de host onze eigen IT Glue-API is. De netwerklaag plakt de API-key als header op elk request, dus een ingesloten host mag de controle nooit kunnen omleiden.
 - Elk pad met tekens buiten `A-Z a-z 0-9 _ - . /` in het padgedeelte. De querystring valt buiten deze controle, dus filterwaarden met een spatie, een `%` of een `&` blijven gewoon werkbaar.
 - Elk pad dat niet als URL te parsen is. De guard faalt dicht: wat we niet kunnen beoordelen, laten we niet door.
 
-Toegestaan blijven de collectie en de relationships-variant: `/passwords`, `/passwords/` en `/organizations/<id>/relationships/passwords`. Dat is wat de guard toestaat; het `get`-subcommando is strenger en weigert die drie ook, omdat een vrij pad daar de ruwe attributes zou printen (zie "Een resource zonder subcommando opvragen").
+Toegestaan blijven de collectie en de relationships-variant: `/passwords`, `/passwords/` en `/organizations/<id>/relationships/passwords`. Dat is wat de guard toestaat; het `get`-subcommando is strenger en weigert die drie ook, plus een `include` op de passwords-resource, omdat een vrij pad daar de ruwe attributes zou printen (zie "Een resource zonder subcommando opvragen").
 
 Twee praktische gevolgen:
 
@@ -248,7 +252,7 @@ De 📄-markers in de tekst hierboven zijn leidend; deze tabel is niet uitputten
 | Respons-shape van contacts en configurations | `node itglue-lookup.mjs contacts <org-id> --raw` en `configs <org-id> --raw` |
 | Klopt het aantal items met `meta` | zit in dezelfde `--raw`-output: `data.length` naast het totaal in `meta` |
 | Geeft het passwords-collectie-endpoint items terug of een 403 | `node itglue-lookup.mjs password-link <org-id> "a"`. De zoekterm is verplicht en filtert alleen client-side op de itemnaam, dus de call gaat altijd uit: "IT Glue API fout 403" betekent dat het endpoint weigert, rijen betekenen dat het items levert. Komt er "Geen resultaten.", dan slaagde de call maar bevatte geen naam die term; probeer een andere letter. `--raw` is hier geblokkeerd |
-| Vorm van de password-deeplink `https://juict.eu.itglue.com/<org-id>/passwords/<password-id>` 📄 | open één link uit de uitvoer van `password-link` in de portal en kijk of hij op het juiste wachtwoord-item uitkomt. Dit is het enige ongemeten punt waar het hele antwoord op een wachtwoordvraag van afhangt |
+| Vorm van de password-deeplink `https://juict.eu.itglue.com/<org-id>/passwords/<password-id>` 📄 gecorroboreerd | de vorm is in gebruik in `huntress-bulk-onboarding` met echte 16-cijferige id's (zie "Wachtwoorden"), dus dit is geen kale aanname meer. Wat nog open staat is de eigen observatie: open één link uit de uitvoer van `password-link` in de portal en kijk of hij op het juiste wachtwoord-item uitkomt. Het hele antwoord op een wachtwoordvraag hangt hiervan af |
 | Vorm van de documenten-deeplink `https://juict.eu.itglue.com/<org-id>/docs/<document-id>` 📄 | open één link uit de uitvoer van `docs <org-id>` in de portal en kijk of hij op het juiste document uitkomt |
 | Bestaat `/locations` met het org-filter | `node itglue-lookup.mjs get "locations?filter[organization_id]=<id>"` |
 | Bestaat `/password_categories` | `node itglue-lookup.mjs get "password_categories"` |
