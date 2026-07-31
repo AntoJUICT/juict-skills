@@ -73,6 +73,10 @@ De client gebruikt Key Vault zodra `AZURE_KEYVAULT_URL` gezet is, anders env var
 
 Actieve status-picklist (zone 19, geverifieerd 31-07-2026): 1 New, 5 Complete, 7 Waiting Customer, 8 In behandeling, 10 Afspraak gepland, 12 Wacht op leverancier, 13 Wacht op planning, 16 Autocomplete (RMM), 17 In de wacht, 19 Klantnotitie toegevoegd, 20 Notitie Toegevoegd (RMM), 21 Wacht op klant, 22 Wachten op goedkeuring, 23 Goedgekeurd, 24 Afgekeurd, 25 Wacht op administratie, 26 Werkzaamheden gepland, 27 Notitie toegevoegd.
 
+Queue-picklist (zone 19, geverifieerd 31-07-2026): `29682833` Eerste lijn support, `29682969` Tweede lijn support, `29683488` Derde lijn support, `29683378` Administratie, `29683482` Verkoop, `29683487` Offboarding, `5` Het JUICT portaal, `6` Post Sale, `8` Monitoring Alert. De support-lijnen zijn de enige betrouwbare as om eerste- van tweedelijnswerk te scheiden — zie de Resources-les in LESSONS.md.
+
+Overige ticket-picklists (zone 19): `ticketType` 1 Service Request, 2 Incident, 3 Problem, 4 Change Request, 5 Alert. `source` -2 Insourced, -1 Client Portal, 2 Telefoon, 4 Email, 8 Monitoring Alert, 11 Mondeling, 13 Herhalend, 14 Intern, 15 Datto RMM, 16 SaaS Alerts.
+
 ### Ticket Notes (NESTED — zie LESSONS.md)
 - `POST /Tickets/{ticketId}/Notes` — note toevoegen
 - `GET /TicketNotes/query` — notes opzoeken
@@ -103,6 +107,14 @@ Actieve status-picklist (zone 19, geverifieerd 31-07-2026): 1 New, 5 Complete, 7
 ### Resources
 - `GET /Resources/query` — filter op `email` (het primaire e-mailveld). Let op: Resources gebruikt `email`, NIET `emailAddress` zoals Contacts — geverifieerd in zone 19.
 - Filter op `isActive: true` voor actieve medewerkers. Let op: de lijst bevat ook API-integratieaccounts (Claude API, Rewst API, Xelion API, enz.). Die hebben `licenseType` 7 (API User); echte collega's hebben 1 of 3. Voor een "Toewijzen aan collega"-dropdown filter je ze weg met `{ field: "licenseType", op: "noteq", value: 7 }`.
+- Beschikbare velden (zone 19): o.a. `email`, `firstName`, `lastName`, `title`, `resourceType`, `licenseType`, `locationID`, `defaultServiceDeskRoleID`, `hireDate`, `payrollType`. Er is **geen** `departmentID`.
+
+### SLA-resultaten per ticket
+- `POST /ServiceLevelAgreementResults/query` — filter op `ticketID` (`op: "in"` met een array werkt, chunk op ~200 ids). **Dit is de enige bron voor SLA-klokuren.**
+- Velden: `firstResponseElapsedHours`, `resolutionElapsedHours`, `resolutionPlanElapsedHours`, `isFirstResponseMet`, `isResolutionMet`, `isResolutionPlanMet`, `serviceLevelAgreementName`, `ticketID` en drie resource-ids.
+- De verstreken uren lopen op een **gepauzeerde kantoorurenklok**: Autotask verrekent business hours én wachtstatussen zelf. Voorbeeld zone 19: een ticket met 141,84 u wall-clock kwam uit op 33,84 u — exact 108 u aan nachten en weekend eruit. De kalender is ma–vr 08:00–17:00 (narekening klopt op 0,01 u).
+- Autotask start de resolutieklok bij **ticketcreatie**; wil je de tijd ná de eerste reactie, trek dan af: `resolutionElapsedHours − firstResponseElapsedHours`.
+- `GET /ServiceLevelAgreements/...` bestaat NIET (404). De SLA-definitie (toegestane doorlooptijd) is via REST niet op te halen.
 
 ### Contracts & Services
 - `GET /Contracts/query` — filter op `companyID`, `status`
@@ -165,7 +177,7 @@ interface AutotaskTicket {
   priority: number;            // ZONE 19: custom picklist — 1=Prio 2, 2=Prio 3, 4=Prio 1, 5=Spoed. GEEN waarde 3! De generieke 1=Critical/2=High/3=Normal/4=Low geldt NIET.
   companyID: number;
   contactID?: number;
-  source?: number;             // 8=Portal, telefoon=eigen ID
+  source?: number;             // ZONE 19: -1=Client Portal, 2=Telefoon, 4=Email, 8=Monitoring Alert, 15=Datto RMM, 16=SaaS Alerts (volledige lijst hierboven)
   issueType?: number;
   subIssueType?: number;
   ticketType?: number;

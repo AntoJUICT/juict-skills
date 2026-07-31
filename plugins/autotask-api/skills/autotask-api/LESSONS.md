@@ -20,6 +20,13 @@ Bekende valkuilen, fouten en hard-geleerde lessen bij werken met de Autotask RES
 
 **Verifieer altijd of een endpoint bestaat voor implementatie.** Test met een GET of check Swagger. Schrijf nooit een Autotask endpoint zonder verificatie als er geen werkend voorbeeld in de codebase staat.
 
+**Bereken response- en resolutietijd nooit zelf uit `createDate`/`completedDate`.** Dat is wall-clock inclusief nachten, weekenden en wachtstatussen — onvergelijkbaar met welke norm dan ook. Gebruik `ServiceLevelAgreementResults/query`; Autotask verrekent kantooruren en pauzes al. Zone 19 gaf 141,84 u wall-clock tegen 33,84 u op de SLA-klok voor hetzelfde ticket.
+- How to apply: onderscheid de SLA-**klok** (het meetinstrument, altijd bruikbaar) van de SLA-**norm** (`isResolutionMet`, de due-datums). De norm is de contractuele ondergrens en kan orden van grootte ruimer zijn dan een intern doel — bij JUICT een mediaan van 311 u tegen een doel van 30 min. Hang nooit een efficiency-KPI aan `isResolutionMet`.
+
+**Drie SLA-velden op het Ticket-entity lijken bruikbaar maar zijn leeg in zone 19.** `serviceLevelAgreementHasBeenMet`, `serviceLevelAgreementPausedNextEventHours` en `resolutionPlanDueDateTime` waren 0/713 gevuld. Gebruik `ServiceLevelAgreementResults` in plaats daarvan. `firstResponseDateTime`/`DueDateTime` en `resolvedDateTime`/`DueDateTime` zijn wél gevuld.
+
+**Autotask levert geen status- of queue-historie via REST.** Je ziet alleen de huidige stand per ticket. Een "hoeveel tickets zijn geëscaleerd"-vraag beantwoord je dus met een eindstand (in welke queue staat het ticket nu), niet met een overgang. Benoem dat verschil in rapportages; een ticket dat meteen in de tweede lijn is aangemaakt telt anders mee als escalatie.
+
 ---
 
 ## Filters / query-operators
@@ -78,7 +85,7 @@ Verkeerde resource+role combinatie → "The specified AssignedResourceID and Ass
 **Bij het afronden van een ticket hoort een `resolution` én een check op service calls.** `PATCH /Tickets` met `{ id, status: 5, resolution }` werkt ook op een change-ticket met `changeApprovalStatus` gezet. Service calls hangen als losse entity aan het ticket, dus controleer expliciet of ze dicht staan.
 - How to apply: `POST /ServiceCallTickets/query` op `ticketID`, dan per `serviceCallID` een `GET /ServiceCalls/{id}` en kijk naar `status` (2 = Complete). Een vaak herplande change heeft er meerdere; meld de stand voordat je zegt dat het ticket dicht is.
 
-**Zet altijd `ticketType` én `ticketCategory` bij het aanmaken van een ticket.** JUICT-conventie (zone 19): een change krijgt `ticketType: 4` (Change Request) met `ticketCategory: 117` (Minor Change) of `119` (Major Change); een incident `ticketType: 2` met `ticketCategory: 113`. De categorie bepaalt welke velden verplicht worden (zie de queueID-les hierboven) — laat je ze weg dan valt het ticket op "Standard" en klopt de layout in de UI niet.
+**Zet altijd `ticketType` én `ticketCategory` bij het aanmaken van een ticket.** JUICT-conventie (zone 19): een change krijgt `ticketType: 4` (Change Request) met `ticketCategory: 117` (Minor Change) of `119` (Major Change); een incident `ticketType: 2` met `ticketCategory: 113`. De categorie bepaalt welke velden verplicht worden (zie de queueID-les hierboven) — laat je ze weg dan valt het ticket op "Standard" en klopt de layout in de UI niet. Volledige categorie-picklist zone 19: 2 Datto RMM Alert, 3 Standard, 4 Datto Alert, 5 RMA, 6 Datto Networking Alert, 112 Standard Change, 113 Incident, 115 Problem, 117 Minor Change, 119 Major Change, 121 SaaS Alerts.
 
 **Ticket-descriptions volgen een vaste template per type** (JUICT-conventie, patroon uit xelion-transcriptie `src/lib/openai.ts`). Change:
 
@@ -165,9 +172,15 @@ AUTOTASK_SECRET='abc#def'    # # binnen single quotes = literal hekje
 - Retry op 429 en 5xx, NIET op 4xx (client errors)
 - Fetch resources altijd sequentieel (for-loop), NOOIT parallel met `Promise.all`
 
+**Een `UND_ERR_CONNECT_TIMEOUT` op de eerste call is meestal geen storing.** Node/undici hanteert 10s connect-timeout; een koude DNS/TLS-handshake naar `webservices19.autotask.net` duurde vanaf een werkplek 11,4s en faalde, waarna dezelfde verbinding 0,2s nam. Draai de call gewoon opnieuw voordat je aan credentials of firewalls gaat sleutelen — een `curl -sI` op de base-URL is de snelste bevestiging.
+
 ---
 
 ## Data-inconsistenties in API-responses
+
+**`Resources` heeft geen `departmentID` in zone 19, en `title` is vrije tekst.** Wie een medewerker aan een team of supportlijn wil koppelen, kan dat niet op de resource doen: `title` heeft geen picklist (waarden als "Support Engineer", "System Engineer" zonder lijnaanduiding) en een afdelingsveld ontbreekt. Gebruik de **ticket-queue** als as, niet de resource.
+
+**Filteren op `ticketType` vangt niet al het machineverkeer.** In zone 19 stonden 214 tickets met `source` 16 (SaaS Alerts) geregistreerd als `ticketType` 2 (Incident). Wil je alerts uitsluiten, filter dan op `ticketType === 5` **of** `source` in {8 Monitoring Alert, 15 Datto RMM, 16 SaaS Alerts}.
 
 **Tasks missen `completedPercentage` en `isCompleted` velden.** Bereken zelf: `estimatedHours - remainingHours`. Gebruik `status === 5` voor completed-check.
 
