@@ -71,12 +71,19 @@ De client gebruikt Key Vault zodra `AZURE_KEYVAULT_URL` gezet is, anders env var
 - `PATCH /Tickets` — bijwerken status/velden
 - `GET /Tickets/query` — zoeken op velden
 
+Actieve status-picklist (zone 19, geverifieerd 31-07-2026): 1 New, 5 Complete, 7 Waiting Customer, 8 In behandeling, 10 Afspraak gepland, 12 Wacht op leverancier, 13 Wacht op planning, 16 Autocomplete (RMM), 17 In de wacht, 19 Klantnotitie toegevoegd, 20 Notitie Toegevoegd (RMM), 21 Wacht op klant, 22 Wachten op goedkeuring, 23 Goedgekeurd, 24 Afgekeurd, 25 Wacht op administratie, 26 Werkzaamheden gepland, 27 Notitie toegevoegd.
+
 ### Ticket Notes (NESTED — zie LESSONS.md)
 - `POST /Tickets/{ticketId}/Notes` — note toevoegen
 - `GET /TicketNotes/query` — notes opzoeken
 
 ### Time Entries
 - `POST /TimeEntries` — tijdsregistratie aanmaken
+
+### Service Calls
+- `POST /ServiceCallTickets/query` — filter op `ticketID`, geeft per koppeling een `serviceCallID` (een herpland ticket heeft er meerdere)
+- `GET /ServiceCalls/{id}` — `startDateTime`, `endDateTime`, `duration`, `status`, `isComplete`
+- Status-picklist (zone 19): `1 = New`, `2 = Complete`, `101 = Canceled`, `102 = Canceled by Company`, `103 = Missed`
 
 ### Companies
 - `GET /Companies/{id}`

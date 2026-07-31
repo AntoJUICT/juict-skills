@@ -75,6 +75,9 @@ Verkeerde resource+role combinatie → "The specified AssignedResourceID and Ass
 
 **Tickets kunnen niet via `DELETE /Tickets/{id}` verwijderd worden — geeft 405.** Opruimen kan alleen door te sluiten: `PATCH /Tickets` met `status: 5` (Complete), of handmatig in de UI.
 
+**Bij het afronden van een ticket hoort een `resolution` én een check op service calls.** `PATCH /Tickets` met `{ id, status: 5, resolution }` werkt ook op een change-ticket met `changeApprovalStatus` gezet. Service calls hangen als losse entity aan het ticket, dus controleer expliciet of ze dicht staan.
+- How to apply: `POST /ServiceCallTickets/query` op `ticketID`, dan per `serviceCallID` een `GET /ServiceCalls/{id}` en kijk naar `status` (2 = Complete). Een vaak herplande change heeft er meerdere; meld de stand voordat je zegt dat het ticket dicht is.
+
 **Zet altijd `ticketType` én `ticketCategory` bij het aanmaken van een ticket.** JUICT-conventie (zone 19): een change krijgt `ticketType: 4` (Change Request) met `ticketCategory: 117` (Minor Change) of `119` (Major Change); een incident `ticketType: 2` met `ticketCategory: 113`. De categorie bepaalt welke velden verplicht worden (zie de queueID-les hierboven) — laat je ze weg dan valt het ticket op "Standard" en klopt de layout in de UI niet.
 
 **Ticket-descriptions volgen een vaste template per type** (JUICT-conventie, patroon uit xelion-transcriptie `src/lib/openai.ts`). Change:
