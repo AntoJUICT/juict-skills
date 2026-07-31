@@ -113,6 +113,39 @@ test("assertPathAllowed: tab/newline/CR omzeilen de blokkade niet, ook niet midd
   assert.throws(() => assertPathAllowed("/pass\rwords/12345"), /Geblokkeerd/);
 });
 
+test("assertPathAllowed: een control character binnen een escape omzeilt de blokkade niet", () => {
+  // Een tab/newline/CR midden in "%2F" breekt de letterlijke string-match, maar de URL-parser
+  // stript dat teken weg en levert alsnog "/passwords%2F12345" op. De controle moet daarom op de
+  // geparseerde pathname werken, niet op de ruwe invoerstring.
+  assert.throws(() => assertPathAllowed("/passwords%\t2F12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/passwords%2\tF12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/passwords%\n2F12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/passwords%\r5c12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/passwords%\t5C12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/pass\twords%\t2F12345"), /Geblokkeerd/);
+});
+
+test("assertPathAllowed: een pad met scheme of host wordt geweigerd", () => {
+  // De netwerklaag stuurt de API-key als header mee op wat dit pad ook oplevert, dus een pad dat
+  // naar een andere host wijst is key-exfiltratie. Alleen een zuiver relatief pad op onze eigen
+  // API mag door.
+  assert.throws(() => assertPathAllowed("https://evil.example/configurations"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("//evil.example/x"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("https://api.eu.itglue.com@evil.example/x"), /Geblokkeerd/);
+  // Varianten met backslash, hoofdletters, een tab in het scheme en een leidende spatie: de parser
+  // ziet die allemaal alsnog als scheme of authority.
+  assert.throws(() => assertPathAllowed("\\\\evil.example\\x"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/\\evil.example/x"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("HTTPS://evil.example/x"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("ht\ttps://evil.example/x"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed(" https://evil.example/x"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("http:/\\evil.example/x"), /Geblokkeerd/);
+  // Ook de eigen API als absolute URL is niet toegestaan: de guard heeft alleen een contract over
+  // relatieve paden, en zo kan ITGLUE_BASE_URL de controle nooit verzwakken. Bewust een letterlijke
+  // URL en niet BASE_URL, zodat deze test niet van een env var afhangt.
+  assert.throws(() => assertPathAllowed("https://api.eu.itglue.com/configurations"), /Geblokkeerd/);
+});
+
 test("assertPathAllowed: onparseerbare invoer wordt geweigerd (fail closed)", () => {
   // "//" is voor new URL() een network-path reference met een lege host, en dat gooit een
   // Invalid URL-fout. Een pad dat we niet kunnen beoordelen, keuren we niet goed.
@@ -120,58 +153,132 @@ test("assertPathAllowed: onparseerbare invoer wordt geweigerd (fail closed)", ()
   assert.throws(() => assertPathAllowed("//"), /Geblokkeerd/);
 });
 
-test("assertPathAllowed: guard en URL-parser zien exact dezelfde pathname", () => {
-  // Onafhankelijke oracle: bereken voor elke poging de pathname zoals de netwerklaag die
-  // straks daadwerkelijk zou gebruiken (new URL(pad, BASE_URL)), en leid daar zelf af of dat
-  // op de individuele password-resource uitkomt. De guard moet exact diezelfde paden weigeren
-  // en verder niets — dat vangt toekomstige omzeilingstrucs automatisch af, zonder dat we per
-  // teken een nieuwe regel hoeven toe te voegen.
-  function pathnameIsIndividueelPassword(pathname) {
-    const segmenten = pathname.toLowerCase().split("/").filter(Boolean);
-    const index = segmenten.indexOf("passwords");
-    return index !== -1 && index < segmenten.length - 1;
-  }
+// Onafhankelijke oracle, bewust anders opgeschreven dan de segmentlogica in de implementatie: een
+// simpele regex op de pathname die de netwerklaag straks daadwerkelijk zou gebruiken. Geen kopie van
+// heeftVerbodenPasswordSegment(), zodat een fout in die ene regel zich hier niet herhaalt.
+const RESOLVED_INDIVIDUEEL_PASSWORD = /(^|\/)passwords\/+[^/]/i;
 
+function oraclePathname(pad) {
+  try {
+    return new URL(pad, BASE_URL).pathname;
+  } catch {
+    return null;
+  }
+}
+
+test("oracle-sanity: de regex flagt /passwords/<id> en laat de collectie staan", () => {
+  // Als de oracle stilletjes altijd false zou opleveren, was de invariant hieronder leeg. Daarom
+  // eerst controleren dat de oracle zelf doet wat hij belooft.
+  assert.ok(RESOLVED_INDIVIDUEEL_PASSWORD.test(oraclePathname("/passwords/12345")));
+  assert.ok(RESOLVED_INDIVIDUEEL_PASSWORD.test(oraclePathname("/passwords\t/12345")));
+  assert.ok(RESOLVED_INDIVIDUEEL_PASSWORD.test(oraclePathname("/passwords//12345")));
+  assert.ok(!RESOLVED_INDIVIDUEEL_PASSWORD.test(oraclePathname("/passwords")));
+  assert.ok(!RESOLVED_INDIVIDUEEL_PASSWORD.test(oraclePathname("/passwords/")));
+  assert.ok(!RESOLVED_INDIVIDUEEL_PASSWORD.test(oraclePathname("/organizations/7/relationships/passwords")));
+});
+
+test("assertPathAllowed: elke bekende omzeiling wordt geweigerd", () => {
+  // Alle paden in deze lijst zijn omzeilingspogingen uit de opeenvolgende reviewrondes. Ze moeten
+  // allemaal geweigerd worden. Alleen deze richting is een harde invariant: er staat bewust GEEN
+  // omgekeerde assertie in (oracle vindt iets onschuldig, dus de guard mag het toestaan), want de
+  // string-normalisatielaag van de guard is met opzet strenger dan de URL-parser: %2F en %5C komen
+  // ongedecodeerd uit de parser, maar een server aan de andere kant leest ze wel als scheidingsteken.
+  // Legitieme paden staan daarom in hun eigen, expliciete lijst in de test hieronder.
   const pogingen = [
+    // ronde 0: het basisgeval
     "/passwords/12345",
+    "passwords/12345",
+    "/passwords/12345?include=related",
+    "/passwords?show_password=true",
+    // ronde 1: dubbele slash en gecodeerde slash
     "/passwords//12345",
+    "/passwords///12345",
+    "/passwords%2F12345",
+    "/passwords%2f12345",
+    // ronde 2: backslash, letterlijk en gecodeerd
     "/passwords\\12345",
+    "/passwords\\\\12345",
+    "/passwords/\\12345",
+    "/passwords\\/12345",
+    "/passwords%5C12345",
+    "/passwords%5c12345",
+    // ronde 3: tab, newline en CR, ook midden in het woord
     "/passwords\t/12345",
     "/pass\twords/1",
     "/passwords\n/12345",
     "/passwords\r/12345",
     "/pass\rwords/12345",
-    "/passwords?filter[organization_id]=7",
-    "/passwords/",
-    "/organizations/7/relationships/passwords",
-    "/configurations?page[size]=50",
-    "passwords/12345",
+    "/passwords?show%5Fpassword=true",
+    "//",
+    // ronde 4, bevinding 1: control character binnen de escape
+    "/passwords%\t2F12345",
+    "/passwords%2\tF12345",
+    "/passwords%\n2F12345",
+    "/passwords%\r5c12345",
+    "/passwords%\t5C12345",
+    "/pass\twords%\t2F12345",
+    // ronde 4, bevinding 2: scheme of host in het pad
+    "https://evil.example/configurations",
+    "//evil.example/x",
+    "https://api.eu.itglue.com@evil.example/x",
+    "\\\\evil.example\\x",
+    "/\\evil.example/x",
+    "HTTPS://evil.example/x",
+    "ht\ttps://evil.example/x",
+    " https://evil.example/x",
+    "http:/\\evil.example/x",
+    // eigen extra pogingen van deze ronde
+    "/PASSWORDS/12345",
+    "/./passwords/12345",
+    "/configurations/../passwords/12345",
+    "/organizations/7/relationships/passwords/12345",
+    "/passwords/12345#x",
+    "/passwords%2F%2F12345",
+    // Dot-segmenten: de parser rekent die weg, dus de oracle-pathname is hier onschuldig. De guard
+    // weigert ze toch, want een pad dat in zijn ruwe vorm de individuele password-resource aanspreekt
+    // is nooit legitiem.
+    "/passwords/../configurations",
+    "/passwords/%2e%2e/configurations",
   ];
 
   for (const pad of pogingen) {
-    const pathname = new URL(pad, BASE_URL).pathname;
-    const zouGeblokkeerdMoetenZijn = pathnameIsIndividueelPassword(pathname);
-    if (zouGeblokkeerdMoetenZijn) {
-      assert.throws(
-        () => assertPathAllowed(pad),
-        /Geblokkeerd/,
-        `verwachtte blokkade voor ${JSON.stringify(pad)} (pathname ${JSON.stringify(pathname)})`
-      );
-    } else {
-      assert.doesNotThrow(
-        () => assertPathAllowed(pad),
-        `verwachtte geen blokkade voor ${JSON.stringify(pad)} (pathname ${JSON.stringify(pathname)})`
-      );
-    }
+    const pathname = oraclePathname(pad);
+    const oracleFlagt = pathname !== null && RESOLVED_INDIVIDUEEL_PASSWORD.test(pathname);
+    assert.throws(
+      () => assertPathAllowed(pad),
+      /Geblokkeerd/,
+      oracleFlagt
+        ? `de oracle resolved ${JSON.stringify(pad)} naar ${JSON.stringify(pathname)}, dus de guard MOET blokkeren`
+        : `bekende omzeiling ${JSON.stringify(pad)} moet geblokkeerd blijven (oracle-pathname ${JSON.stringify(pathname)})`
+    );
   }
 });
 
-test("assertPathAllowed: toegestane paden komen ongewijzigd terug, ook na normalisatie-controle", () => {
-  assert.equal(assertPathAllowed("/passwords?filter[organization_id]=7"), "/passwords?filter[organization_id]=7");
-  assert.equal(
-    assertPathAllowed("/organizations/7/relationships/passwords"),
-    "/organizations/7/relationships/passwords"
-  );
+test("assertPathAllowed: legitieme paden worden toegestaan en byte-identiek teruggegeven", () => {
+  // Expliciete lijst in plaats van een omgekeerde assertie op de oracle: dit zijn de paden die de
+  // netwerklaag echt gebruikt, en die moeten onveranderd terugkomen zodat de URL er 1-op-1 mee
+  // gebouwd kan worden. Een pad zonder leidende slash hoort daar ook bij.
+  const legitiem = [
+    "/organizations/7/relationships/passwords",
+    "/passwords",
+    "/passwords/",
+    "/passwords?filter[organization_id]=7",
+    "/configurations?filter[name]=100%",
+    "/configurations?page[size]=50",
+    "/flexible_assets?filter[organization_id]=7",
+    "/organizations?filter[name]=JUICT B.V.",
+    "/password_categories",
+    "configurations?page[size]=50",
+    "/passwords?page[size]=50&page[number]=2",
+  ];
+
+  for (const pad of legitiem) {
+    assert.equal(
+      assertPathAllowed(pad),
+      pad,
+      `legitiem pad ${JSON.stringify(pad)} moet toegestaan zijn en byte-identiek terugkomen`
+    );
+  }
 });
 
 test("assertPathAllowed: een losse % in de query gooit geen decodeerfout", () => {

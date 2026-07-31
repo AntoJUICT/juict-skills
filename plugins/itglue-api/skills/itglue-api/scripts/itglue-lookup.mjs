@@ -61,13 +61,17 @@ const GEBLOKKEERD_PASSWORD =
 const GEBLOKKEERD_SHOW_PASSWORD = "Geblokkeerd: de parameter show_password is niet toegestaan.";
 const GEBLOKKEERD_ONPARSEERBAAR =
   "Geblokkeerd: het pad kon niet als URL geïnterpreteerd worden en wordt daarom geweigerd " +
-  "(fail closed) — een pad dat we niet kunnen beoordelen laten we niet door.";
+  "(fail closed): een pad dat we niet kunnen beoordelen laten we niet door.";
+const GEBLOKKEERD_HOST =
+  "Geblokkeerd: alleen een relatief pad op onze eigen IT Glue API is toegestaan. Dit pad bevat " +
+  "een scheme of een host, en de netwerklaag stuurt de API-key als header mee: een request naar " +
+  "een andere host zou die key weggeven.";
 
-// Alleen voor de goedkope voorcontrole, niet voor het teruggegeven pad: %2f/%2F en %5c/%5C
-// zijn gecodeerde scheidingstekens die de WHATWG URL-parser hieronder NIET decodeert (die
-// laat percent-encoding in het pad met rust), maar die IT Glue's eigen server mogelijk wel
-// als "/" interpreteert. Dubbele/drievoudige letterlijke slashes horen hier ook bij. Bewust
-// geen decodeURIComponent() op het hele pad: dat gooit op een losse "%" (bijv. "100%" in een
+// Extra normalisatie bovenop de geparseerde pathname, alleen voor de controle en nooit voor het
+// teruggegeven pad: %2f/%2F en %5c/%5C zijn gecodeerde scheidingstekens die de WHATWG URL-parser
+// NIET decodeert (die laat percent-encoding in het pad met rust), maar die IT Glue's eigen server
+// mogelijk wel als "/" interpreteert. Dubbele/drievoudige letterlijke slashes horen hier ook bij.
+// Bewust geen decodeURIComponent() op het hele pad: dat gooit op een losse "%" (bijv. "100%" in een
 // filterwaarde). Alle vervangingen hieronder zijn letterlijke, veilige string-replaces die
 // nooit kunnen gooien. Backslash wordt eerst omgezet, vóór de slash-samenvoeging, anders
 // glipt "/passwords\/12345" er nog tussendoor.
@@ -79,17 +83,33 @@ function padVoorControle(pad) {
     .replace(/\/{2,}/g, "/");
 }
 
-// Vaste, veilige basis om de controle-URL te bouwen — expliciet LOS van BASE_URL/ITGLUE_BASE_URL.
+// Vaste, veilige basis om de controle-URL te bouwen, expliciet LOS van BASE_URL/ITGLUE_BASE_URL.
 // Die env var komt uit configuratie en zou in theorie iets geks kunnen bevatten (een pad, een
 // vreemde host); de blokkade mag daar niet van afhangen. Alleen een geldige absolute basis is
 // nodig zodat een relatief pad hetzelfde resolved als tegen een root-basis als BASE_URL. ".invalid"
 // is gereserveerd (RFC 2606) en resolved bewust nooit ergens naartoe.
 const CONTROLE_BASIS = "https://itglue-guard.invalid/";
+const CONTROLE_ORIGIN = new URL(CONTROLE_BASIS).origin;
+
+// De URL-parser verwijdert tab, newline en carriage return overal uit de invoer en negeert
+// leidende controletekens en spaties. Voor de scheme/host-controle moeten we dus naar de invoer
+// kijken zoals de parser die ziet, anders verstopt "ht\ttps://evil.example/x" zich achter een tab.
+function invoerZoalsParserDieZiet(pad) {
+  return String(pad ?? "")
+    .replace(/[\t\n\r]/g, "")
+    .replace(/^[\u0000-\u0020]+/, "");
+}
+
+// Een zuiver relatief pad heeft geen scheme ("https:", "data:", ...) en begint niet met twee
+// scheidingstekens ("//host", "\\host", "/\host"), want dat is een authority. Beide vormen laten
+// de netwerklaag naar een vreemde host praten, met onze API-key in de header.
+const HEEFT_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+const BEGINT_MET_AUTHORITY = /^[/\\]{2}/;
 
 // Gezaghebbende controle: bouwt de URL exact zoals de netwerklaag straks doet (new URL(pad, base))
 // en toetst op wat fetch() daadwerkelijk gebruikt. Dat vangt automatisch alles wat de WHATWG
-// URL-parser normaliseert of stript — tab/newline/CR worden overal uit de invoer verwijderd
-// (spec-gedrag, ook midden in "passwords"), en een letterlijke backslash wordt naar "/" omgezet —
+// URL-parser normaliseert of stript: tab/newline/CR worden overal uit de invoer verwijderd
+// (spec-gedrag, ook midden in "passwords"), en een letterlijke backslash wordt naar "/" omgezet,
 // zonder dat wij zelf een zwarte lijst van zulke tekens moeten bijhouden.
 function heeftVerbodenPasswordSegment(pathname) {
   const segmenten = pathname.toLowerCase().split("/").filter(Boolean);
@@ -102,36 +122,63 @@ function heeftVerbodenPasswordSegment(pathname) {
 export function assertPathAllowed(path) {
   const p = String(path ?? "");
 
-  // Laag 1: goedkope voorcontrole op de ruwe string (vangt %2f/%5c, zie padVoorControle hierboven).
-  const teControleren = padVoorControle(p);
-  const padZonderQuery = teControleren.split("?")[0];
-  if (VERBODEN_PASSWORD_PAD.test(padZonderQuery)) {
-    throw new Error(GEBLOKKEERD_PASSWORD);
-  }
-  if (/show_password/i.test(teControleren)) {
-    throw new Error(GEBLOKKEERD_SHOW_PASSWORD);
-  }
-
-  // Laag 2: de gezaghebbende controle op de daadwerkelijk geparseerde URL. Fail closed: een pad
-  // dat niet te parsen is, keuren we niet goed.
+  // Eerst parsen, want de parser bepaalt wat de netwerklaag straks werkelijk opvraagt. Fail closed:
+  // een pad dat niet te parsen is, keuren we niet goed.
   let url;
   try {
     url = new URL(p, CONTROLE_BASIS);
   } catch {
     throw new Error(GEBLOKKEERD_ONPARSEERBAAR);
   }
+
+  // Host-controle: alleen een zuiver relatief pad op onze eigen API mag door. Een scheme of een
+  // authority in de invoer stuurt het request naar een vreemde host, en de netwerklaag plakt onze
+  // API-key als header op elk request: dat is key-exfiltratie. De origin-vergelijking gebeurt tegen
+  // CONTROLE_BASIS en bewust niet tegen BASE_URL, zodat de env var ITGLUE_BASE_URL deze controle
+  // nooit kan verzwakken. Een pad zonder leidende slash ("configurations?page[size]=50") is wel
+  // legitiem en resolved gewoon binnen dezelfde origin.
+  const invoer = invoerZoalsParserDieZiet(p);
+  if (HEEFT_SCHEME.test(invoer) || BEGINT_MET_AUTHORITY.test(invoer) || url.origin !== CONTROLE_ORIGIN) {
+    throw new Error(GEBLOKKEERD_HOST);
+  }
+
+  // Laag 1a: string-normalisatie op de GEPARSEERDE pathname, niet op de ruwe invoerstring. Op de
+  // ruwe string breekt een control character binnen een escape ("/passwords%\t2F12345") de
+  // letterlijke match, terwijl de parser dat teken juist wegstript en er alsnog
+  // "/passwords%2F12345" van maakt. Deze laag blijft nodig omdat de parser %2F/%5C niet decodeert,
+  // maar de server aan de andere kant dat wel als scheidingsteken kan lezen.
+  const genormaliseerdePad = padVoorControle(url.pathname);
+  if (VERBODEN_PASSWORD_PAD.test(genormaliseerdePad) || heeftVerbodenPasswordSegment(genormaliseerdePad)) {
+    throw new Error(GEBLOKKEERD_PASSWORD);
+  }
+
+  // Laag 1b: dezelfde controle nog een keer op de ruwe invoer, met de query eraf. Dit is puur extra
+  // strengheid: de parser rekent dot-segmenten weg, dus "/passwords/../configurations" komt als
+  // "/configurations" uit laag 1a. Zo'n pad is nooit legitiem, dus we weigeren het toch. Deze laag
+  // kan alleen extra blokkeren, nooit iets goedkeuren dat laag 1a of 2 zou weigeren.
+  const ruwePad = padVoorControle(invoer.split(/[?#]/)[0]);
+  if (VERBODEN_PASSWORD_PAD.test(ruwePad) || heeftVerbodenPasswordSegment(ruwePad)) {
+    throw new Error(GEBLOKKEERD_PASSWORD);
+  }
+
+  // Laag 2: de gezaghebbende segmentcontrole op de pathname zoals de parser die oplevert.
   if (heeftVerbodenPasswordSegment(url.pathname)) {
     throw new Error(GEBLOKKEERD_PASSWORD);
   }
-  // Case-insensitief en op de gedecodeerde parameternaam, zodat bijv. show%5Fpassword ook telt.
+
+  // show_password: op de gedecodeerde parameternamen (zodat bijv. show%5Fpassword ook telt) en voor
+  // de zekerheid ook op de ruwe invoer, want geen enkel legitiem pad bevat dit woord.
   for (const sleutel of url.searchParams.keys()) {
-    if (sleutel.toLowerCase() === "show_password") {
+    if (sleutel.toLowerCase().includes("show_password")) {
       throw new Error(GEBLOKKEERD_SHOW_PASSWORD);
     }
   }
+  if (/show_password/i.test(invoer)) {
+    throw new Error(GEBLOKKEERD_SHOW_PASSWORD);
+  }
 
-  // Beide lagen akkoord: geef het oorspronkelijke, byte-identieke pad terug. De netwerklaag
-  // bouwt daar de echte request-URL mee, niet met de genormaliseerde controle-versie.
+  // Alle lagen akkoord: geef het oorspronkelijke, byte-identieke pad terug. De netwerklaag bouwt
+  // daar de echte request-URL mee, niet met de genormaliseerde controle-versie.
   return p;
 }
 
