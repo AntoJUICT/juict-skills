@@ -665,3 +665,50 @@ test("runSubcommand: 404 op docs geeft een duidelijke fout, geen lege lijst", as
     /IT Glue API fout 404/
   );
 });
+
+// Regressietest op de filternaam van flexible assets. Filters gaan bij IT Glue in snake_case
+// (flexible_asset_type_id), terwijl de attribuutsleutels in de RESPONS kebab-case zijn
+// (flexible-asset-type-name). Die twee zijn eerder verwisseld; de kebab-vorm als filter geeft geen
+// treffers en dat is een stille lege lijst in plaats van een fout.
+test("runSubcommand: assets filtert op filter[flexible_asset_type_id] in snake_case", async () => {
+  const opgevraagd = [];
+  const assets = {
+    data: [
+      {
+        id: "900",
+        attributes: { name: "Backup Office 365", "flexible-asset-type-name": "Backup" },
+      },
+    ],
+    meta: { "next-page": null },
+  };
+  const routes = fakeApi({ "/organizations": ORG_RESPONS, "/flexible_assets": assets });
+
+  const { soort, rijen } = await runSubcommand(["assets", "juict bv", "12"], {
+    key: "k",
+    fetchImpl: async (url, init) => {
+      opgevraagd.push(url);
+      return routes(url, init);
+    },
+  });
+
+  assert.equal(soort, "assets");
+  assert.equal(rijen[0].naam, "Backup Office 365");
+  assert.equal(rijen[0].type, "Backup");
+
+  // URLSearchParams percent-encodeert de blokhaken (filter%5B...%5D), dus eerst decoderen voordat
+  // we op de leesbare filternaam asserten.
+  const assetCall = opgevraagd.map((u) => decodeURIComponent(u)).find((u) => u.includes("/flexible_assets"));
+  assert.ok(assetCall, "er moet een call naar /flexible_assets zijn gegaan");
+  assert.ok(
+    assetCall.includes("filter[flexible_asset_type_id]=12"),
+    `filternaam moet snake_case zijn, kreeg: ${assetCall}`
+  );
+  assert.ok(
+    !assetCall.includes("filter[flexible-asset-type-id]"),
+    `de kebab-vorm van de filternaam mag niet meer gebruikt worden, kreeg: ${assetCall}`
+  );
+  assert.ok(
+    assetCall.includes("filter[organization_id]=7"),
+    `beide filters zijn nodig bij flexible assets, kreeg: ${assetCall}`
+  );
+});

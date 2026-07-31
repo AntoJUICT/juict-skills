@@ -413,8 +413,12 @@ export async function runSubcommand(argv, opts) {
   }
 
   if (subcommando === "assets") {
+    // Filternamen zijn snake_case (flexible_asset_type_id), ook al zijn de ATTRIBUUTsleutels in de
+    // respons kebab-case (flexible-asset-type-name). De kebab-vorm als filter levert geen treffers.
+    // Let op: IT Glue vraagt voor flexible assets om BEIDE filters; alleen op organization_id
+    // filteren geeft een lege collectie. Geef dus altijd een asset-type-id mee (zie REFERENCE.md).
     const assetFilters = { organization_id: org.id };
-    if (rest[1]) assetFilters["flexible-asset-type-id"] = rest[1];
+    if (rest[1]) assetFilters["flexible_asset_type_id"] = rest[1];
     const items = await fetchAllItGlue("flexible_assets", { ...opts, filters: assetFilters });
     return {
       soort: "assets",
