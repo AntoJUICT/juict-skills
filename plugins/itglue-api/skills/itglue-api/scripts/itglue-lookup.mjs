@@ -2,9 +2,11 @@
 // Standalone read-only IT Glue lookup-CLI. Geen npm-deps; Node 18+ (fetch ingebouwd).
 // Key uit Key Vault via `az`, met env-var fallback. Nooit de key of een wachtwoord loggen.
 //
-// Harde regel: wachtwoordwaarden worden niet opgehaald. Onze API-key heeft geen
-// password-access, en een wachtwoord in een transcript is een incident. Bij een
-// wachtwoordvraag levert dit script alleen de naam van het item en een deeplink.
+// Harde regel, en wel als beleid en niet als technische aanname: wachtwoordwaarden worden niet
+// opgehaald. De opdrachtgever heeft vastgelegd dat password-access voor deze toepassing uit staat,
+// en een wachtwoordwaarde in een transcript of logbestand is een incident. Bij een wachtwoordvraag
+// levert dit script alleen de naam van het item en een deeplink. Wat de API zou teruggeven doet
+// hier niet toe: de blokkade geldt onvoorwaardelijk.
 
 import { execSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
@@ -58,9 +60,11 @@ export function pickExactOrg(orgs, zoekterm) {
 const VERBODEN_PASSWORD_PAD = /(^|\/)passwords\/[^/#]+/i;
 
 const GEBLOKKEERD_PASSWORD =
-  "Geblokkeerd: de individuele password-resource mag niet opgevraagd worden. " +
-  "Onze API-key heeft geen password-access. Gebruik het collectie-endpoint om het " +
-  "item te vinden en lever de deeplink via passwordDeeplink().";
+  "Geblokkeerd: de individuele password-resource mag niet opgevraagd worden. Dit is beleid: " +
+  "wachtwoordwaarden halen we niet op, password-access staat voor deze toepassing uit, en een " +
+  "wachtwoordwaarde in een transcript of logbestand is een incident. De blokkade geldt dus " +
+  "onafhankelijk van wat de API zou teruggeven. Gebruik het collectie-endpoint om het item te " +
+  "vinden en lever de deeplink via passwordDeeplink().";
 const GEBLOKKEERD_SHOW_PASSWORD = "Geblokkeerd: de parameter show_password is niet toegestaan.";
 const GEBLOKKEERD_ONPARSEERBAAR =
   "Geblokkeerd: het pad kon niet als URL geïnterpreteerd worden en wordt daarom geweigerd " +
@@ -435,6 +439,53 @@ export async function runSubcommand(argv, opts) {
   return { soort: "password-link", rijen: passwordTreffers(items, org.id, zoekterm) };
 }
 
+// Bewust klein: bij een collectie met meer dan twee items is er dan echt een volgende pagina, en
+// alleen dán laat meta zien welke sleutel IT Glue voor "volgende pagina" gebruikt. Dat is het punt
+// van --raw: het is de enige manier om die sleutelnaam te controleren zonder de code te wijzigen.
+export const RAW_PAGE_SIZE = 2;
+
+// Welke resource en filters horen bij een subcommando. Apart van runSubcommand() zodat --raw
+// exact dezelfde call doet als het subcommando zelf, in plaats van een eigen pad te verzinnen.
+export async function rawDoel(argv, opts) {
+  const [subcommando, ...rest] = argv;
+  if (!SUBCOMMANDS.includes(subcommando)) {
+    throw new Error(`Onbekend subcommando "${subcommando ?? ""}". Geldig: ${SUBCOMMANDS.join(", ")}.`);
+  }
+
+  // Geen ruwe dump van password-items. De rest van dit script laat van een password-item alleen
+  // naam en deeplink door (passwordTreffers), en --raw zou dat filter juist omzeilen: precies de
+  // reden dat die whitelist er is. Beleid boven nieuwsgierigheid.
+  if (subcommando === "password-link") {
+    throw new Error(
+      "Geblokkeerd: --raw is niet toegestaan op password-link. Een ruwe dump van password-items " +
+        "omzeilt de whitelist die alleen naam en deeplink doorlaat. Gebruik password-link zonder " +
+        "--raw, of inspecteer een andere resource."
+    );
+  }
+
+  if (subcommando === "org") {
+    const term = String(rest[0] ?? "").trim();
+    if (!term) throw new Error("Geef een organisatie op (naam of id).");
+    return { resource: "organizations", filters: { name: term } };
+  }
+
+  const org = await resolveOrg(rest[0], opts);
+  const filters = { organization_id: org.id };
+  if (subcommando === "configs") return { resource: "configurations", filters };
+  if (subcommando === "contacts") return { resource: "contacts", filters };
+  if (subcommando === "docs") return { resource: "documents", filters };
+  if (rest[1]) filters["flexible_asset_type_id"] = rest[1];
+  return { resource: "flexible_assets", filters };
+}
+
+// Haalt de ruwe JSON:API-body van de EERSTE pagina op, inclusief meta en links. Geen paginatie:
+// hier gaat het om de vorm van de respons, niet om de volledige lijst.
+export async function runRaw(argv, opts) {
+  const { resource, filters } = await rawDoel(argv, opts);
+  const query = buildQuery(filters, { pageSize: RAW_PAGE_SIZE, pageNumber: 1 });
+  return igFetch(`${resource}${query}`, opts);
+}
+
 function filterOpNaam(items, zoekterm, naamVan = (i) => i?.attributes?.name ?? "") {
   if (!zoekterm) return items;
   return items.filter((i) => String(naamVan(i)).toLowerCase().includes(zoekterm));
@@ -498,7 +549,7 @@ const KOLOMMEN = {
   "password-link": ["naam", "link"],
 };
 
-const GEBRUIK = `Gebruik: node itglue-lookup.mjs <subcommando> <organisatie> [zoekterm] [--json]
+const GEBRUIK = `Gebruik: node itglue-lookup.mjs <subcommando> <organisatie> [zoekterm] [--json|--raw]
 
   org <naam>                     organisaties zoeken op naam
   configs <org> [zoekterm]       configuraties (servers, netwerk, endpoints)
@@ -507,17 +558,37 @@ const GEBRUIK = `Gebruik: node itglue-lookup.mjs <subcommando> <organisatie> [zo
   assets <org> [asset-type-id]   flexible assets
   password-link <org> <term>     naam en deeplink van een wachtwoord-item
 
+  --json   de verwerkte rijen als JSON in plaats van een tabel
+  --raw    de ruwe JSON:API-body van de eerste pagina, inclusief meta en links.
+           Voor het verifieren van de responsvorm: welke meta-sleutel de volgende
+           pagina aangeeft, hoe de attribuutsleutels heten, hoeveel items er zijn.
+           Paginagrootte staat op ${RAW_PAGE_SIZE} zodat er echt een volgende pagina is.
+           Niet toegestaan op password-link.
+
 Read-only. Wachtwoordwaarden worden nooit opgehaald: password-link geeft
 alleen de naam van het item en een link naar IT Glue.`;
 
 async function main() {
-  const argv = process.argv.slice(2).filter((a) => a !== "--json");
-  const alsJson = process.argv.includes("--json");
+  const meegegeven = process.argv.slice(2);
+  const argv = meegegeven.filter((a) => a !== "--json" && a !== "--raw");
+  const alsJson = meegegeven.includes("--json");
+  const alsRaw = meegegeven.includes("--raw");
   if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
     console.log(GEBRUIK);
     return;
   }
-  const { soort, rijen } = await runSubcommand(argv, { key: getApiKey() });
+
+  const key = getApiKey();
+
+  if (alsRaw) {
+    // redactSecrets als vangnet: de key hoort niet in een responsbody te staan, maar een ruwe dump
+    // die we ongefilterd naar de console schrijven is precies de plek om dat niet aan te nemen.
+    const body = await runRaw(argv, { key });
+    console.log(redactSecrets(JSON.stringify(body, null, 2), key));
+    return;
+  }
+
+  const { soort, rijen } = await runSubcommand(argv, { key });
   if (alsJson) {
     console.log(JSON.stringify(rijen, null, 2));
     return;

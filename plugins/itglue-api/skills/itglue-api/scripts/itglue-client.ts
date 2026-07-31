@@ -3,9 +3,11 @@ import { getSecret } from "./azure-keyvault";
 // IT Glue REST API client (read-only) met Key Vault-auth in productie en env-var
 // fallback lokaal. Zie REFERENCE.md voor endpoints en LESSONS.md voor valkuilen.
 //
-// Harde regel: wachtwoordwaarden worden niet opgehaald. Onze API-key heeft geen
-// password-access, en een wachtwoordwaarde in logs of een transcript is een incident.
-// Gebruik passwordDeeplink() en lever een link naar IT Glue.
+// Harde regel, en wel als beleid en niet als technische aanname: wachtwoordwaarden worden niet
+// opgehaald. De opdrachtgever heeft vastgelegd dat password-access voor deze toepassing uit staat,
+// en een wachtwoordwaarde in een transcript of logbestand is een incident. Wat de API zou
+// teruggeven doet hier niet toe: de blokkade geldt onvoorwaardelijk. Gebruik passwordDeeplink()
+// en lever een link naar IT Glue.
 //
 // Dit bestand is bedoeld om te kopieren naar een Next.js-project: geen import buiten
 // ./azure-keyvault, zodat het zelfstandig werkt.
@@ -48,9 +50,11 @@ function releaseSlot(): void {
 const VERBODEN_PASSWORD_PAD = /(^|\/)passwords\/[^/#]+/i;
 
 const GEBLOKKEERD_PASSWORD =
-  "Geblokkeerd: de individuele password-resource mag niet opgevraagd worden. " +
-  "Onze API-key heeft geen password-access. Gebruik het collectie-endpoint om het " +
-  "item te vinden en lever de deeplink via passwordDeeplink().";
+  "Geblokkeerd: de individuele password-resource mag niet opgevraagd worden. Dit is beleid: " +
+  "wachtwoordwaarden halen we niet op, password-access staat voor deze toepassing uit, en een " +
+  "wachtwoordwaarde in een transcript of logbestand is een incident. De blokkade geldt dus " +
+  "onafhankelijk van wat de API zou teruggeven. Gebruik het collectie-endpoint om het item te " +
+  "vinden en lever de deeplink via passwordDeeplink().";
 const GEBLOKKEERD_SHOW_PASSWORD = "Geblokkeerd: de parameter show_password is niet toegestaan.";
 const GEBLOKKEERD_ONPARSEERBAAR =
   "Geblokkeerd: het pad kon niet als URL geïnterpreteerd worden en wordt daarom geweigerd " +

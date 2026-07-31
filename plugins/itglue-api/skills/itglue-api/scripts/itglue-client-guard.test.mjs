@@ -261,7 +261,7 @@ test("guard: het blok voert de aanvalsvectoren uit taak 2 daadwerkelijk uit", as
     "/passwords?filter[organization_id]=7",
     "configurations?page[size]=50",
     "/organizations/7/relationships/passwords",
-    "/flexible_assets?filter[flexible-asset-type-id]=12&page[number]=2",
+    "/flexible_assets?filter[flexible_asset_type_id]=12&page[number]=2",
   ];
   for (const pad of MOET_DOOR) {
     assert.equal(

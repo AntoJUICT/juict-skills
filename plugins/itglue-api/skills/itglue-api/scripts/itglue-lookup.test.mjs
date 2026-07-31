@@ -14,6 +14,9 @@ import {
   resolveOrg,
   formatTabel,
   runSubcommand,
+  rawDoel,
+  runRaw,
+  RAW_PAGE_SIZE,
 } from "./itglue-lookup.mjs";
 
 test("normalizeOrgName: strippt rechtsvorm, leestekens en dubbele spaties", () => {
@@ -711,4 +714,85 @@ test("runSubcommand: assets filtert op filter[flexible_asset_type_id] in snake_c
     assetCall.includes("filter[organization_id]=7"),
     `beide filters zijn nodig bij flexible assets, kreeg: ${assetCall}`
   );
+});
+
+// --raw is het afvinkgereedschap voor de openstaande punten in REFERENCE.md: zonder een manier om
+// de ruwe body te zien is de naam van de meta-sleutel voor de volgende pagina niet te controleren
+// en is elk "kijk naar de ruwe meta"-advies in de documentatie een dood commando.
+test("runRaw: geeft de ruwe JSON:API-body van de eerste pagina terug, inclusief meta", async () => {
+  const body = {
+    data: [{ id: "100", type: "configurations", attributes: { name: "SRV-DC01" } }],
+    meta: { "current-page": 1, "next-page": 2, "total-count": 3 },
+    links: { next: "https://api.eu.itglue.com/configurations?page[number]=2" },
+  };
+  const opgevraagd = [];
+  const uit = await runRaw(["configs", "juict bv"], {
+    key: "k",
+    fetchImpl: async (url, init) => {
+      opgevraagd.push(url);
+      if (url.includes("/organizations")) return nepRespons({ body: ORG_RESPONS });
+      return nepRespons({ body });
+    },
+  });
+
+  // De volledige body komt onbewerkt terug: meta en links horen erbij, want daar is het om te doen.
+  assert.deepEqual(uit, body);
+  assert.deepEqual(uit.meta, { "current-page": 1, "next-page": 2, "total-count": 3 });
+  assert.ok(uit.links, "links hoort in de ruwe body te blijven staan");
+
+  const call = decodeURIComponent(opgevraagd.find((u) => u.includes("/configurations")));
+  assert.ok(call.includes("filter[organization_id]=7"), `verwachtte het org-filter, kreeg: ${call}`);
+  assert.ok(call.includes("page[number]=1"), `--raw haalt alleen de eerste pagina, kreeg: ${call}`);
+  assert.ok(
+    call.includes(`page[size]=${RAW_PAGE_SIZE}`),
+    `--raw hoort een kleine paginagrootte te gebruiken, kreeg: ${call}`
+  );
+});
+
+test("runRaw: doet precies één call na het oplossen van de organisatie, geen paginatie", async () => {
+  const paginas = [];
+  await runRaw(["contacts", "7"], {
+    key: "k",
+    fetchImpl: async (url) => {
+      paginas.push(url);
+      // Een meta die naar een volgende pagina wijst: runRaw mag die NIET gaan volgen.
+      return nepRespons({ body: { data: [{ id: "1" }, { id: "2" }], meta: { "next-page": 2 } } });
+    },
+  });
+  assert.equal(paginas.length, 1, `verwachtte één call, kreeg: ${JSON.stringify(paginas)}`);
+});
+
+test("runRaw: weigert password-link, want dat zou de naam-en-link-whitelist omzeilen", async () => {
+  let gebeld = false;
+  await assert.rejects(
+    () =>
+      runRaw(["password-link", "juict bv", "firewall"], {
+        key: "k",
+        fetchImpl: async () => {
+          gebeld = true;
+          return nepRespons({ body: ORG_RESPONS });
+        },
+      }),
+    /Geblokkeerd.*--raw/s
+  );
+  assert.equal(gebeld, false, "een geweigerde --raw mag geen enkel request veroorzaken");
+});
+
+test("rawDoel: koppelt elk toegestaan subcommando aan de juiste resource", async () => {
+  const opts = { key: "k", fetchImpl: fakeApi({ "/organizations": ORG_RESPONS }) };
+  assert.deepEqual(await rawDoel(["org", "JUICT"], opts), {
+    resource: "organizations",
+    filters: { name: "JUICT" },
+  });
+  assert.equal((await rawDoel(["configs", "7"], opts)).resource, "configurations");
+  assert.equal((await rawDoel(["contacts", "7"], opts)).resource, "contacts");
+  assert.equal((await rawDoel(["docs", "7"], opts)).resource, "documents");
+
+  const assets = await rawDoel(["assets", "7", "12"], opts);
+  assert.equal(assets.resource, "flexible_assets");
+  assert.deepEqual(assets.filters, { organization_id: "7", flexible_asset_type_id: "12" });
+});
+
+test("rawDoel: onbekend subcommando geeft dezelfde fout als runSubcommand", async () => {
+  await assert.rejects(() => rawDoel(["wachtwoord-dumpen", "juict"], { key: "k" }), /Onbekend subcommando/);
 });
