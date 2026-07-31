@@ -41,6 +41,11 @@
       "name": "site-scraper",
       "source": "./plugins/site-scraper",
       "description": "Technische opbouw van een website in kaart brengen — framework, sitemap/routes en backend API-endpoints, ook achter login."
+    },
+    {
+      "name": "itglue-api",
+      "source": "./plugins/itglue-api",
+      "description": "Werken met de IT Glue REST API in JUICT-projecten — Key Vault-auth, read-only lookups, endpoints en valkuilen; wachtwoorden alleen als deeplink."
     }
   ]
 }
