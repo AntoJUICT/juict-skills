@@ -8,6 +8,7 @@ import {
   passwordTreffers,
   buildQuery,
   redactSecrets,
+  BASE_URL,
 } from "./itglue-lookup.mjs";
 
 test("normalizeOrgName: strippt rechtsvorm, leestekens en dubbele spaties", () => {
@@ -101,6 +102,70 @@ test("assertPathAllowed: backslash die niets met passwords te maken heeft mag we
   );
 });
 
+test("assertPathAllowed: tab/newline/CR omzeilen de blokkade niet, ook niet midden in het woord", () => {
+  // De WHATWG URL-parser verwijdert ASCII tab, newline en carriage return overal uit de
+  // invoer (spec-gedrag), dus "/pass\twords/1" wordt voor fetch()/new URL() gewoon
+  // "/passwords/1". De geparseerde controle in assertPathAllowed moet dat zelf ook zien.
+  assert.throws(() => assertPathAllowed("/passwords\t/12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/pass\twords/1"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/passwords\n/12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/passwords\r/12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/pass\rwords/12345"), /Geblokkeerd/);
+});
+
+test("assertPathAllowed: onparseerbare invoer wordt geweigerd (fail closed)", () => {
+  // "//" is voor new URL() een network-path reference met een lege host, en dat gooit een
+  // Invalid URL-fout. Een pad dat we niet kunnen beoordelen, keuren we niet goed.
+  assert.throws(() => new URL("//", BASE_URL));
+  assert.throws(() => assertPathAllowed("//"), /Geblokkeerd/);
+});
+
+test("assertPathAllowed: guard en URL-parser zien exact dezelfde pathname", () => {
+  // Onafhankelijke oracle: bereken voor elke poging de pathname zoals de netwerklaag die
+  // straks daadwerkelijk zou gebruiken (new URL(pad, BASE_URL)), en leid daar zelf af of dat
+  // op de individuele password-resource uitkomt. De guard moet exact diezelfde paden weigeren
+  // en verder niets — dat vangt toekomstige omzeilingstrucs automatisch af, zonder dat we per
+  // teken een nieuwe regel hoeven toe te voegen.
+  function pathnameIsIndividueelPassword(pathname) {
+    const segmenten = pathname.toLowerCase().split("/").filter(Boolean);
+    const index = segmenten.indexOf("passwords");
+    return index !== -1 && index < segmenten.length - 1;
+  }
+
+  const pogingen = [
+    "/passwords/12345",
+    "/passwords//12345",
+    "/passwords\\12345",
+    "/passwords\t/12345",
+    "/pass\twords/1",
+    "/passwords\n/12345",
+    "/passwords\r/12345",
+    "/pass\rwords/12345",
+    "/passwords?filter[organization_id]=7",
+    "/passwords/",
+    "/organizations/7/relationships/passwords",
+    "/configurations?page[size]=50",
+    "passwords/12345",
+  ];
+
+  for (const pad of pogingen) {
+    const pathname = new URL(pad, BASE_URL).pathname;
+    const zouGeblokkeerdMoetenZijn = pathnameIsIndividueelPassword(pathname);
+    if (zouGeblokkeerdMoetenZijn) {
+      assert.throws(
+        () => assertPathAllowed(pad),
+        /Geblokkeerd/,
+        `verwachtte blokkade voor ${JSON.stringify(pad)} (pathname ${JSON.stringify(pathname)})`
+      );
+    } else {
+      assert.doesNotThrow(
+        () => assertPathAllowed(pad),
+        `verwachtte geen blokkade voor ${JSON.stringify(pad)} (pathname ${JSON.stringify(pathname)})`
+      );
+    }
+  }
+});
+
 test("assertPathAllowed: toegestane paden komen ongewijzigd terug, ook na normalisatie-controle", () => {
   assert.equal(assertPathAllowed("/passwords?filter[organization_id]=7"), "/passwords?filter[organization_id]=7");
   assert.equal(
@@ -110,6 +175,8 @@ test("assertPathAllowed: toegestane paden komen ongewijzigd terug, ook na normal
 });
 
 test("assertPathAllowed: een losse % in de query gooit geen decodeerfout", () => {
+  // Dit pad gaat ook door new URL() (laag 2 van de controle); geverifieerd dat een ongepaarde
+  // "%" daar geen fout oplevert, dus dit moet gewoon toegestaan worden, niet via fail-closed.
   assert.equal(
     assertPathAllowed("/configurations?filter[name]=100%"),
     "/configurations?filter[name]=100%"

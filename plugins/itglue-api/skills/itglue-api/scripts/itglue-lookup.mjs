@@ -54,17 +54,23 @@ export function pickExactOrg(orgs, zoekterm) {
 // eindigen op "passwords" en hebben dus geen segment erna.
 const VERBODEN_PASSWORD_PAD = /(^|\/)passwords\/[^/#]+/i;
 
-// Alleen voor de blokkade-controle, niet voor het teruggegeven pad: %2f/%2F is een
-// gecodeerde slash en dubbele/drievoudige slashes tellen voor een server hetzelfde als één.
-// Een letterlijke backslash (en zijn ge-encodeerde vorm %5c/%5C) telt ook mee: Node's
-// WHATWG URL-parser (die fetch()/new URL() gebruiken) normaliseert "\" naar "/" zodra het
-// pad tegen BASE_URL geplakt wordt, dus "/passwords\12345" is voor de netwerklaag straks
-// gewoon "/passwords/12345". Backslashes worden daarom EERST naar "/" omgezet en pas
-// daarna worden opeenvolgende scheidingstekens samengevoegd — in die volgorde, anders glipt
-// "/passwords\/12345" (backslash gevolgd door een losse slash) er nog tussendoor.
-// Bewust geen decodeURIComponent() op het hele pad: dat gooit op een losse "%" (bijv. "100%"
-// in een filterwaarde) en kan andere tekens ongewenst veranderen. Alle vervangingen hieronder
-// zijn letterlijke, veilige string-replaces die nooit kunnen gooien.
+const GEBLOKKEERD_PASSWORD =
+  "Geblokkeerd: de individuele password-resource mag niet opgevraagd worden. " +
+  "Onze API-key heeft geen password-access. Gebruik het collectie-endpoint om het " +
+  "item te vinden en lever de deeplink via passwordDeeplink().";
+const GEBLOKKEERD_SHOW_PASSWORD = "Geblokkeerd: de parameter show_password is niet toegestaan.";
+const GEBLOKKEERD_ONPARSEERBAAR =
+  "Geblokkeerd: het pad kon niet als URL geïnterpreteerd worden en wordt daarom geweigerd " +
+  "(fail closed) — een pad dat we niet kunnen beoordelen laten we niet door.";
+
+// Alleen voor de goedkope voorcontrole, niet voor het teruggegeven pad: %2f/%2F en %5c/%5C
+// zijn gecodeerde scheidingstekens die de WHATWG URL-parser hieronder NIET decodeert (die
+// laat percent-encoding in het pad met rust), maar die IT Glue's eigen server mogelijk wel
+// als "/" interpreteert. Dubbele/drievoudige letterlijke slashes horen hier ook bij. Bewust
+// geen decodeURIComponent() op het hele pad: dat gooit op een losse "%" (bijv. "100%" in een
+// filterwaarde). Alle vervangingen hieronder zijn letterlijke, veilige string-replaces die
+// nooit kunnen gooien. Backslash wordt eerst omgezet, vóór de slash-samenvoeging, anders
+// glipt "/passwords\/12345" er nog tussendoor.
 function padVoorControle(pad) {
   return String(pad ?? "")
     .replace(/\\/g, "/")
@@ -73,20 +79,59 @@ function padVoorControle(pad) {
     .replace(/\/{2,}/g, "/");
 }
 
+// Vaste, veilige basis om de controle-URL te bouwen — expliciet LOS van BASE_URL/ITGLUE_BASE_URL.
+// Die env var komt uit configuratie en zou in theorie iets geks kunnen bevatten (een pad, een
+// vreemde host); de blokkade mag daar niet van afhangen. Alleen een geldige absolute basis is
+// nodig zodat een relatief pad hetzelfde resolved als tegen een root-basis als BASE_URL. ".invalid"
+// is gereserveerd (RFC 2606) en resolved bewust nooit ergens naartoe.
+const CONTROLE_BASIS = "https://itglue-guard.invalid/";
+
+// Gezaghebbende controle: bouwt de URL exact zoals de netwerklaag straks doet (new URL(pad, base))
+// en toetst op wat fetch() daadwerkelijk gebruikt. Dat vangt automatisch alles wat de WHATWG
+// URL-parser normaliseert of stript — tab/newline/CR worden overal uit de invoer verwijderd
+// (spec-gedrag, ook midden in "passwords"), en een letterlijke backslash wordt naar "/" omgezet —
+// zonder dat wij zelf een zwarte lijst van zulke tekens moeten bijhouden.
+function heeftVerbodenPasswordSegment(pathname) {
+  const segmenten = pathname.toLowerCase().split("/").filter(Boolean);
+  const index = segmenten.indexOf("passwords");
+  // Alleen een segment ná "passwords" is verboden: "/passwords", "/passwords/" (collectie) en
+  // ".../relationships/passwords" (passwords is dan het laatste segment) blijven toegestaan.
+  return index !== -1 && index < segmenten.length - 1;
+}
+
 export function assertPathAllowed(path) {
   const p = String(path ?? "");
+
+  // Laag 1: goedkope voorcontrole op de ruwe string (vangt %2f/%5c, zie padVoorControle hierboven).
   const teControleren = padVoorControle(p);
   const padZonderQuery = teControleren.split("?")[0];
   if (VERBODEN_PASSWORD_PAD.test(padZonderQuery)) {
-    throw new Error(
-      "Geblokkeerd: de individuele password-resource mag niet opgevraagd worden. " +
-        "Onze API-key heeft geen password-access. Gebruik het collectie-endpoint om het " +
-        "item te vinden en lever de deeplink via passwordDeeplink()."
-    );
+    throw new Error(GEBLOKKEERD_PASSWORD);
   }
   if (/show_password/i.test(teControleren)) {
-    throw new Error("Geblokkeerd: de parameter show_password is niet toegestaan.");
+    throw new Error(GEBLOKKEERD_SHOW_PASSWORD);
   }
+
+  // Laag 2: de gezaghebbende controle op de daadwerkelijk geparseerde URL. Fail closed: een pad
+  // dat niet te parsen is, keuren we niet goed.
+  let url;
+  try {
+    url = new URL(p, CONTROLE_BASIS);
+  } catch {
+    throw new Error(GEBLOKKEERD_ONPARSEERBAAR);
+  }
+  if (heeftVerbodenPasswordSegment(url.pathname)) {
+    throw new Error(GEBLOKKEERD_PASSWORD);
+  }
+  // Case-insensitief en op de gedecodeerde parameternaam, zodat bijv. show%5Fpassword ook telt.
+  for (const sleutel of url.searchParams.keys()) {
+    if (sleutel.toLowerCase() === "show_password") {
+      throw new Error(GEBLOKKEERD_SHOW_PASSWORD);
+    }
+  }
+
+  // Beide lagen akkoord: geef het oorspronkelijke, byte-identieke pad terug. De netwerklaag
+  // bouwt daar de echte request-URL mee, niet met de genormaliseerde controle-versie.
   return p;
 }
 
