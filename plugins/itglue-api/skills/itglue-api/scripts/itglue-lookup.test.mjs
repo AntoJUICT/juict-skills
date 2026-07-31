@@ -71,6 +71,31 @@ test("assertPathAllowed: collectie-endpoints mogen wel", () => {
   assert.equal(assertPathAllowed("/configurations?page[size]=50"), "/configurations?page[size]=50");
 });
 
+test("assertPathAllowed: dubbele/drievoudige slash omzeilt de blokkade niet", () => {
+  assert.throws(() => assertPathAllowed("/passwords//12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/passwords///12345"), /Geblokkeerd/);
+});
+
+test("assertPathAllowed: gecodeerde slash (%2F) omzeilt de blokkade niet", () => {
+  assert.throws(() => assertPathAllowed("/passwords%2F12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/passwords%2f12345"), /Geblokkeerd/);
+});
+
+test("assertPathAllowed: toegestane paden komen ongewijzigd terug, ook na normalisatie-controle", () => {
+  assert.equal(assertPathAllowed("/passwords?filter[organization_id]=7"), "/passwords?filter[organization_id]=7");
+  assert.equal(
+    assertPathAllowed("/organizations/7/relationships/passwords"),
+    "/organizations/7/relationships/passwords"
+  );
+});
+
+test("assertPathAllowed: een losse % in de query gooit geen decodeerfout", () => {
+  assert.equal(
+    assertPathAllowed("/configurations?filter[name]=100%"),
+    "/configurations?filter[name]=100%"
+  );
+});
+
 test("passwordDeeplink: bouwt de portal-URL en slikt dubbele slashes", () => {
   assert.equal(passwordDeeplink(7, 42), "https://juict.eu.itglue.com/7/passwords/42");
   assert.equal(passwordDeeplink(7, 42, "https://juict.eu.itglue.com/"), "https://juict.eu.itglue.com/7/passwords/42");

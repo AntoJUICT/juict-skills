@@ -54,9 +54,22 @@ export function pickExactOrg(orgs, zoekterm) {
 // eindigen op "passwords" en hebben dus geen segment erna.
 const VERBODEN_PASSWORD_PAD = /(^|\/)passwords\/[^/#]+/i;
 
+// Alleen voor de blokkade-controle, niet voor het teruggegeven pad: %2f/%2F is een
+// gecodeerde slash en dubbele/drievoudige slashes tellen voor een server hetzelfde als één.
+// Zonder deze normalisatie is de regex hierboven te omzeilen met "/passwords//12345" of
+// "/passwords%2F12345". Bewust geen decodeURIComponent() op het hele pad: dat gooit op een
+// losse "%" (bijv. "100%" in een filterwaarde) en kan andere tekens ongewenst veranderen.
+// Deze vervanging is een letterlijke, veilige string-replace die nooit kan gooien.
+function padVoorControle(pad) {
+  return String(pad ?? "")
+    .replace(/%2f/gi, "/")
+    .replace(/\/{2,}/g, "/");
+}
+
 export function assertPathAllowed(path) {
   const p = String(path ?? "");
-  const padZonderQuery = p.split("?")[0];
+  const teControleren = padVoorControle(p);
+  const padZonderQuery = teControleren.split("?")[0];
   if (VERBODEN_PASSWORD_PAD.test(padZonderQuery)) {
     throw new Error(
       "Geblokkeerd: de individuele password-resource mag niet opgevraagd worden. " +
@@ -64,7 +77,7 @@ export function assertPathAllowed(path) {
         "item te vinden en lever de deeplink via passwordDeeplink()."
     );
   }
-  if (/show_password/i.test(p)) {
+  if (/show_password/i.test(teControleren)) {
     throw new Error("Geblokkeerd: de parameter show_password is niet toegestaan.");
   }
   return p;
