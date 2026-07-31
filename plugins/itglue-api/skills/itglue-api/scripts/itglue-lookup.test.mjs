@@ -9,6 +9,8 @@ import {
   buildQuery,
   redactSecrets,
   BASE_URL,
+  igFetch,
+  fetchAllItGlue,
 } from "./itglue-lookup.mjs";
 
 test("normalizeOrgName: strippt rechtsvorm, leestekens en dubbele spaties", () => {
@@ -402,4 +404,121 @@ test("redactSecrets: vervangt de key door [REDACTED]", () => {
 
 test("redactSecrets: lege key laat de tekst ongemoeid", () => {
   assert.equal(redactSecrets("gewone tekst", ""), "gewone tekst");
+});
+
+// Minimale nep-Response die genoeg lijkt op het echte object voor deze tests.
+function nepRespons({ status = 200, body = {}, headers = {} } = {}) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (naam) => headers[naam.toLowerCase()] ?? null },
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  };
+}
+
+test("igFetch: zet de auth-header en bouwt de volledige URL", async () => {
+  const gezien = [];
+  const fetchImpl = async (url, init) => {
+    gezien.push({ url, init });
+    return nepRespons({ body: { data: [] } });
+  };
+  await igFetch("/organizations?page[size]=1", { key: "ITG.geheim", fetchImpl });
+  assert.equal(gezien[0].url, "https://api.eu.itglue.com/organizations?page[size]=1");
+  assert.equal(gezien[0].init.headers["x-api-key"], "ITG.geheim");
+  assert.equal(gezien[0].init.headers["Content-Type"], "application/vnd.api+json");
+});
+
+test("igFetch: pad zonder leidende slash werkt ook", async () => {
+  let gezienUrl = null;
+  const fetchImpl = async (url) => {
+    gezienUrl = url;
+    return nepRespons({ body: { data: [] } });
+  };
+  await igFetch("organizations", { key: "k", fetchImpl });
+  assert.equal(gezienUrl, "https://api.eu.itglue.com/organizations");
+});
+
+test("igFetch: verboden pad doet geen enkele request", async () => {
+  let aangeroepen = false;
+  const fetchImpl = async () => {
+    aangeroepen = true;
+    return nepRespons();
+  };
+  await assert.rejects(() => igFetch("/passwords/42", { key: "k", fetchImpl }), /Geblokkeerd/);
+  assert.equal(aangeroepen, false, "er mag geen request uitgaan bij een verboden pad");
+});
+
+test("igFetch: 429 wordt opnieuw geprobeerd volgens retry-after", async () => {
+  const wachttijden = [];
+  let poging = 0;
+  const fetchImpl = async () => {
+    poging++;
+    if (poging === 1) return nepRespons({ status: 429, headers: { "retry-after": "3" } });
+    return nepRespons({ body: { data: [{ id: "1" }] } });
+  };
+  const body = await igFetch("/organizations", {
+    key: "k",
+    fetchImpl,
+    sleepImpl: async (ms) => wachttijden.push(ms),
+  });
+  assert.equal(poging, 2);
+  assert.deepEqual(wachttijden, [3000]);
+  assert.equal(body.data[0].id, "1");
+});
+
+test("igFetch: fout bevat status en redacteert de key", async () => {
+  const fetchImpl = async () =>
+    nepRespons({ status: 401, body: { errors: [{ detail: "key ITG.geheim ongeldig" }] } });
+  await assert.rejects(
+    () => igFetch("/organizations", { key: "ITG.geheim", fetchImpl }),
+    (err) => {
+      assert.match(err.message, /IT Glue API fout 401/);
+      assert.ok(!err.message.includes("ITG.geheim"));
+      assert.match(err.message, /\[REDACTED\]/);
+      return true;
+    }
+  );
+});
+
+test("igFetch: 429 blijft niet eeuwig doorgaan", async () => {
+  let pogingen = 0;
+  const fetchImpl = async () => {
+    pogingen++;
+    return nepRespons({ status: 429 });
+  };
+  await assert.rejects(
+    () => igFetch("/organizations", { key: "k", fetchImpl, retries: 2, sleepImpl: async () => {} }),
+    /IT Glue API fout 429/
+  );
+  assert.equal(pogingen, 3, "1 poging plus 2 retries");
+});
+
+test("fetchAllItGlue: loopt pagina's door tot next-page leeg is", async () => {
+  const opgevraagd = [];
+  const fetchImpl = async (url) => {
+    opgevraagd.push(url);
+    const nummer = new URL(url).searchParams.get("page[number]");
+    if (nummer === "1") {
+      return nepRespons({ body: { data: [{ id: "1" }], meta: { "next-page": 2 } } });
+    }
+    return nepRespons({ body: { data: [{ id: "2" }], meta: { "next-page": null } } });
+  };
+  const alles = await fetchAllItGlue("configurations", {
+    key: "k",
+    filters: { organization_id: 7 },
+    pageSize: 1,
+    fetchImpl,
+  });
+  assert.deepEqual(alles.map((d) => d.id), ["1", "2"]);
+  assert.equal(opgevraagd.length, 2);
+  assert.ok(opgevraagd[0].includes("filter%5Borganization_id%5D=7"));
+});
+
+test("fetchAllItGlue: stopt bij maxPages en meldt dat", async () => {
+  const fetchImpl = async () => nepRespons({ body: { data: [{ id: "x" }], meta: { "next-page": 99 } } });
+  await assert.rejects(
+    () => fetchAllItGlue("configurations", { key: "k", maxPages: 3, fetchImpl }),
+    /maxPages/
+  );
 });

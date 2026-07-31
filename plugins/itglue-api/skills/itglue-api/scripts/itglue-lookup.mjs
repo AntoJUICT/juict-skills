@@ -258,3 +258,65 @@ export function redactSecrets(tekst, key) {
   if (!key) return String(tekst);
   return String(tekst).split(key).join("[REDACTED]");
 }
+
+const standaardSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Netwerklaag: enige plek die daadwerkelijk fetch aanroept. Alleen GET, nooit een muterend
+// verb, want onze API-key is bewust read-only tegen IT Glue.
+export async function igFetch(
+  path,
+  { key, baseUrl = BASE_URL, fetchImpl = fetch, sleepImpl = standaardSleep, retries = 3 } = {}
+) {
+  assertPathAllowed(path);
+  if (!key) throw new Error("igFetch vereist een API-key");
+  const pad = String(path).startsWith("/") ? String(path) : `/${path}`;
+  const url = `${String(baseUrl).replace(/\/+$/, "")}${pad}`;
+
+  for (let poging = 0; ; poging++) {
+    const res = await fetchImpl(url, {
+      method: "GET",
+      headers: {
+        "x-api-key": key,
+        "Content-Type": "application/vnd.api+json",
+      },
+    });
+
+    if (res.status === 429 && poging < retries) {
+      const retryAfter = Number(res.headers?.get?.("retry-after"));
+      const seconden = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 2 ** poging;
+      await sleepImpl(seconden * 1000);
+      continue;
+    }
+
+    if (!res.ok) {
+      const tekst = redactSecrets(await res.text(), key);
+      throw new Error(`IT Glue API fout ${res.status}: ${tekst}`);
+    }
+
+    return res.json();
+  }
+}
+
+// Pagineert via page[number]/page[size] (buildQuery), nooit via een doorgegeven links.next: die
+// is bij IT Glue een absolute URL en assertPathAllowed accepteert alleen relatieve paden.
+export async function fetchAllItGlue(
+  resource,
+  { key, filters = {}, pageSize = 100, maxPages = 50, ...opts } = {}
+) {
+  const alles = [];
+  for (let pageNumber = 1; ; pageNumber++) {
+    if (pageNumber > maxPages) {
+      throw new Error(
+        `fetchAllItGlue stopte op ${resource}: meer dan maxPages (${maxPages}) pagina's. ` +
+          "Verklein het resultaat met een filter of verhoog maxPages bewust."
+      );
+    }
+    const body = await igFetch(`${resource}${buildQuery(filters, { pageSize, pageNumber })}`, {
+      key,
+      ...opts,
+    });
+    alles.push(...(body?.data ?? []));
+    const volgende = body?.meta?.["next-page"] ?? null;
+    if (!volgende) return alles;
+  }
+}
