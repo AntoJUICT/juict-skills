@@ -10,7 +10,13 @@ Bekende valkuilen bij de IT Glue REST API. Voeg nieuwe lessen toe na elk project
 
 **Wachtwoordwaarden halen we niet op. Dat is beleid, geen technische aanname.** Password-access staat voor deze toepassing uit en een wachtwoordwaarde in een transcript of logbestand is een incident. De skill blokkeert de individuele password-resource daarom codematig, onafhankelijk van wat de API zou teruggeven: er is geen flag, geen env var en geen "alleen deze keer". Vraagt iemand toch om een wachtwoordwaarde, dan is het antwoord de deeplink `https://juict.eu.itglue.com/<org-id>/passwords/<id>`, en zoekt de collega het daar zelf op.
 
-`--raw` is om dezelfde reden geblokkeerd op `password-link`. Een ruwe dump van password-items zou precies de whitelist omzeilen die alleen naam en deeplink doorlaat.
+`--raw` is om dezelfde reden geblokkeerd op `password-link`. Een ruwe dump van password-items zou precies de whitelist omzeilen die alleen naam en deeplink doorlaat. Het vrije `get`-subcommando weigert om diezelfde reden élk pad dat de passwords-resource raakt, ook de collectie: anders zou `get "passwords?filter[organization_id]=7"` de ruwe attributes printen en was de whitelist met één commando omzeild.
+
+`password-link` vereist een zoekterm. Zonder term zou het naam en link van alle password-items van de organisatie tonen, en itemnamen vertellen zelf al welke systemen en accounts er zijn.
+
+De deeplinkvorm zelf is niet gemeten. `https://juict.eu.itglue.com/<org-id>/passwords/<id>` komt uit onze eigen code, niet uit een meting, en hetzelfde geldt voor de documentenvariant `/<org-id>/docs/<id>`. Beide staan in de tabel met openstaande punten in REFERENCE.md; ze zijn afgevinkt zodra iemand één zo'n link in de portal heeft geopend.
+
+**In een project is de whitelist niet automatisch.** `fetchAllItGlue("passwords", ...)` in `itglue-client.ts` levert de ruwe items van het collectie-endpoint. De client heeft daarvoor `passwordTreffers()` als tegenhanger van dezelfde functie in de CLI: die laat uitsluitend naam en deeplink door. Haal password-items daar altijd langs voordat er iets naar een UI, een log of een transcript gaat. De harde grens blijft de padguard; deze functie is de laag die voorkomt dat je per ongeluk de hele attributes doorgeeft.
 
 **Het collectie-endpoint geeft de waarde niet mee.** `GET /passwords?filter[organization_id]=` en `GET /organizations/{id}/relationships/passwords` gaven password-items terug zonder het `password`-veld, ook met `?show_password=true` erbij (gemeten 2026-07-21). Het collectie-endpoint is dus bruikbaar om een item te vinden, niet om iets te lezen wat er niet hoort te staan.
 
@@ -32,11 +38,13 @@ Bekende valkuilen bij de IT Glue REST API. Voeg nieuwe lessen toe na elk project
 
 **Het numerieke organisatie-id is een sluiproute, maar niet bij `org`.** Geef je een getal aan `configs`, `contacts`, `docs`, `assets` of `password-link`, dan gebruikt `resolveOrg()` dat direct als id en gaat er geen zoekcall uit. Het `org`-subcommando doet dat níet: dat gaat niet via `resolveOrg()` maar zoekt altijd op naam, dus `org 7` zoekt naar een organisatie die "7" heet en geeft "Geen resultaten.".
 
-Gevolg: `org <deelnaam>` kan leeg terugkomen terwijl de organisatie bestaat, en er is geen subcommando dat alle organisaties opsomt. Ken je de exacte naam niet, zoek de organisatie dan op `https://juict.eu.itglue.com` en lees het id uit de URL; daarna werkt elk ander subcommando met dat id. Wil je het in de terminal, dan is een losse GET op `/organizations?page[size]=1000` met client-side filteren de route.
+Gevolg: `org <deelnaam>` kan leeg terugkomen terwijl de organisatie bestaat. Ken je de exacte naam niet, zoek de organisatie dan op `https://juict.eu.itglue.com` en lees het id uit de URL; daarna werkt elk ander subcommando met dat id. Wil je het in de terminal, dan is `node itglue-lookup.mjs get "organizations?page[size]=1000"` met client-side filteren de route.
+
+**Nul treffers op een naam is het normale pad, niet de uitzondering.** Omdat `filter[name]` geen deelstrings matcht, komt iedereen die een deelnaam typt uit bij nul resultaten. `resolveOrg()` heeft daar een eigen melding voor die uitlegt dat de volledige naam nodig is en de twee routes naar het id noemt. Bij meerdere treffers krijg je wel een kandidatenlijst met ids. Die twee takken staan met een test vast, want een kandidatenkopje zonder kandidaten plus het advies "gebruik het id" is een doodlopende melding.
 
 **Normaliseer organisatienamen voordat je ze vergelijkt.** Rechtsvormsuffixen verschillen per bron (B.V. tegenover BV tegenover Holding B.V.). `normalizeOrgName()` in `scripts/itglue-lookup.mjs` strips die woorden voor het fuzzy zoeken, maar `pickExactOrg()` vergelijkt eerst strikt mét die woorden. Dat is nodig omdat "JUICT B.V." en "JUICT Holding B.V." anders identiek normaliseren en de verkeerde organisatie als exacte match zou gelden.
 
-**Flexible assets hebben twee filters nodig.** Alleen op `filter[organization_id]` filteren geeft een lege collectie. Combineer altijd met `filter[flexible_asset_type_id]`, en haal de type-ids eerst op met `GET /flexible_asset_types` (gemeten 2026-07-21). Dus: eerst de types, dan per type de assets van de organisatie.
+**Flexible assets hebben twee filters nodig.** Alleen op `filter[organization_id]` filteren geeft een lege collectie. Combineer altijd met `filter[flexible_asset_type_id]`, en haal de type-ids eerst op met `node itglue-lookup.mjs get "flexible_asset_types"` (endpoint gemeten 2026-07-21). Dus: eerst de types, dan per type de assets van de organisatie.
 
 **Resourcepaden met meerdere woorden gebruiken underscores.** `flexible_assets` en `flexible_asset_types` (gemeten 2026-07-21), `configuration_types` en `configuration_statuses` (gemeten 2026-07-31). De streepjesvariant is nergens correct. Voor `password_categories` volgen we dezelfde conventie, maar dat pad is niet gemeten.
 
@@ -84,7 +92,11 @@ node itglue-lookup.mjs configs <org-id> --raw
 
 **Bij een 401 of S2S17001 op de `az keyvault`-call: controleer `az account show`.** Een andere sessie kan de default subscription naar een klanttenant hebben gezet, waardoor de JUICT-vault onbereikbaar is. Fix: `az account set --subscription JUICTAzure`.
 
-**Nooit de key echoën.** Niet in een debugregel, niet in een testfixture, niet in een foutmelding. De netwerklaag haalt de key met `redactSecrets()` uit elke responsbody voordat die in een `Error` terechtkomt, en `--raw` doet hetzelfde met de body die hij print. Houd dat zo als je daar iets aanpast.
+**Nooit de key echoën.** Niet in een debugregel, niet in een testfixture, niet in een foutmelding. De netwerklaag haalt de key met `redactSecrets()` uit elke responsbody voordat die in een `Error` terechtkomt, en `--raw` en `get` doen hetzelfde met de body die ze printen. Houd dat zo als je daar iets aanpast.
+
+**Laat `res.json()` niet los op een onbekende body.** Een 200 met een HTML-body (een proxy of gateway ertussen) geeft dan `SyntaxError: Unexpected token '<' ...`: geen status, geen resource, en een ongeredacteerd fragment van de body in de melding. Dat laatste is de echte reden om het te vangen, want het breekt de belofte dat elke responsbody eerst door de redactie gaat. Beide netwerklagen lezen de body daarom als tekst en parseren die zelf, met een eigen fout die het pad, de status en een geredacteerd fragment noemt.
+
+**Zet een timeout op elk request in de client.** `itglueFetch()` geeft een `AbortSignal.timeout()` mee (20 seconden, `ITGLUE_TIMEOUT_MS` of de optie `timeoutMs`). Zonder timeout houdt een hangende IT Glue-verbinding een Next.js-route onbeperkt vast en loopt die pas af op de platform-timeout.
 
 ---
 
@@ -94,4 +106,4 @@ node itglue-lookup.mjs configs <org-id> --raw
 
 Twee dingen om te weten mocht je ooit buiten deze skill wel gaan schrijven. Een update op een flexible asset wist elke trait die je niet meestuurt, anders dan bij configuraties waar niet-meegestuurde velden ongemoeid blijven. En tag-velden zijn asymmetrisch: bij lezen komt een tag-trait terug als object met `.values`, bij schrijven verwacht IT Glue een array van resource-ids, en items met `resource-deleted: true` moet je eruit filteren om geen dode referentie terug te schrijven. Beide waargenomen op 2026-07-21.
 
-**Verifieer een endpoint voordat je erop bouwt.** Doe een losse GET en kijk naar de echte respons. Bij IT Glue is dat extra belangrijk omdat een niet-werkend pad zich als een lege lijst voordoet in plaats van als een 404.
+**Verifieer een endpoint voordat je erop bouwt.** Doe een losse GET met `node itglue-lookup.mjs get "<pad>"` en kijk naar de echte respons. Bij IT Glue is dat extra belangrijk omdat een niet-werkend pad zich als een lege lijst voordoet in plaats van als een 404.

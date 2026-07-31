@@ -9,6 +9,8 @@ De repo is public zodat de skills op elke werkplek binnenkomen, ook bij collega'
 | Plugin | Waarvoor | Auth nodig |
 |--------|----------|------------|
 | `autotask-api` | Werken met de Autotask REST API: geverifieerde endpoints, env vars, data structures en lessons learned. | Key Vault |
+| `autotask-approve-post` | De maandelijkse Approve & Post per klant voorbereiden: nog niet geposte tickets, time entries en charges, met data-issues en conservatieve AI-checks. | Key Vault |
+| `itglue-api` | Werken met de IT Glue REST API: read-only lookup-CLI, kopieerbare client, endpoints met verificatiestatus en valkuilen. Wachtwoordwaarden levert de skill nooit, alleen naam en deeplink. | Key Vault |
 | `tdsynnex` | Rewst-workflows bouwen tegen de TD Synnex StreamOne Ion API v3: subscriptions, seats, catalog en bekende quirks. | nee |
 | `azure-saas-devops-deploy` | Een klant-automation deployen naar een eigen Azure subscription via Azure DevOps Pipelines en Bicep/AVM (types web, split, service). | az login |
 | `ticket-aanmaken` | Een Autotask-supportticket aanmaken vanuit vrije tekst. Claude leidt de velden af en maakt het ticket pas na jouw akkoord aan. | Key Vault |
@@ -37,7 +39,7 @@ Updates ophalen: `/plugin marketplace update juict-skills`. Onder de org-uitrol 
 
 De meeste skills draaien standalone. Skills die Autotask of Azure raken hebben runtime-auth nodig:
 
-- **Key Vault** (`autotask-api`, `ticket-aanmaken`, `ticket-reactie`): credentials komen uit de shared Azure Key Vault via je `az`-login of managed identity. De skills bevatten alleen de secret-namen, nooit de waarden.
+- **Key Vault** (`autotask-api`, `autotask-approve-post`, `itglue-api`, `ticket-aanmaken`, `ticket-reactie`): credentials komen uit de shared Azure Key Vault via je `az`-login of managed identity. De skills bevatten alleen de secret-namen, nooit de waarden.
 - **az login** (`azure-saas-devops-deploy`): een geldige Azure CLI-sessie met toegang tot de betreffende subscription en Azure DevOps.
 
 ## Structuur
@@ -62,8 +64,9 @@ Elke plugin heeft dezelfde vorm: een manifest onder `.claude-plugin/` en de skil
 1. Maak de mapstructuur `plugins/<naam>/.claude-plugin/plugin.json` en `plugins/<naam>/skills/<naam>/SKILL.md`.
 2. Vul `plugin.json` met naam, versie en beschrijving (kopieer de vorm van een bestaande plugin).
 3. Voeg een entry toe aan `.claude-plugin/marketplace.json` met `"source": "./plugins/<naam>"`.
-4. Werk via een feature branch en open een pull request naar `main`.
-5. Zet de plugin org-breed aan door hem toe te voegen aan `enabledPlugins` in de Claude organization settings.
+4. Zet de plugin in de tabel [Skills in deze marketplace](#skills-in-deze-marketplace) hierboven, en in de lijst onder [Vereisten](#vereisten) als hij Key Vault of `az login` nodig heeft. Deze stap werd eerder vergeten, waardoor de tabel achterliep op de marketplace.
+5. Werk via een feature branch en open een pull request naar `main`.
+6. Zet de plugin org-breed aan door hem toe te voegen aan `enabledPlugins` in de Claude organization settings.
 
 ## Bijwerken
 

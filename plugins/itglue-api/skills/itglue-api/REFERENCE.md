@@ -50,6 +50,7 @@ Lokaal kun je `ITGLUE_API_KEY` als env var zetten. De CLI pakt die eerst en valt
 | `ITGLUE_API_KEY` | API-key, fallback voor Key Vault | leeg |
 | `ITGLUE_BASE_URL` | Base URL | `https://api.eu.itglue.com` |
 | `ITGLUE_PORTAL_URL` | Portal voor deeplinks | `https://juict.eu.itglue.com` |
+| `ITGLUE_TIMEOUT_MS` | Timeout per request in de TypeScript-client | `20000` |
 
 ## JSON:API-vorm
 
@@ -100,13 +101,13 @@ Controleer dat met `--raw`. Die vlag print de ruwe JSON:API-body van de eerste p
 node itglue-lookup.mjs configs <org-id> --raw
 ```
 
-Wat je in die output wilt zien: welke sleutel in `meta` naar de volgende pagina verwijst, en of het aantal items in `data` klopt met wat `meta` als totaal noemt. `--raw` werkt op `org`, `configs`, `contacts`, `docs` en `assets`, en is bewust geblokkeerd op `password-link`.
+Wat je in die output wilt zien: welke sleutel in `meta` naar de volgende pagina verwijst, en of het aantal items in `data` klopt met wat `meta` als totaal noemt. `--raw` werkt op `org`, `configs`, `contacts`, `docs` en `assets`, en is bewust geblokkeerd op `password-link` en op `get`.
 
 IT Glue stuurt als JSON:API ook een `links`-object mee met een absolute `links.next`. Gebruik die niet. De guard in onze scripts accepteert uitsluitend relatieve paden (zie "Padregels"), dus pagineer altijd zelf met `page[number]`.
 
 De blokhaken in `page[size]` en `filter[...]` worden door `URLSearchParams` percent-gecodeerd naar `%5B` en `%5D`. Of IT Glue die vorm net zo leest als letterlijke haken is een aanname 📄: al onze metingen zijn met letterlijke haken gedaan, terwijl de scripts de gecodeerde vorm versturen.
 
-Let op hoe je die aanname controleert, want een call die slaagt bewijst hier niets. Herkent de server de parameters niet, dan negeert hij ze en krijg je een 200 met de default paginagrootte en een ongefilterde lijst. Het bewijs zit in de inhoud van de `--raw`-uitvoer: `data` moet exact twee items bevatten, want dan is `page[size]=2` gehonoreerd, en elk item moet bij de opgevraagde organisatie horen (`organization-id` in de attributes), want dan is het filter gehonoreerd. Zie je meer dan twee items, of een item van een andere organisatie, dan worden de gecodeerde haken genegeerd. Kies er wel een organisatie bij met minstens drie configuraties, anders zegt een korte `data` niets.
+Let op hoe je die aanname controleert, want een call die slaagt bewijst hier niets. Herkent de server de parameters niet, dan negeert hij ze en krijg je een 200 met de default paginagrootte en een ongefilterde lijst. Het bewijs zit in de inhoud van de `--raw`-uitvoer: `data` moet exact twee items bevatten, want dan is `page[size]=2` gehonoreerd, en elk item moet bij de opgevraagde organisatie horen (`organization-id` in de attributes), want dan is het filter gehonoreerd. Zie je meer dan twee items, of een item van een andere organisatie, dan worden de gecodeerde haken genegeerd. Kies er wel een organisatie bij met minstens drie configuraties, anders zegt een korte `data` niets. Dat weet je vooraf op twee manieren: `meta.total-count` staat in dezelfde `--raw`-uitvoer, of je draait eerst `node itglue-lookup.mjs configs <org-id>` en telt de rijen in de tabel.
 
 ## Filters
 
@@ -114,9 +115,9 @@ Filters gaan als `filter[<veld>]=<waarde>` in de querystring, in snake_case.
 
 `filter[organization_id]` is het werkpaard: bijna elke resource die aan een organisatie hangt, filter je daarmee. Gemeten op passwords en op flexible assets ✅ 2026-07-21; voor de andere resources is het dezelfde conventie maar niet apart getest.
 
-`filter[name]` is niet betrouwbaar voor deelstrings. Op 2026-07-31 gaf `?filter[name]=Rouwenhorst` nul resultaten terwijl "Rouwenhorst Installatietechniek B.V." wel bestaat, zonder foutmelding. Op 2026-07-21 gaf een andere zoekterm juist meerdere organisaties terug. Reken er dus niet op dat je met een stuk van de naam iets vindt. Betrouwbaar zoeken doe je door alle organisaties te pagineren met `page[size]=1000` en client-side te matchen, of door direct het organisatie-id te gebruiken.
+`filter[name]` is niet betrouwbaar voor deelstrings. Op 2026-07-31 gaf `?filter[name]=Rouwenhorst` nul resultaten terwijl "Rouwenhorst Installatietechniek B.V." wel bestaat, zonder foutmelding. Op 2026-07-21 gaf een andere zoekterm juist meerdere organisaties terug. Reken er dus niet op dat je met een stuk van de naam iets vindt. Betrouwbaar zoeken doe je door alle organisaties te pagineren met `page[size]=1000` en client-side te matchen (`node itglue-lookup.mjs get "organizations?page[size]=1000"`), of door direct het organisatie-id te gebruiken. De CLI zegt dit ook in de foutmelding: nul treffers op een naam levert geen kandidatenlijst maar deze uitleg plus die twee routes.
 
-Voor flexible assets zijn twee filters nodig: alleen op `organization_id` filteren geeft een lege collectie. Combineer altijd `filter[organization_id]` met `filter[flexible_asset_type_id]`, en haal de type-ids eerst op met `GET /flexible_asset_types`. ✅ 2026-07-21
+Voor flexible assets zijn twee filters nodig: alleen op `organization_id` filteren geeft een lege collectie. Combineer altijd `filter[organization_id]` met `filter[flexible_asset_type_id]`, en haal de type-ids eerst op met `node itglue-lookup.mjs get "flexible_asset_types"`. ✅ 2026-07-21
 
 Namen normaliseren blijft nodig omdat rechtsvormsuffixen per bron verschillen (B.V., BV, Holding). Zie `normalizeOrgName()` en `pickExactOrg()` in `scripts/itglue-lookup.mjs`: die vergelijken eerst strikt en vallen daarna terug op de genormaliseerde naam, zodat "JUICT B.V." en "JUICT Holding B.V." niet per ongeluk als dezelfde organisatie gelden.
 
@@ -133,7 +134,13 @@ node itglue-lookup.mjs configs 7
 
 Let op dat die numerieke sluiproute niet voor `org` zelf geldt. `org 7` zoekt op de naam "7" en geeft "Geen resultaten.", want `org` doet een naamzoekopdracht en gaat niet via `resolveOrg()`.
 
-Weet je de exacte naam niet, dan helpt de CLI je niet verder: er is geen subcommando dat alle organisaties opsomt, en zoeken op een deel van de naam werkt niet. Pak dan de portal. Zoek de organisatie op `https://juict.eu.itglue.com` en lees het id uit de URL van de organisatiepagina; met dat id werkt elk subcommando. Wil je liever een lijst in de terminal, dan is een losse GET op `/organizations?page[size]=1000` de route, met client-side filteren op wat je wel weet.
+Weet je de exacte naam niet, dan is zoeken op een deel van de naam geen optie: `filter[name]` matcht geen deelstrings en `org <deelnaam>` komt leeg terug. Twee routes werken dan wel. Zoek de organisatie op `https://juict.eu.itglue.com` en lees het id uit de URL van de organisatiepagina; met dat id werkt elk subcommando. Of haal de lijst in de terminal op en filter zelf op wat je wel weet:
+
+```bash
+node itglue-lookup.mjs get "organizations?page[size]=1000"
+```
+
+Dat is precies de melding die `resolveOrg()` geeft bij nul treffers, zodat je niet in een leeg kandidatenlijstje blijft hangen.
 
 ## Resources
 
@@ -160,6 +167,25 @@ Dat het `configurations`-pad bestaat is een zijproduct van ander werk op 2026-07
 
 Dat een resource bestaat betekent niet dat de inhoud er is. Documenten zijn het duidelijke voorbeeld: het relationships-pad geeft netjes 200, maar de collectie is leeg terwijl er in de portal wel documenten staan. Zie LESSONS.md.
 
+## Een resource zonder subcommando opvragen: `get`
+
+De CLI heeft vaste subcommando's voor de resources die we vaak nodig hebben. Voor de rest is er `get`, met een relatief pad:
+
+```bash
+node itglue-lookup.mjs get "flexible_asset_types"
+node itglue-lookup.mjs get "locations?filter[organization_id]=7"
+node itglue-lookup.mjs get "organizations?page[size]=1000"
+```
+
+Zet het pad tussen quotes, anders eet je shell de blokhaken en de `&`. Vier dingen om te weten:
+
+- Het pad gaat door dezelfde `assertPathAllowed()` als elke andere call, dus een absolute URL wordt geweigerd (zie "Padregels") en de individuele password-resource ook.
+- Daarbovenop weigert `get` élk pad dat de passwords-resource raakt, ook de collectie. Een vrij pad zou daar de ruwe attributes van password-items printen en zo de whitelist omzeilen die in de rest van de skill alleen naam en link doorlaat. Zoek je een wachtwoord-item, gebruik `password-link`.
+- De uitvoer is de ruwe body, door dezelfde redactie als `--raw`. `--raw` zelf heeft geen zin op `get` en wordt daar geweigerd.
+- Het pad gaat byte-identiek de deur uit, dus met de letterlijke blokhaken die je typt. Daarmee is `get` het gereedschap om de `%5B`/`%5D`-aanname te meten: leg de uitvoer van `get "configurations?filter[organization_id]=<id>&page[size]=2"` naast die van `configs <org-id> --raw`, die de gecodeerde vorm verstuurt.
+
+Deze route is bedoeld voor de openstaande punten hieronder. Blijkt een pad structureel nuttig, geef het dan een eigen subcommando met een nette uitvoer.
+
 ## Wachtwoorden
 
 Deze skill haalt geen wachtwoordwaarden op. Dat is beleid en geen technische beperking: password-access staat voor deze toepassing uit, en een wachtwoordwaarde in een transcript of logbestand is een incident. De blokkade geldt dus onafhankelijk van wat de API zou teruggeven.
@@ -169,6 +195,10 @@ Wat wel mag: het collectie-endpoint aanspreken om het juiste item te vinden op n
 ```
 https://juict.eu.itglue.com/<org-id>/passwords/<password-id>
 ```
+
+Die vorm is 📄 en niet gemeten: hij komt uit onze eigen code, niet uit een meting. Dat is een ongemakkelijke plek voor een ongemeten aanname, want klopt het pad niet, dan is het antwoord op elke wachtwoordvraag een dode link. Het staat als openstaand punt in de tabel onderaan, samen met de documenten-deeplink `https://juict.eu.itglue.com/<org-id>/docs/<document-id>` die het `docs`-subcommando per rij meegeeft.
+
+`password-link` vereist een zoekterm. Dat is een keuze en geen API-beperking: zonder term zou het commando naam en link van élk password-item van de organisatie tonen. Dat is geen waarde, maar itemnamen vertellen zelf al welke systemen en accounts er zijn.
 
 Het collectie-endpoint geeft de waarde ook niet mee. Password-items kwamen terug zonder het `password`-veld, ook met `?show_password=true` erbij. ✅ 2026-07-21
 
@@ -186,7 +216,7 @@ Alle IT Glue-calls in deze skill lopen door `assertPathAllowed()`. Die functie k
 - Elk pad met tekens buiten `A-Z a-z 0-9 _ - . /` in het padgedeelte. De querystring valt buiten deze controle, dus filterwaarden met een spatie, een `%` of een `&` blijven gewoon werkbaar.
 - Elk pad dat niet als URL te parsen is. De guard faalt dicht: wat we niet kunnen beoordelen, laten we niet door.
 
-Toegestaan blijven de collectie en de relationships-variant: `/passwords`, `/passwords/` en `/organizations/<id>/relationships/passwords`.
+Toegestaan blijven de collectie en de relationships-variant: `/passwords`, `/passwords/` en `/organizations/<id>/relationships/passwords`. Dat is wat de guard toestaat; het `get`-subcommando is strenger en weigert die drie ook, omdat een vrij pad daar de ruwe attributes zou printen (zie "Een resource zonder subcommando opvragen").
 
 Twee praktische gevolgen:
 
@@ -197,6 +227,10 @@ Pagineer met `page[number]` en nooit met de absolute `links.next` uit de JSON:AP
 ## Foutresponses en rate limiting
 
 Fouten komen als JSON:API-foutobject terug, met een `errors`-array waarin per fout een `title`, `detail` en `status` staan 📄. De netwerklaag van deze skill gooit bij elke niet-2xx status een `Error` met de statuscode en de responsbody erin, en haalt daarbij eerst de API-key uit de tekst (`redactSecrets`) zodat een foutmelding nooit de key kan bevatten.
+
+Een 200 met een niet-JSON body hoort daar ook bij. Beide netwerklagen lezen de body eerst als tekst en parseren die zelf, zodat een HTML-foutpagina van een proxy geen kale `SyntaxError` oplevert (die noemt geen status en geen resource, en zou een ongeredacteerd stuk body in de melding zetten). Wat je in plaats daarvan krijgt: `IT Glue API gaf geen JSON terug op <pad> (status <status>)`, met de eerste 300 tekens van de body erachter, geredacteerd.
+
+De TypeScript-client geeft elk request een timeout mee (`DEFAULT_TIMEOUT_MS`, 20 seconden, te overrulen per call met `timeoutMs` of globaal met `ITGLUE_TIMEOUT_MS`). Zonder timeout houdt een hangende verbinding een Next.js-route onbeperkt vast. Een retry na een 429 krijgt zijn eigen verse timeout. De CLI heeft die timeout niet: die draait interactief en is met ctrl-C te stoppen.
 
 Bij een 429 wacht de netwerklaag en probeert het opnieuw, maximaal drie keer. Hij gebruikt de `retry-after`-header als die er is en anders exponentiële backoff (1, 2, 4 seconden). Of IT Glue die header daadwerkelijk meestuurt is nog niet gemeten 📄, vandaar de fallback.
 
@@ -209,16 +243,18 @@ De 📄-markers in de tekst hierboven zijn leidend; deze tabel is niet uitputten
 | Open punt | Commando dat het afvinkt |
 |---|---|
 | Naam van de meta-sleutel voor de volgende pagina | `node itglue-lookup.mjs configs <org-id> --raw` en kijken welke sleutel in `meta` naar pagina 2 wijst |
-| Of `page[number]` bestaat en 1-based is | `node itglue-lookup.mjs configs <org-id> --raw` geeft pagina 1; leg die `data` naast een losse GET met `page[number]=2` |
+| Of `page[number]` bestaat en 1-based is | `node itglue-lookup.mjs configs <org-id> --raw` geeft pagina 1; leg die `data` naast `node itglue-lookup.mjs get "configurations?filter[organization_id]=<id>&page[size]=2&page[number]=2"` |
 | Werkt `documents` als top-level resource | `node itglue-lookup.mjs docs <org-id> --raw` |
 | Respons-shape van contacts en configurations | `node itglue-lookup.mjs contacts <org-id> --raw` en `configs <org-id> --raw` |
 | Klopt het aantal items met `meta` | zit in dezelfde `--raw`-output: `data.length` naast het totaal in `meta` |
-| Geeft het passwords-collectie-endpoint items terug of een 403 | `node itglue-lookup.mjs password-link <org-id> ""`, zonder `--raw`, want dat is daar geblokkeerd |
-| Bestaat `/locations` met het org-filter | een losse GET op `/locations?filter[organization_id]=<id>` |
-| Bestaat `/password_categories` | een losse GET op `/password_categories` |
-| Wat er boven `page[size]=1000` gebeurt | een losse GET op `/organizations?page[size]=2000`: kapt hij af op 1000, geeft hij een fout, of komt alles terug |
-| Accepteert IT Glue `%5B`/`%5D` net als letterlijke haken | `node itglue-lookup.mjs configs <org-id> --raw` op een organisatie met minstens drie configuraties, en dan de inhoud narekenen: `data` moet exact twee items hebben en elk item moet die `organization-id` dragen. Meer items of een vreemde organisatie betekent dat de haken genegeerd worden. Een 200 op zich is geen bewijs |
-| Eist IT Glue het `Content-Type`-header op een GET | een losse GET zonder dat header |
+| Geeft het passwords-collectie-endpoint items terug of een 403 | `node itglue-lookup.mjs password-link <org-id> "a"`. De zoekterm is verplicht en filtert alleen client-side op de itemnaam, dus de call gaat altijd uit: "IT Glue API fout 403" betekent dat het endpoint weigert, rijen betekenen dat het items levert. Komt er "Geen resultaten.", dan slaagde de call maar bevatte geen naam die term; probeer een andere letter. `--raw` is hier geblokkeerd |
+| Vorm van de password-deeplink `https://juict.eu.itglue.com/<org-id>/passwords/<password-id>` 📄 | open één link uit de uitvoer van `password-link` in de portal en kijk of hij op het juiste wachtwoord-item uitkomt. Dit is het enige ongemeten punt waar het hele antwoord op een wachtwoordvraag van afhangt |
+| Vorm van de documenten-deeplink `https://juict.eu.itglue.com/<org-id>/docs/<document-id>` 📄 | open één link uit de uitvoer van `docs <org-id>` in de portal en kijk of hij op het juiste document uitkomt |
+| Bestaat `/locations` met het org-filter | `node itglue-lookup.mjs get "locations?filter[organization_id]=<id>"` |
+| Bestaat `/password_categories` | `node itglue-lookup.mjs get "password_categories"` |
+| Wat er boven `page[size]=1000` gebeurt | `node itglue-lookup.mjs get "organizations?page[size]=2000"`: kapt hij af op 1000, geeft hij een fout, of komt alles terug |
+| Accepteert IT Glue `%5B`/`%5D` net als letterlijke haken | `node itglue-lookup.mjs configs <org-id> --raw` op een organisatie met minstens drie configuraties, en dan de inhoud narekenen: `data` moet exact twee items hebben en elk item moet die `organization-id` dragen. Meer items of een vreemde organisatie betekent dat de haken genegeerd worden. Een 200 op zich is geen bewijs. Hoe weet je vooraf dat een organisatie er drie heeft: `meta.total-count` staat in dezelfde `--raw`-uitvoer, of draai eerst `configs <org-id>` en tel de rijen. Tegenproef met de letterlijke haken: `node itglue-lookup.mjs get "configurations?filter[organization_id]=<id>&page[size]=2"` |
+| Eist IT Glue het `Content-Type`-header op een GET | niet met deze CLI te doen: die stuurt het header altijd mee. Dit blijft een losse call met bijvoorbeeld curl of Invoke-RestMethod, en dan zonder de key in je shell-history |
 | Komt `retry-after` mee bij een 429 | pas zichtbaar onder load; noteer het zodra je een 429 ziet |
 
 ## Bronnen
