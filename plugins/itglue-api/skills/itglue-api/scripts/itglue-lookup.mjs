@@ -56,12 +56,19 @@ const VERBODEN_PASSWORD_PAD = /(^|\/)passwords\/[^/#]+/i;
 
 // Alleen voor de blokkade-controle, niet voor het teruggegeven pad: %2f/%2F is een
 // gecodeerde slash en dubbele/drievoudige slashes tellen voor een server hetzelfde als één.
-// Zonder deze normalisatie is de regex hierboven te omzeilen met "/passwords//12345" of
-// "/passwords%2F12345". Bewust geen decodeURIComponent() op het hele pad: dat gooit op een
-// losse "%" (bijv. "100%" in een filterwaarde) en kan andere tekens ongewenst veranderen.
-// Deze vervanging is een letterlijke, veilige string-replace die nooit kan gooien.
+// Een letterlijke backslash (en zijn ge-encodeerde vorm %5c/%5C) telt ook mee: Node's
+// WHATWG URL-parser (die fetch()/new URL() gebruiken) normaliseert "\" naar "/" zodra het
+// pad tegen BASE_URL geplakt wordt, dus "/passwords\12345" is voor de netwerklaag straks
+// gewoon "/passwords/12345". Backslashes worden daarom EERST naar "/" omgezet en pas
+// daarna worden opeenvolgende scheidingstekens samengevoegd — in die volgorde, anders glipt
+// "/passwords\/12345" (backslash gevolgd door een losse slash) er nog tussendoor.
+// Bewust geen decodeURIComponent() op het hele pad: dat gooit op een losse "%" (bijv. "100%"
+// in een filterwaarde) en kan andere tekens ongewenst veranderen. Alle vervangingen hieronder
+// zijn letterlijke, veilige string-replaces die nooit kunnen gooien.
 function padVoorControle(pad) {
   return String(pad ?? "")
+    .replace(/\\/g, "/")
+    .replace(/%5c/gi, "/")
     .replace(/%2f/gi, "/")
     .replace(/\/{2,}/g, "/");
 }

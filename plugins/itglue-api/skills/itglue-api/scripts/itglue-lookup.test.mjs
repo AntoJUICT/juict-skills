@@ -81,6 +81,26 @@ test("assertPathAllowed: gecodeerde slash (%2F) omzeilt de blokkade niet", () =>
   assert.throws(() => assertPathAllowed("/passwords%2f12345"), /Geblokkeerd/);
 });
 
+test("assertPathAllowed: backslash (letterlijk of gecodeerd) omzeilt de blokkade niet", () => {
+  // Node's URL-parser normaliseert "\" naar "/" zodra de netwerklaag dit pad tegen
+  // BASE_URL plakt, dus elk van deze varianten wordt daar alsnog /passwords/12345.
+  assert.throws(() => assertPathAllowed("/passwords\\12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/passwords\\\\12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/passwords/\\12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/passwords\\/12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/passwords%5C12345"), /Geblokkeerd/);
+  assert.throws(() => assertPathAllowed("/passwords%5c12345"), /Geblokkeerd/);
+});
+
+test("assertPathAllowed: backslash die niets met passwords te maken heeft mag wel", () => {
+  // Een backslash in een filterwaarde van een ander endpoint raakt de password-guard niet:
+  // "/configurations" bevat geen "passwords"-segment, ongeacht hoe je de backslash normaliseert.
+  assert.equal(
+    assertPathAllowed("/configurations?filter[name]=a\\b"),
+    "/configurations?filter[name]=a\\b"
+  );
+});
+
 test("assertPathAllowed: toegestane paden komen ongewijzigd terug, ook na normalisatie-controle", () => {
   assert.equal(assertPathAllowed("/passwords?filter[organization_id]=7"), "/passwords?filter[organization_id]=7");
   assert.equal(
