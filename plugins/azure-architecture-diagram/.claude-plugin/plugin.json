@@ -1,0 +1,12 @@
+{
+  "name": "azure-architecture-diagram",
+  "version": "1.0.0",
+  "description": "Genereert een Azure-architectuurplaat als bewerkbaar .drawio bronbestand plus standalone .svg — shape-index tegen verzonnen icoonpaden, layoutchecks tegen kruisende lijnen, en het diagram staat als code in git.",
+  "author": {
+    "name": "AntoJUICT",
+    "email": "anto@juict.nl"
+  },
+  "homepage": "https://github.com/AntoJUICT/juict-skills",
+  "repository": "https://github.com/AntoJUICT/juict-skills",
+  "keywords": ["azure", "architectuur", "diagram", "drawio", "svg", "bicep", "visualisatie", "juict"]
+}
