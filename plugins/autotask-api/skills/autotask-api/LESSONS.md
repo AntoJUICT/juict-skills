@@ -31,6 +31,9 @@ Bekende valkuilen, fouten en hard-geleerde lessen bij werken met de Autotask RES
 
 ## Filters / query-operators
 
+**Een platte filter-array gedroeg zich als AND, niet als OR.** Geverifieerd zone 19 op 05-08-2026 over negen endpoints (Tickets, Contacts, Resources, TicketNotes, TimeEntries, AttachmentInfo, TicketAdditionalContacts, Invoices, BillingItems): `[companyID eq 0, status noteq 5, status noteq 16]` gaf exact dezelfde 14 records als de `and`-wrapper, allemaal companyID 0.
+- How to apply: leun er niet op, in geen van beide richtingen. Wikkel condities expliciet in `{ op: "and", items: [...] }` overal waar een gemiste conditie een tenant-lek of een verkeerde dataset oplevert. Het is één regel code en haalt de aanname weg.
+
 **De `noteExist`-operator is onbetrouwbaar in zone 19.** `{ field: "rmmAlertID", op: "noteExist" }` gaf álle records terug i.p.v. alleen de tickets zónder rmmAlertID, terwijl `op: "exist"` wél correct de RMM-tickets (rmmAlertID gezet) teruggaf. Filter "veld is leeg"-condities client-side (in JS) i.p.v. op `noteExist` te vertrouwen — het is een stille datafout (200 met te véél records, geen foutmelding).
 
 ---
@@ -77,8 +80,14 @@ Verkeerde resource+role combinatie → "The specified AssignedResourceID and Ass
 **`POST /Tickets/{id}/Attachments` vereist `attachmentType`, `publish`, `title` en `fullPath`.** Zet `attachmentType: "FILE_ATTACHMENT"`, `publish: 1` (All Autotask Users), `data` = base64. Het top-level `/AttachmentInfo` met `attachedObjectType`/`attachedObjectID` werkt NIET — die velden bestaan niet.
 
 **Ticket-bijlagen ophalen = `GET /Tickets/{id}/Attachments` (nested GET, 200).** De top-level `POST /AttachmentInfo/query` met `attachedObjectID`/`attachedObjectType` geeft 500 "Unable to find attachedObjectID in the AttachmentInfo Entity" — die velden bestaan niet; de echte koppelvelden zijn `parentID`/`ticketID`/`parentType`. Nested `/query` (`POST /Tickets/{id}/Attachments/query`) geeft 404 — nested ondersteunt alleen GET.
+- Wil je wél `AttachmentInfo/query` gebruiken, dan is de werkende combinatie voor klant-zichtbare ticketbijlagen: `ticketID` eq + `parentType` eq 4 ("Task Or Ticket") + `publish` eq 1. Zonder `parentType` komen ook time-entry- (18) en notitiebijlagen (23) mee; zonder `publish` komen interne bijlagen mee (op JUICT-tickets stond 18 van 121 op `publish` 2).
+- `AttachmentInfo.publish`: 1 All Autotask Users, 2 Internal Users Only, 4 Internal & Co-Managed. Het datumveld heet **`attachDate`**, er is géén `createDate` — een mapping op `createDate` levert stil `undefined`.
 
-**De REST API geeft de bestandsinhoud (`data`) van een bijlage NIET terug.** `GET /AttachmentInfo/{id}`, de single nested GET én `?includeData=true` leveren allemaal geen `data` — het veld staat niet eens in `AttachmentInfo/entityInformation/fields`. Via REST is alleen metadata beschikbaar; voor de bytes is een ander mechanisme nodig (SOAP `GetAttachment` of sync). Geverifieerd in zone 19.
+**De bestandsinhoud van een bijlage komt WEL via REST, maar alleen via de geneste single-GET.** Geverifieerd zone 19 op 05-08-2026: `GET /Tickets/{ticketId}/Attachments/{attachmentId}` levert `data` als base64 (50.606 bytes → 67.476 tekens, byte-voor-byte identiek aan de upload). `GET /AttachmentInfo/{id}` geeft géén `data`, ook niet met `?includeData=true`, en de geneste lijst-GET zonder id geeft `data: null`. SOAP of een sync is dus niet nodig.
+- How to apply: dit endpoint antwoordt met een **collectie** (`{ items, pageDetails }`), niet met `{ item }` — ook bij één id. Lees `items[0]`; wie `.item` uitleest krijgt `undefined` en concludeert onterecht dat er geen data is. Het `ticketId` in het pad dwingt bovendien af dat de bijlage bij dát ticket hoort, wat een gratis tweede laag is naast je eigen eigendomscheck.
+
+**`PATCH /Tickets` bevestigt soms een statuswijziging die niet landt.** Twee keer los van elkaar vastgesteld in zone 19 op 05-08-2026: de PATCH gaf 200 met `itemId`, maar het ticket bleef op de oude status staan (na `status: 5` bleef het op 19 met `completedDate` null; na `status: 19` bleef het op 1). Dezelfde PATCH kort daarna werkte wél. Vermoedelijke oorzaak: workflow rules die vanuit een net toegevoegde notitie of bijlage in de wachtrij staan en de status terugzetten.
+- How to apply: lees na élke statuswijziging die ergens op vertrouwt (een klant die "gesloten" te zien krijgt, een engineer die een signaal moet krijgen) de status terug met `cache: "no-store"`, herkans één keer na ~1,5 s, en meld daarna eerlijk dat het niet gelukt is. Een 200 op deze PATCH is geen bewijs.
 
 **Tickets kunnen niet via `DELETE /Tickets/{id}` verwijderd worden — geeft 405.** Opruimen kan alleen door te sluiten: `PATCH /Tickets` met `status: 5` (Complete), of handmatig in de UI.
 
@@ -182,6 +191,8 @@ AUTOTASK_SECRET='abc#def'    # # binnen single quotes = literal hekje
 
 **Filteren op `ticketType` vangt niet al het machineverkeer.** In zone 19 stonden 214 tickets met `source` 16 (SaaS Alerts) geregistreerd als `ticketType` 2 (Incident). Wil je alerts uitsluiten, filter dan op `ticketType === 5` **of** `source` in {8 Monitoring Alert, 15 Datto RMM, 16 SaaS Alerts}.
 
+**`showOnInvoice` en `isNonBillable` op TimeEntries zijn in zone 19 constant en dus waardeloos als filter.** Steekproef van alle 595 time entries op de 277 JUICT-tickets (05-08-2026): `showOnInvoice` was `false` op 595/595 en `isNonBillable` `true` op 595/595. Wie hierop filtert om "klant mag dit zien" te bepalen, houdt niets over. Het bruikbare onderscheid is het véld: `summaryNotes` is de klant-zichtbare samenvatting, `internalNotes` de interne aantekening (13 entries hadden alléén internalNotes, 75 hadden beide).
+
 **Tasks missen `completedPercentage` en `isCompleted` velden.** Bereken zelf: `estimatedHours - remainingHours`. Gebruik `status === 5` voor completed-check.
 
 **Gantt-volgorde is niet beschikbaar via de API.** Sla handmatig op in `config/autotask-sort.json`.
@@ -194,7 +205,13 @@ AUTOTASK_SECRET='abc#def'    # # binnen single quotes = literal hekje
 
 ## Notes
 
-Notes hebben een `Publish` veld: `1` = zichtbaar voor klant, `2` = intern. Filter bij weergave aan klanten.
+Notes hebben een `Publish` veld: `1` = zichtbaar voor klant, `2` = intern, `4` = Internal & Co-Managed. Filter bij weergave aan klanten.
+
+**`publish` alléén is niet genoeg om notities aan een klant te tonen — filter óók op `noteType`.** In zone 19 stonden op 470 klant-zichtbare (`publish: 1`) notities van JUICT-tickets 336 RMM-notities (`noteType` 99, titels als "DEVICE SNAPSHOT" en "OPEN ALERTS") en 59 workflow-rule-notities (13 en 91, op naam van "Autotask Administrator", resource-id 4). Filteren op de creator vangt de RMM-dumps niet.
+- How to apply: gebruik een allowlist van menselijke communicatie in plaats van een blocklist: `noteType` 1 Task Summary, 2 Task Detail, 3 Task Notes, 18 Client Portal Note, 101 Email Note. Uitsluiten: 13 en 91 (workflow rule), 99 (RMM), 100 (BDR), 15/92/93/94/95 (duplicaat-, forward- en merge-ruis).
+
+**`createdByContactID` op een ticketnotitie is niet schrijfbaar, ondanks `isReadOnly: false` in de metadata.** `GET /TicketNotes/entityInformation/fields` meldt het veld als schrijfbaar, maar `POST /Tickets/{id}/Notes` negeert de waarde: getest met `createdByContactID` én `CreatedByContactID`, beide keren 200 en beide keren bleef het veld `null` terwijl `creatorResourceID` op het API-account werd gezet. Autotask vult dit veld alleen zelf, wanneer een contact de notitie via zijn eigen clientportaal plaatst.
+- How to apply: wil je vastleggen wie een notitie schreef, zet het in de **titel** met een marker die een mens niet per ongeluk typt (bv. `Reactie van {naam} (via klantportaal)`) en lees die bij weergave terug. Strip de marker uit de naam vóór je hem in de titel zet, anders kan een naam die de marker zelf bevat de terugleesregex misleiden.
 
 **Vertrouw het `publish`-label uit de metadata NIET.** `GET /TicketNotes/entityInformation/fields` noemt `1 = All Autotask Users`, maar in zone 19 rendert `publish: 1` als een EXTERNE, klant-zichtbare note — gebruik `2` voor intern (leidend blijft: 1 = klant, 2 = intern). Een per ongeluk externe note corrigeer je met `PATCH /Tickets/{id}/Notes` en body `{ id, noteType, publish: 2 }` (DELETE geeft 405).
 

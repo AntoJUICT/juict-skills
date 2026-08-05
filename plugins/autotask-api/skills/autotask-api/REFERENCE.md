@@ -75,11 +75,21 @@ Actieve status-picklist (zone 19, geverifieerd 31-07-2026): 1 New, 5 Complete, 7
 
 Queue-picklist (zone 19, geverifieerd 31-07-2026): `29682833` Eerste lijn support, `29682969` Tweede lijn support, `29683488` Derde lijn support, `29683378` Administratie, `29683482` Verkoop, `29683487` Offboarding, `5` Het JUICT portaal, `6` Post Sale, `8` Monitoring Alert. De support-lijnen zijn de enige betrouwbare as om eerste- van tweedelijnswerk te scheiden — zie de Resources-les in LESSONS.md.
 
-Overige ticket-picklists (zone 19): `ticketType` 1 Service Request, 2 Incident, 3 Problem, 4 Change Request, 5 Alert. `source` -2 Insourced, -1 Client Portal, 2 Telefoon, 4 Email, 8 Monitoring Alert, 11 Mondeling, 13 Herhalend, 14 Intern, 15 Datto RMM, 16 SaaS Alerts.
+Overige ticket-picklists (zone 19): `ticketType` 1 Service Request, 2 Incident, 3 Problem, 4 Change Request, 5 Alert. `source` -2 Insourced, -1 Client Portal, 2 Telefoon, 4 Email, 8 Monitoring Alert, 11 Mondeling, 13 Herhalend, 14 Intern, 15 Datto RMM, 16 SaaS Alerts. Let op: er is geen waarde "Portal" — een melding uit een eigen klantportaal hoort op `-1`; `8` is Monitoring Alert en vervuilt de alert-rapportage.
+
+Veldlengtes (zone 19, geverifieerd 05-08-2026): `Ticket.title` 255 (verplicht), `Ticket.description` 8000, `Ticket.resolution` 32000, `TicketNote.description` 32000 (verplicht), `TicketNote.title` 250. Autotask kapt te lange waarden stil af — valideer aan je eigen kant.
 
 ### Ticket Notes (NESTED — zie LESSONS.md)
 - `POST /Tickets/{ticketId}/Notes` — note toevoegen
 - `GET /TicketNotes/query` — notes opzoeken
+- `noteType`-picklist (zone 19): 1 Task Summary, 2 Task Detail, 3 Task Notes, 13 Workflow Rule Note - Task, 15 Duplicate Ticket Note, 16 Outsource Workflow Note, 17 Surveys, 18 Client Portal Note, 19 Taskfire Note, 91 Workflow Rule Action Note, 92 Forward/Modify Note, 93 Merged Into Ticket, 94 Absorbed Another Ticket, 95 Copied to Project, 99 RMM Note, 100 BDR Note, 101 Email Note
+- `publish`: 1 All Autotask Users, 2 Internal Project Team, 4 Internal & Co-Managed
+
+### Ticket Attachments (NESTED — zie LESSONS.md)
+- `POST /Tickets/{ticketId}/Attachments` — bijlage toevoegen (`attachmentType`, `publish`, `title`, `fullPath`, `data` base64)
+- `GET /Tickets/{ticketId}/Attachments` — metadata van alle bijlagen (`data` is hier null)
+- `GET /Tickets/{ticketId}/Attachments/{attachmentId}` — **mét** base64 `data`; antwoordt als collectie (`items[0]`)
+- `POST /AttachmentInfo/query` — filter op `ticketID` + `parentType` (4 = Task Or Ticket) + `publish`; datumveld is `attachDate`
 
 ### Time Entries
 - `POST /TimeEntries` — tijdsregistratie aanmaken
@@ -154,7 +164,7 @@ Query-responses bevatten soms minder velden dan `GET /{entity}/{id}`. Controleer
 
 ## Filters
 
-De REST API gebruikt POST met een `filter`-array op `*/query` endpoints. Meerdere condities moeten in een `and`-wrapper — een platte array wordt als OR geïnterpreteerd:
+De REST API gebruikt POST met een `filter`-array op `*/query` endpoints. Wikkel meerdere condities altijd in een `and`-wrapper:
 
 ```json
 { "filter": [{ "op": "and", "items": [
@@ -163,7 +173,11 @@ De REST API gebruikt POST met een `filter`-array op `*/query` endpoints. Meerder
 ]}], "maxRecords": 500 }
 ```
 
-Paginatie via `pageDetails.nextPageUrl` in de response — blijf volgen tot `null`.
+Een platte array gedroeg zich in zone 19 óók als AND (geverifieerd op negen endpoints, 05-08-2026), maar leun daar niet op — zie de filter-les in LESSONS.md.
+
+Beperk de respons met `includeFields` naast `filter`; geverifieerd op `/TimeEntries/query` dat de respons dan alleen de opgegeven velden bevat. Handig om gevoelige velden (zoals `internalNotes`) niet eens op te halen.
+
+Paginatie via `pageDetails.nextPageUrl` in de response — blijf volgen tot `null`. **Die URL wil een POST met dezelfde body**; een GET geeft 405 "The requested resource does not support http method 'GET'". Pagina 2 sluit exact aan op pagina 1 zonder overlap.
 
 ## Data structures (TypeScript)
 
