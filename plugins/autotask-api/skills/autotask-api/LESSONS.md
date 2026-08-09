@@ -10,11 +10,10 @@ Bekende valkuilen, fouten en hard-geleerde lessen bij werken met de Autotask RES
 
 **`/ProjectPhases/query` geeft 404 in zone 19.** Gebruik `/Projects/{id}/Phases` (GET, niet query).
 
-**Notes en Attachments zijn geneste resources — nooit top-level aanspreken.**
-- Gebruik: `POST /Tickets/{id}/Notes` en `POST /Tickets/{id}/Attachments`
-- Gebruik NOOIT: `/TicketNotes` of `/TicketNoteAttachments` als top-level endpoint
-- Why: Beide gaven 404 in productie. Swagger-verificatie toonde de correcte geneste structuur.
-- How to apply: Controleer bij elk nieuw endpoint of het een sub-resource is. Verifieer via `GET /Entity/entityInformation` of test in Swagger voor implementatie.
+**Notes en Attachments AANMAKEN kan alleen genest — lezen mag wel top-level.**
+- Aanmaken: `POST /Tickets/{id}/Notes` en `POST /Tickets/{id}/Attachments`. Top-level `/TicketNotes` en `/TicketNoteAttachments` gaven daarvoor 404 in productie; Swagger toonde de geneste structuur.
+- Lezen: `POST /TicketNotes/query` werkt wél top-level (200, geverifieerd 09-08-2026) en is de manier om notities van veel tickets tegelijk op te halen (filter `ticketID in [...]`, chunk op ~200 ids).
+- How to apply: lees de regel als "creates zijn genest", niet als "dit entity bestaat niet top-level". De oude, absolute formulering sprak REFERENCE.md tegen en kostte een omweg.
 
 **Company To-Dos zijn óók een geneste resource — `POST /Companies/{id}/ToDos`.** Zowel top-level `/CompanyToDos` als `/ToDos` geven 404; alleen de nested variant onder Companies werkt. Let op: `GET /CompanyToDos/entityInformation/fields` geeft wél 200 — dat een entity-metadata endpoint bestaat betekent dus niet dat het top-level CRUD-pad bestaat.
 

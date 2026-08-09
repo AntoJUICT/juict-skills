@@ -70,6 +70,7 @@ De client gebruikt Key Vault zodra `AZURE_KEYVAULT_URL` gezet is, anders env var
 - `POST /Tickets` — aanmaken, response: `{ itemId: number }`
 - `PATCH /Tickets` — bijwerken status/velden
 - `GET /Tickets/query` — zoeken op velden
+- `POST /Tickets/query/count` — alleen tellen, respons `{ "queryCount": N }` (geverifieerd 09-08-2026). Zelfde filterbody als een gewone query; scheelt doorpagineren als je alleen een aantal nodig hebt.
 
 Actieve status-picklist (zone 19, geverifieerd 31-07-2026): 1 New, 5 Complete, 7 Waiting Customer, 8 In behandeling, 10 Afspraak gepland, 12 Wacht op leverancier, 13 Wacht op planning, 16 Autocomplete (RMM), 17 In de wacht, 19 Klantnotitie toegevoegd, 20 Notitie Toegevoegd (RMM), 21 Wacht op klant, 22 Wachten op goedkeuring, 23 Goedgekeurd, 24 Afgekeurd, 25 Wacht op administratie, 26 Werkzaamheden gepland, 27 Notitie toegevoegd.
 
@@ -177,7 +178,7 @@ Een platte array gedroeg zich in zone 19 óók als AND (geverifieerd op negen en
 
 Beperk de respons met `includeFields` naast `filter`; geverifieerd op `/TimeEntries/query` dat de respons dan alleen de opgegeven velden bevat. Handig om gevoelige velden (zoals `internalNotes`) niet eens op te halen.
 
-Paginatie via `pageDetails.nextPageUrl` in de response — blijf volgen tot `null`. **Die URL wil een POST met dezelfde body**; een GET geeft 405 "The requested resource does not support http method 'GET'". Pagina 2 sluit exact aan op pagina 1 zonder overlap.
+Paginatie via `pageDetails.nextPageUrl` in de response — blijf volgen tot `null`. **Die URL wil een POST met dezelfde body**; een GET geeft 405 "The requested resource does not support http method 'GET'". De body is verplicht: een POST met een lege body geeft 500, dus "opschonen" van die tweede body breekt de paginatie. Pagina 2 sluit exact aan op pagina 1 zonder overlap (herbevestigd 09-08-2026).
 
 ## Data structures (TypeScript)
 
