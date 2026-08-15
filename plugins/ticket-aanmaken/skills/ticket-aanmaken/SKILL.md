@@ -22,9 +22,13 @@ zonder expliciet akkoord van Anto.
    - Meerdere matches → vraag welke. Geen match → stop en vraag door (nooit gokken, geen fallback-bedrijf).
 3. **Haal picklists op:**
    `node scripts/at-ticket.mjs picklists`
-   - Gebruik de LIVE waarden voor `status`, `priority`, `queueID`, `ticketCategory`, `billingCodeID` (work type).
+   - Gebruik de LIVE waarden voor `status`, `priority`, `queueID`, `ticketType`,
+     `ticketCategory`, `billingCodeID` (work type).
    - `ticketCategory`: zet ALTIJD expliciet mee — anders valt Autotask terug op de default
      `3=Standard`. Voor een gewoon support-ticket is `113=Incident` de juiste keuze.
+   - `ticketType`: zet ALTIJD mee en houd het gelijk aan de categorie (JUICT-conventie):
+     incident = `ticketType 2` + `ticketCategory 113`, change = `ticketType 4` +
+     `ticketCategory 117` (minor) of `119` (major).
 4. **Bepaal de toewijzing** (default Anto). Zoek diens resource + rol:
    `node scripts/at-ticket.mjs resources "anto"`
    - Elke resource komt terug met `roleID`, `roleIDs` en `queueRoles` ([{queueID, roleID}]).
@@ -56,6 +60,7 @@ Velden voor `create` (verplicht: `title`, `companyID`, `status`, `priority`):
       "status": 1,
       "priority": 2,
       "queueID": 5,
+      "ticketType": 2,
       "ticketCategory": 113,
       "billingCodeID": 29682885,
       "assignedResourceID": 29682902,
@@ -75,10 +80,13 @@ Impersonatie is GEEN ticket-veld maar een header — geef die als CLI-flag mee
 - **Status** default op de "New"-waarde uit de picklist.
 - **ticketCategory** ALTIJD expliciet zetten (`113=Incident` voor support). Zonder waarde
   valt Autotask terug op `3=Standard`.
+- **ticketType** ALTIJD meegeven en laten kloppen met de categorie: `2` bij Incident (113),
+  `4` bij een change (117 minor / 119 major). Zonder ticketType klopt de layout in de UI niet.
 - **Impersonatie**: maak ALTIJD aan met `--impersonate <acting-resourceID>`, anders staat de
   creator op het API-account (Claude API) i.p.v. de medewerker. Vereist "Add" op Resource
   Impersonation (Tickets) in de Autotask API-security-level; faalt de create daarop, meld het.
-- **Work type**: alleen codes uit `picklists.workType` (billingCodeType 0 + useType 1).
+- **Work type**: alleen codes uit `picklists.workType` (isActive + useType 1). Die lijst bevat
+  ook interne codes (`billingCodeType: 2`, bv. "Verkoop") — dat zijn geldige work types.
 - **401 bij een call:** verkeerde header-case of API-user gelockt — herhaal niet blind
   (herhaalde 401's locken de user). Meld het en laat Anto de API-user checken.
 - **Secrets nooit printen of loggen.**

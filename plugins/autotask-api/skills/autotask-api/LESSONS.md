@@ -59,7 +59,9 @@ Verkeerde resource+role combinatie → "The specified AssignedResourceID and Ass
 - Gebruik: `params.resourceId ?? Number(process.env.AUTOTASK_DEFAULT_RESOURCE_ID)`
 
 **`billingCodeID` accepteert alleen "general allocation codes".** Een code uit `/BillingCodes/query` met `billingCodeType: 0` is niet automatisch geldig — materiaal/contract-codes geven 500 "The given allocation code is not an active general allocation code". Alleen als general allocation code geconfigureerde labor-codes werken.
-- How to apply: filter de work-type-lijst óók op `useType: 1`. Combineer dus `isActive: true` + `billingCodeType: 0` + `useType: 1`; dat levert exact de bruikbare work types.
+- How to apply: `useType: 1` is het bepalende filter, niet `billingCodeType`. Filter op `isActive: true` + `useType: 1` en laat `billingCodeType` los.
+- Interne codes met `billingCodeType: 2` zijn wél geldige work types (zone 19: "Verkoop", 29682860, geverifieerd op een POST /Tickets). Het strakkere filter `billingCodeType: 0` liet die stil wegvallen.
+- Let op naamdubbels: er is een tweede "Verkoop" (29683529, `billingCodeType: 0`, `useType: 3`) die op nul tickets voorkomt. Kies op `useType`, niet op naam.
 
 ---
 
