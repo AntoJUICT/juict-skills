@@ -10,11 +10,10 @@ Bekende valkuilen, fouten en hard-geleerde lessen bij werken met de Autotask RES
 
 **`/ProjectPhases/query` geeft 404 in zone 19.** Gebruik `/Projects/{id}/Phases` (GET, niet query).
 
-**Notes en Attachments zijn geneste resources — nooit top-level aanspreken.**
-- Gebruik: `POST /Tickets/{id}/Notes` en `POST /Tickets/{id}/Attachments`
-- Gebruik NOOIT: `/TicketNotes` of `/TicketNoteAttachments` als top-level endpoint
-- Why: Beide gaven 404 in productie. Swagger-verificatie toonde de correcte geneste structuur.
-- How to apply: Controleer bij elk nieuw endpoint of het een sub-resource is. Verifieer via `GET /Entity/entityInformation` of test in Swagger voor implementatie.
+**Notes en Attachments AANMAKEN kan alleen genest — lezen mag wel top-level.**
+- Aanmaken: `POST /Tickets/{id}/Notes` en `POST /Tickets/{id}/Attachments`. Top-level `/TicketNotes` en `/TicketNoteAttachments` gaven daarvoor 404 in productie; Swagger toonde de geneste structuur.
+- Lezen: `POST /TicketNotes/query` werkt wél top-level (200, geverifieerd 09-08-2026) en is de manier om notities van veel tickets tegelijk op te halen (filter `ticketID in [...]`, chunk op ~200 ids).
+- How to apply: lees de regel als "creates zijn genest", niet als "dit entity bestaat niet top-level". De oude, absolute formulering sprak REFERENCE.md tegen en kostte een omweg.
 
 **Company To-Dos zijn óók een geneste resource — `POST /Companies/{id}/ToDos`.** Zowel top-level `/CompanyToDos` als `/ToDos` geven 404; alleen de nested variant onder Companies werkt. Let op: `GET /CompanyToDos/entityInformation/fields` geeft wél 200 — dat een entity-metadata endpoint bestaat betekent dus niet dat het top-level CRUD-pad bestaat.
 
@@ -60,7 +59,9 @@ Verkeerde resource+role combinatie → "The specified AssignedResourceID and Ass
 - Gebruik: `params.resourceId ?? Number(process.env.AUTOTASK_DEFAULT_RESOURCE_ID)`
 
 **`billingCodeID` accepteert alleen "general allocation codes".** Een code uit `/BillingCodes/query` met `billingCodeType: 0` is niet automatisch geldig — materiaal/contract-codes geven 500 "The given allocation code is not an active general allocation code". Alleen als general allocation code geconfigureerde labor-codes werken.
-- How to apply: filter de work-type-lijst óók op `useType: 1`. Combineer dus `isActive: true` + `billingCodeType: 0` + `useType: 1`; dat levert exact de bruikbare work types.
+- How to apply: `useType: 1` is het bepalende filter, niet `billingCodeType`. Filter op `isActive: true` + `useType: 1` en laat `billingCodeType` los.
+- Interne codes met `billingCodeType: 2` zijn wél geldige work types (zone 19: "Verkoop", 29682860, geverifieerd op een POST /Tickets). Het strakkere filter `billingCodeType: 0` liet die stil wegvallen.
+- Let op naamdubbels: er is een tweede "Verkoop" (29683529, `billingCodeType: 0`, `useType: 3`) die op nul tickets voorkomt. Kies op `useType`, niet op naam.
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "ticket-aanmaken",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Maakt een Autotask-supportticket aan vanuit een vrije-tekstomschrijving. Claude leidt de velden af (klant, prioriteit, status, queue, work type), toont een voorstel ter goedkeuring en maakt het ticket pas na akkoord aan. Standalone, Key Vault via az.",
   "author": {
     "name": "AntoJUICT",
