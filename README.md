@@ -16,6 +16,7 @@ De repo is public zodat de skills op elke werkplek binnenkomen, ook bij collega'
 | `ticket-aanmaken` | Een Autotask-supportticket aanmaken vanuit vrije tekst. Claude leidt de velden af en maakt het ticket pas na jouw akkoord aan. | Key Vault |
 | `ticket-reactie` | Een Autotask-ticket onderzoeken (PDF of live) en een concept klantreactie opstellen in Anto's tone of voice. | Key Vault |
 | `site-scraper` | De technische opbouw van een website in kaart brengen (framework, routes, API-endpoints), ook achter een login. | nee |
+| `azure-architecture-diagram` | Een Azure-architectuurplaat genereren als bewerkbaar `.drawio` bronbestand plus `.svg`, met shape-index en layoutchecks zodat iconen renderen en lijnen niet kruisen. | nee |
 
 ## Installeren
 

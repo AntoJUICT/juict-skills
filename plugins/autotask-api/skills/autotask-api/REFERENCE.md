@@ -70,12 +70,27 @@ De client gebruikt Key Vault zodra `AZURE_KEYVAULT_URL` gezet is, anders env var
 - `POST /Tickets` — aanmaken, response: `{ itemId: number }`
 - `PATCH /Tickets` — bijwerken status/velden
 - `GET /Tickets/query` — zoeken op velden
+- `POST /Tickets/query/count` — alleen tellen, respons `{ "queryCount": N }` (geverifieerd 09-08-2026). Zelfde filterbody als een gewone query; scheelt doorpagineren als je alleen een aantal nodig hebt.
 
 Actieve status-picklist (zone 19, geverifieerd 31-07-2026): 1 New, 5 Complete, 7 Waiting Customer, 8 In behandeling, 10 Afspraak gepland, 12 Wacht op leverancier, 13 Wacht op planning, 16 Autocomplete (RMM), 17 In de wacht, 19 Klantnotitie toegevoegd, 20 Notitie Toegevoegd (RMM), 21 Wacht op klant, 22 Wachten op goedkeuring, 23 Goedgekeurd, 24 Afgekeurd, 25 Wacht op administratie, 26 Werkzaamheden gepland, 27 Notitie toegevoegd.
+
+Queue-picklist (zone 19, geverifieerd 31-07-2026): `29682833` Eerste lijn support, `29682969` Tweede lijn support, `29683488` Derde lijn support, `29683378` Administratie, `29683482` Verkoop, `29683487` Offboarding, `5` Het JUICT portaal, `6` Post Sale, `8` Monitoring Alert. De support-lijnen zijn de enige betrouwbare as om eerste- van tweedelijnswerk te scheiden — zie de Resources-les in LESSONS.md.
+
+Overige ticket-picklists (zone 19): `ticketType` 1 Service Request, 2 Incident, 3 Problem, 4 Change Request, 5 Alert. `source` -2 Insourced, -1 Client Portal, 2 Telefoon, 4 Email, 8 Monitoring Alert, 11 Mondeling, 13 Herhalend, 14 Intern, 15 Datto RMM, 16 SaaS Alerts. Let op: er is geen waarde "Portal" — een melding uit een eigen klantportaal hoort op `-1`; `8` is Monitoring Alert en vervuilt de alert-rapportage.
+
+Veldlengtes (zone 19, geverifieerd 05-08-2026): `Ticket.title` 255 (verplicht), `Ticket.description` 8000, `Ticket.resolution` 32000, `TicketNote.description` 32000 (verplicht), `TicketNote.title` 250. Autotask kapt te lange waarden stil af — valideer aan je eigen kant.
 
 ### Ticket Notes (NESTED — zie LESSONS.md)
 - `POST /Tickets/{ticketId}/Notes` — note toevoegen
 - `GET /TicketNotes/query` — notes opzoeken
+- `noteType`-picklist (zone 19): 1 Task Summary, 2 Task Detail, 3 Task Notes, 13 Workflow Rule Note - Task, 15 Duplicate Ticket Note, 16 Outsource Workflow Note, 17 Surveys, 18 Client Portal Note, 19 Taskfire Note, 91 Workflow Rule Action Note, 92 Forward/Modify Note, 93 Merged Into Ticket, 94 Absorbed Another Ticket, 95 Copied to Project, 99 RMM Note, 100 BDR Note, 101 Email Note
+- `publish`: 1 All Autotask Users, 2 Internal Project Team, 4 Internal & Co-Managed
+
+### Ticket Attachments (NESTED — zie LESSONS.md)
+- `POST /Tickets/{ticketId}/Attachments` — bijlage toevoegen (`attachmentType`, `publish`, `title`, `fullPath`, `data` base64)
+- `GET /Tickets/{ticketId}/Attachments` — metadata van alle bijlagen (`data` is hier null)
+- `GET /Tickets/{ticketId}/Attachments/{attachmentId}` — **mét** base64 `data`; antwoordt als collectie (`items[0]`)
+- `POST /AttachmentInfo/query` — filter op `ticketID` + `parentType` (4 = Task Or Ticket) + `publish`; datumveld is `attachDate`
 
 ### Time Entries
 - `POST /TimeEntries` — tijdsregistratie aanmaken
@@ -92,6 +107,7 @@ Actieve status-picklist (zone 19, geverifieerd 31-07-2026): 1 New, 5 Complete, 7
 ### Company To-Dos (NESTED — zie LESSONS.md)
 - `POST /Companies/{companyID}/ToDos` — CRM to-do aanmaken (top-level `/CompanyToDos` en `/ToDos` geven 404)
 - `GET /Companies/{companyID}/ToDos` en `GET /Companies/{companyID}/ToDos/{id}` — ophalen
+- `PATCH /Companies/{companyID}/ToDos` — bijwerken; body met `id` + de te wijzigen velden (bijv. `activityDescription`). Geneste PATCH net als Ticket Notes; een top-level PATCH-pad bestaat niet. Response `{ itemId }` (geverifieerd 17-08-2026, zone 19).
 - Verplichte velden: `companyID`, `assignedToResourceID`, `actionType`, `startDateTime`, `endDateTime`. Optioneel o.a. `activityDescription`, `ticketID` (koppelt de to-do aan een ticket), `creatorResourceID`.
 - `actionType` is een picklist; zone 19 heeft o.a. `29682841 = Administratie` (handig voor facturatie-to-do's), naast standaardwaarden als `3 = Algemeen` en `1 = Telefoongesprek`.
 
@@ -103,6 +119,14 @@ Actieve status-picklist (zone 19, geverifieerd 31-07-2026): 1 New, 5 Complete, 7
 ### Resources
 - `GET /Resources/query` — filter op `email` (het primaire e-mailveld). Let op: Resources gebruikt `email`, NIET `emailAddress` zoals Contacts — geverifieerd in zone 19.
 - Filter op `isActive: true` voor actieve medewerkers. Let op: de lijst bevat ook API-integratieaccounts (Claude API, Rewst API, Xelion API, enz.). Die hebben `licenseType` 7 (API User); echte collega's hebben 1 of 3. Voor een "Toewijzen aan collega"-dropdown filter je ze weg met `{ field: "licenseType", op: "noteq", value: 7 }`.
+- Beschikbare velden (zone 19): o.a. `email`, `firstName`, `lastName`, `title`, `resourceType`, `licenseType`, `locationID`, `defaultServiceDeskRoleID`, `hireDate`, `payrollType`. Er is **geen** `departmentID`.
+
+### SLA-resultaten per ticket
+- `POST /ServiceLevelAgreementResults/query` — filter op `ticketID` (`op: "in"` met een array werkt, chunk op ~200 ids). **Dit is de enige bron voor SLA-klokuren.**
+- Velden: `firstResponseElapsedHours`, `resolutionElapsedHours`, `resolutionPlanElapsedHours`, `isFirstResponseMet`, `isResolutionMet`, `isResolutionPlanMet`, `serviceLevelAgreementName`, `ticketID` en drie resource-ids.
+- De verstreken uren lopen op een **gepauzeerde kantoorurenklok**: Autotask verrekent business hours én wachtstatussen zelf. Voorbeeld zone 19: een ticket met 141,84 u wall-clock kwam uit op 33,84 u — exact 108 u aan nachten en weekend eruit. De kalender is ma–vr 08:00–17:00 (narekening klopt op 0,01 u).
+- Autotask start de resolutieklok bij **ticketcreatie**; wil je de tijd ná de eerste reactie, trek dan af: `resolutionElapsedHours − firstResponseElapsedHours`.
+- `GET /ServiceLevelAgreements/...` bestaat NIET (404). De SLA-definitie (toegestane doorlooptijd) is via REST niet op te halen.
 
 ### Contracts & Services
 - `GET /Contracts/query` — filter op `companyID`, `status`
@@ -142,7 +166,7 @@ Query-responses bevatten soms minder velden dan `GET /{entity}/{id}`. Controleer
 
 ## Filters
 
-De REST API gebruikt POST met een `filter`-array op `*/query` endpoints. Meerdere condities moeten in een `and`-wrapper — een platte array wordt als OR geïnterpreteerd:
+De REST API gebruikt POST met een `filter`-array op `*/query` endpoints. Wikkel meerdere condities altijd in een `and`-wrapper:
 
 ```json
 { "filter": [{ "op": "and", "items": [
@@ -151,7 +175,11 @@ De REST API gebruikt POST met een `filter`-array op `*/query` endpoints. Meerder
 ]}], "maxRecords": 500 }
 ```
 
-Paginatie via `pageDetails.nextPageUrl` in de response — blijf volgen tot `null`.
+Een platte array gedroeg zich in zone 19 óók als AND (geverifieerd op negen endpoints, 05-08-2026), maar leun daar niet op — zie de filter-les in LESSONS.md.
+
+Beperk de respons met `includeFields` naast `filter`; geverifieerd op `/TimeEntries/query` dat de respons dan alleen de opgegeven velden bevat. Handig om gevoelige velden (zoals `internalNotes`) niet eens op te halen.
+
+Paginatie via `pageDetails.nextPageUrl` in de response — blijf volgen tot `null`. **Die URL wil een POST met dezelfde body**; een GET geeft 405 "The requested resource does not support http method 'GET'". De body is verplicht: een POST met een lege body geeft 500, dus "opschonen" van die tweede body breekt de paginatie. Pagina 2 sluit exact aan op pagina 1 zonder overlap (herbevestigd 09-08-2026).
 
 ## Data structures (TypeScript)
 
@@ -165,7 +193,7 @@ interface AutotaskTicket {
   priority: number;            // ZONE 19: custom picklist — 1=Prio 2, 2=Prio 3, 4=Prio 1, 5=Spoed. GEEN waarde 3! De generieke 1=Critical/2=High/3=Normal/4=Low geldt NIET.
   companyID: number;
   contactID?: number;
-  source?: number;             // 8=Portal, telefoon=eigen ID
+  source?: number;             // ZONE 19: -1=Client Portal, 2=Telefoon, 4=Email, 8=Monitoring Alert, 15=Datto RMM, 16=SaaS Alerts (volledige lijst hierboven)
   issueType?: number;
   subIssueType?: number;
   ticketType?: number;

@@ -115,13 +115,16 @@ export async function cmdPicklists() {
   const priority = picklistFromFields(fields, "priority");
   const queue = picklistFromFields(fields, "queueID");
   const ticketCategory = picklistFromFields(fields, "ticketCategory");
+  const ticketType = picklistFromFields(fields, "ticketType");
+  // useType 1 (general allocation code) is het bepalende filter. NIET ook op
+  // billingCodeType 0 filteren: interne codes (type 2, bv. "Verkoop") zijn geldige
+  // work types en vielen met dat strakkere filter stil weg.
   const wt = await atQuery("BillingCodes", [
     { field: "isActive", op: "eq", value: true },
-    { field: "billingCodeType", op: "eq", value: 0 },
     { field: "useType", op: "eq", value: 1 },
   ]);
-  const workType = wt.map((b) => ({ id: b.id, name: b.name }));
-  return { status, priority, queue, ticketCategory, workType };
+  const workType = wt.map((b) => ({ id: b.id, name: b.name, billingCodeType: b.billingCodeType }));
+  return { status, priority, queue, ticketCategory, ticketType, workType };
 }
 
 // Vat de ResourceRoles-rijen van één resource samen tot bruikbare rol-id('s).

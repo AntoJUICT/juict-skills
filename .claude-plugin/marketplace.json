@@ -43,6 +43,11 @@
       "description": "Technische opbouw van een website in kaart brengen — framework, sitemap/routes en backend API-endpoints, ook achter login."
     },
     {
+      "name": "azure-architecture-diagram",
+      "source": "./plugins/azure-architecture-diagram",
+      "description": "Azure-architectuurplaat genereren als .drawio bron plus .svg — shape-index tegen verzonnen icoonpaden en layoutchecks tegen kruisende lijnen."
+    },
+    {
       "name": "itglue-api",
       "source": "./plugins/itglue-api",
       "description": "Werken met de IT Glue REST API in JUICT-projecten — Key Vault-auth, read-only lookups, endpoints en valkuilen; wachtwoorden alleen als deeplink."
