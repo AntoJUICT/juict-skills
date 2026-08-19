@@ -2,7 +2,7 @@
 
 Bekende valkuilen bij de IT Glue REST API. Voeg nieuwe lessen toe na elk project, met datum, zodat een volgende collega weet hoe hard een uitspraak is.
 
-**Waar deze lessen vandaan komen.** Alles met een datum is gemeten tijdens ad-hoc werk op 2026-07-21 en 2026-07-31, buiten deze skill om, met losse calls en letterlijke blokhaken in de query. De CLI en de client in deze skill hebben zelf nog nooit een live call gedaan: de geplande verificatieronde van 2026-07-31 kon niet lopen omdat het ophalen van de API-key in die omgeving geweigerd werd. Geen enkele les is dus geverifieerd in exact de vorm die de scripts versturen, want die coderen de blokhaken naar `%5B` en `%5D`. Zonder datum betekent: overgenomen uit de documentatie of uit onze eigen code. REFERENCE.md heeft onderaan een tabel met de openstaande punten en het commando dat ze afvinkt.
+**Waar deze lessen vandaan komen.** Alles met een datum is gemeten tijdens ad-hoc werk op 2026-07-21, 2026-07-31 en 2026-08-18, buiten deze skill om, met losse calls en letterlijke blokhaken in de query. De CLI en de client in deze skill hebben zelf nog nooit een live call gedaan: de geplande verificatieronde van 2026-07-31 kon niet lopen omdat het ophalen van de API-key in die omgeving geweigerd werd. Geen enkele les is dus geverifieerd in exact de vorm die de scripts versturen, want die coderen de blokhaken naar `%5B` en `%5D`. Zonder datum betekent: overgenomen uit de documentatie of uit onze eigen code. REFERENCE.md heeft onderaan een tabel met de openstaande punten en het commando dat ze afvinkt.
 
 ---
 
@@ -26,7 +26,9 @@ Bekende valkuilen bij de IT Glue REST API. Voeg nieuwe lessen toe na elk project
 
 **TOTP-seed is niet beschikbaar via de API.** De attributes bevatten alleen `otp-enabled` (boolean), geen seedveld (`otp_secret`, `otp-secret` en `otpSecret` ontbreken), gemeten 2026-07-21. Onbemande TOTP-flows op basis van IT Glue kunnen dus niet.
 
-**Onze key mag password-items niet opruimen.** Een verwijderpoging gaf 401 "Unauthorized resource access", ook in de bulkvorm (gemeten 2026-07-31). Opruimen is handwerk in de UI. Let op dat PowerShell hierbij geen zichtbare exception gooide: het item bleef simpelweg bestaan.
+**Onze key mag password-items niet direct opruimen.** Een verwijderpoging gaf 401 "Unauthorized resource access", ook in de bulkvorm (gemeten 2026-07-31). Let op dat PowerShell hierbij geen zichtbare exception gooide: het item bleef simpelweg bestaan. Dat een wachtwoord daarmee alleen in de UI weg te krijgen is, blijkt niet te kloppen; zie de volgende les.
+
+**Een DELETE op een flexible asset neemt het gekoppelde wachtwoord wél mee.** `DELETE /flexible_assets/{id}` verwijdert niet alleen de asset maar ook het wachtwoord dat als Password-trait aan die asset hangt, precies omgekeerd aan de 401 op de password-resource zelf (gemeten 2026-08-18 bij het opruimen van een VPN-asset: na de DELETE op de asset gaf een losse `GET /passwords/{id}` op de pre-shared key niets meer). Controleer dus voordat je een asset verwijdert of het gekoppelde wachtwoord nog ergens anders voor nodig is: het verdwijnt zonder waarschuwing mee en de API meldt niet dat er een wachtwoord bij zat. Stel na elke delete met een losse `GET` vast dat het item echt weg is, want de DELETE zelf meldt niets bruikbaars terug.
 
 ---
 
@@ -106,6 +108,6 @@ node itglue-lookup.mjs configs <org-id> --raw
 
 **Deze skill is read-only.** De netwerklaag doet uitsluitend GET. Dat is een keuze, niet een beperking van de API: schrijven op IT Glue raakt de bron van waarheid voor het hele team en hoort een bewuste, apart gereviewde actie te zijn.
 
-Twee dingen om te weten mocht je ooit buiten deze skill wel gaan schrijven. Een update op een flexible asset wist elke trait die je niet meestuurt, anders dan bij configuraties waar niet-meegestuurde velden ongemoeid blijven. En tag-velden zijn asymmetrisch: bij lezen komt een tag-trait terug als object met `.values`, bij schrijven verwacht IT Glue een array van resource-ids, en items met `resource-deleted: true` moet je eruit filteren om geen dode referentie terug te schrijven. Beide waargenomen op 2026-07-21.
+Drie dingen om te weten mocht je ooit buiten deze skill wel gaan schrijven. Een update op een flexible asset wist elke trait die je niet meestuurt, anders dan bij configuraties waar niet-meegestuurde velden ongemoeid blijven. En tag-velden zijn asymmetrisch: bij lezen komt een tag-trait terug als object met `.values`, bij schrijven verwacht IT Glue een array van resource-ids, en items met `resource-deleted: true` moet je eruit filteren om geen dode referentie terug te schrijven. Beide waargenomen op 2026-07-21. En de volgorde telt: vul de velden van een asset aan voordat iemand er handmatig een wachtwoord aan koppelt, want patch je erna, dan moet je die Password-trait expliciet meesturen om de koppeling niet weg te gooien (2026-08-18).
 
 **Verifieer een endpoint voordat je erop bouwt.** Doe een losse GET met `node itglue-lookup.mjs get "<pad>"` en kijk naar de echte respons. Bij IT Glue is dat extra belangrijk omdat een niet-werkend pad zich als een lege lijst voordoet in plaats van als een 404.
