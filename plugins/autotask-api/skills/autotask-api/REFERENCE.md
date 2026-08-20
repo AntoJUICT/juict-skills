@@ -137,9 +137,22 @@ Veldlengtes (zone 19, geverifieerd 05-08-2026): `Ticket.title` 255 (verplicht), 
 - `GET /BillingCodes/query` — filter op `isActive` (NIET `active`) en `billingCodeType`. Work types (labor) = `billingCodeType` 0.
 - Voor een Work Type-dropdown: filter óók op `useType` 1 (general allocation codes) — alleen die zijn geldig als `billingCodeID`. `billingCodeType: 0` alléén bevat ook material/contract-codes die 500 geven.
 
-### Projects
-- `POST /Projects` — aanmaken project
-- `GET /Projects/{id}/Phases` — fases ophalen (NIET `/ProjectPhases/query` — bestaat niet in zone 19)
+### Projects, Phases en Tasks
+Creates zijn genest onder het project, queries zijn top-level. Geverifieerd zone 19 op 20-08-2026.
+
+- `POST /Projects` — aanmaken. Verplicht: `companyID`, `projectName`, `projectType`, `status`, `startDateTime`, `endDateTime`.
+- `GET /Projects/{id}` — `actualHours`, `actualBilledHours`, `estimatedTime`, `projectLeadResourceID`, `status`.
+- `POST /Projects/{id}/Phases` — fase aanmaken (verplicht: `projectID`, `title`). Top-level `POST /Phases` geeft 404.
+- `GET /Projects/{id}/Phases` en `POST /Phases/query` — beide werken voor lezen (filter op `projectID`).
+- `POST /Projects/{id}/Tasks` en `PATCH /Projects/{id}/Tasks` — top-level `POST /Tasks` geeft 404. Verplicht: `projectID`, `title`, `taskType`, `status`. Met een toegewezen resource komen `departmentID` en `billingCodeID` er verplicht bij.
+- `POST /Tasks/query` — lezen, top-level.
+- `POST /Tasks/{id}/SecondaryResources` — resource+rol aan een task hangen (verplicht: `taskID`, `resourceID`, `roleID`). Top-level `/TaskSecondaryResources` geeft 404.
+- `POST /TaskNotes` en `POST /TaskNotes/query` — werken top-level. Verplicht: `taskID`, `description`, `noteType`, `publish`. `noteType` kent hier maar drie waarden: 1 Task Summary, 2 Task Detail, 3 Task Notes.
+
+`projectType` (zone 19): 2 Proposal, 3 Template, 4 Internal, 5 Client, 8 Baseline.
+`Project.status`: 0 Inactive, 1 New, 2 In Behandeling, 3 On Hold, 4 Change Order, 5 Complete, 6 Wacht op Leverancier, 7 Wacht op Klant. `Task.status` gebruikt dezelfde picklist als tickets.
+
+Bestaat niet als entity: `ProjectResources`, `ProjectTeamMembers`, `ProjectTeam`, `ProjectPhases`, `TaskSecondaryResources`, `SecurityLevels`. Projecten en tasks kun je niet verwijderen (`canDelete: false`); afsluiten kan alleen met een status.
 
 ### Metadata / picklists
 - `GET /Tickets/entityInformation/fields` — picklist-waarden voor status, priority, issueType, subIssueType, etc.

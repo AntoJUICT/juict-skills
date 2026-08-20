@@ -8,7 +8,8 @@ Bekende valkuilen, fouten en hard-geleerde lessen bij werken met de Autotask RES
 
 **`/ProjectTemplates` bestaat niet.** Nooit gebruiken. Ontdekt na mislukte requests.
 
-**`/ProjectPhases/query` geeft 404 in zone 19.** Gebruik `/Projects/{id}/Phases` (GET, niet query).
+**Project-entities maak je genest aan, maar je leest ze top-level.** `POST /Projects/{id}/Phases` en `POST /Projects/{id}/Tasks` werken; de top-level varianten `POST /Phases` en `POST /Tasks` geven 404. Voor lezen is het omgekeerd ruimer: `POST /Phases/query` en `POST /Tasks/query` werken wél (de oudere regel "`/ProjectPhases/query` bestaat niet" ging over de entitynaam `ProjectPhases`, niet over `Phases`).
+- How to apply: dit is hetzelfde patroon als bij Ticket Notes. Ga er standaard van uit dat een create onder zijn parent hangt en test dat eerst, in plaats van het top-level pad te gokken.
 
 **Notes en Attachments AANMAKEN kan alleen genest — lezen mag wel top-level.**
 - Aanmaken: `POST /Tickets/{id}/Notes` en `POST /Tickets/{id}/Attachments`. Top-level `/TicketNotes` en `/TicketNoteAttachments` gaven daarvoor 404 in productie; Swagger toonde de geneste structuur.
@@ -25,6 +26,20 @@ Bekende valkuilen, fouten en hard-geleerde lessen bij werken met de Autotask RES
 **Drie SLA-velden op het Ticket-entity lijken bruikbaar maar zijn leeg in zone 19.** `serviceLevelAgreementHasBeenMet`, `serviceLevelAgreementPausedNextEventHours` en `resolutionPlanDueDateTime` waren 0/713 gevuld. Gebruik `ServiceLevelAgreementResults` in plaats daarvan. `firstResponseDateTime`/`DueDateTime` en `resolvedDateTime`/`DueDateTime` zijn wél gevuld.
 
 **Autotask levert geen status- of queue-historie via REST.** Je ziet alleen de huidige stand per ticket. Een "hoeveel tickets zijn geëscaleerd"-vraag beantwoord je dus met een eindstand (in welke queue staat het ticket nu), niet met een overgang. Benoem dat verschil in rapportages; een ticket dat meteen in de tweede lijn is aangemaakt telt anders mee als escalatie.
+
+---
+
+## Projecten, phases en tasks
+
+**`Project.actualHours` telt alleen uren op tasks; uren op een gekoppeld ticket tellen niet mee.** Gemeten op vier projecten in zone 19 (20-08-2026): project 22 had 40,73 u op tasks en 1,80 u op twaalf via `projectID` gekoppelde tickets, en `actualHours` stond exact op 40,73. Wil je dat ticketwerk in de projecturen terugzien, dan moet de tijd op een task staan.
+
+**Een task met een toegewezen resource eist ook `departmentID` en `billingCodeID`.** Beide komen als aparte 500 achter elkaar: "departmentID is a required field when a Resource (primary/secondary) is assigned to a Task", daarna dezelfde melding voor billingCodeID. Zonder `assignedResourceID` is geen van beide nodig.
+- How to apply: haal het department per resource uit `ResourceRoles` (het veld staat niet op de resource zelf) en neem de `billingCodeID` van het bronticket of de meest voorkomende uit de tijdregistraties.
+
+**Tijd boeken op een task kan alleen voor een resource die aan die task hangt.** Een `POST /TimeEntries` met `taskID` voor een collega die er niet op staat geeft 500 "This roleID is not valid for this Task and Resource", ook als de resource+rol-combinatie op zich geldig is. Bij tickets speelt dit niet, daar mag iedereen boeken.
+- How to apply: zet eerst `POST /Tasks/{id}/SecondaryResources` met dezelfde `resourceID` en `roleID` als de tijdregistratie, en pas daarna de entry.
+
+**`PATCH /Tickets` met `projectID` koppelt een ticket aan een project.** Werkt gewoon, ondanks dat het veld zeldzaam gevuld is (16 van de ruim 20.000 tickets in zone 19). Handig om de historie van een ticket vindbaar te houden onder het project waar het werk verderging.
 
 ---
 
@@ -57,6 +72,12 @@ Verkeerde resource+role combinatie → "The specified AssignedResourceID and Ass
 - Sla standaard IDs op in `AUTOTASK_DEFAULT_RESOURCE_ID` en `AUTOTASK_DEFAULT_ROLE_ID`
 - Guard altijd: `durationHours > 0 ? durationHours : 0.01`
 - Gebruik: `params.resourceId ?? Number(process.env.AUTOTASK_DEFAULT_RESOURCE_ID)`
+
+**Een bestaande TimeEntry kan niet van een ticket naar een task verhuizen.** `PATCH /TimeEntries` met `taskID` + `ticketID: null` geeft 500 "This taskID does not reference a valid Task", terwijl diezelfde task even later een nieuwe entry gewoon accepteert; alleen `taskID` sturen geeft "Only one of ticketID,taskID and InternallAllocationCodeID can be used at once". De enige route is kopiëren naar de task en het origineel aanpassen of verwijderen (`DELETE /TimeEntries/{id}` werkt, mits het API-account de entry zelf aanmaakte).
+- How to apply: bij kopiëren neem je `dateWorked`, `startDateTime`, `endDateTime`, `hoursWorked`, `billingCodeID`, `summaryNotes` en `internalNotes` één op één over. `timeEntryType` is read-only en wordt vanzelf 6 (ProjectTask) in plaats van 2.
+
+**`hoursWorked` verlagen lukt alleen als je het start/eind-venster meestuurt.** Een `PATCH` met alleen `hoursWorked` geeft 200 met `itemId` en verandert niets: de uren volgen het venster. Stuur `startDateTime` en `endDateTime` mee en de waarde beweegt wel mee. Nul is onmogelijk (een venster met start = eind geeft 500 "hoursWorked greater than 24 hours or less than zero hours"); één minuut (0,0167) is de ondergrens, en `hoursToBill` wordt dan naar 0,25 afgerond.
+- How to apply: weer een geval waarin een 200 geen bewijs is. Lees de entry terug en controleer `hoursWorked` voordat je iets als verwerkt beschouwt.
 
 **`billingCodeID` accepteert alleen "general allocation codes".** Een code uit `/BillingCodes/query` met `billingCodeType: 0` is niet automatisch geldig — materiaal/contract-codes geven 500 "The given allocation code is not an active general allocation code". Alleen als general allocation code geconfigureerde labor-codes werken.
 - How to apply: `useType: 1` is het bepalende filter, niet `billingCodeType`. Filter op `isActive: true` + `useType: 1` en laat `billingCodeType` los.
@@ -141,6 +162,14 @@ Why: Eerste poging gaf 500 "does not have adequate permissions" omdat de API sec
 
 **Zet de `ImpersonationResourceId`-header NOOIT op query/GET-endpoints.** Op `*/query` geeft de header "The logged in Resource does not have the adequate permissions to query this entity type." Gebruik twee header-sets: één zonder impersonatie voor lezen, één mét voor creates (POST Tickets/Notes).
 
+**Op Tasks wordt de impersonatie-header stil genegeerd.** Geen foutmelding, gewoon 200, en toch blijft het API-account als `creatorResourceID` staan (geverifieerd met drie verschillende resources). Het verschil met een rechtenprobleem is het geluid: ontbreekt het "Add"-recht, dan krijg je een harde 500; ondersteunt de entity het niet, dan gebeurt er niets. Voor tasks valt hier dus niets in te stellen.
+
+**Impersoneren van een API-user resource of van een resource met een beperkt security level wordt geweigerd.** Resources als "Rewst API" en "Claude API" (licenseType 7) geven 500 "does not have the adequate permissions to create this entity type", en dat gold in zone 19 ook voor één gewone collega. Bouw daarom altijd een fallback naar het API-account in plaats van de call te laten klappen, en log wie is teruggevallen.
+
+**Een met impersonatie aangemaakte TimeEntry kan het API-account niet meer verwijderen.** Eerst "You do not have permission to delete time entries that you did not create", en met dezelfde impersonatie erbij "does not have the adequate permissions to delete this entity timeEntryType". Aanpassen mag nog wel. Wil je een migratie terugdraaibaar houden, zet dan naast Add ook het Delete-recht voor Time Entries aan.
+
+**Zet géén impersonatie op een `PATCH` van een bestaande ticket-tijdregistratie.** Dat geeft 500 "User not authorized to change Show On Invoice values for Ticket time entries", ook als je dat veld helemaal niet meestuurt; dezelfde PATCH als API-account slaagt wel. Impersonatie hoort bij creates, niet bij het bijwerken van wat een collega eerder zelf boekte.
+
 **Impersonatie is per entity — `POST /TimeEntries` kan falen terwijl `POST /Tickets` slaagt.** Zonder "Add" voor TimeEntries geeft de header 500 "does not have adequate permissions to create this entity", ook al werkt impersonatie op Tickets. Workaround: laat de `ImpersonationResourceId`-header weg bij `/TimeEntries` — `resourceID` in de body wijst de tijd al toe aan de medewerker.
 
 ---
@@ -217,6 +246,9 @@ Notes hebben een `Publish` veld: `1` = zichtbaar voor klant, `2` = intern, `4` =
 **Vertrouw het `publish`-label uit de metadata NIET.** `GET /TicketNotes/entityInformation/fields` noemt `1 = All Autotask Users`, maar in zone 19 rendert `publish: 1` als een EXTERNE, klant-zichtbare note — gebruik `2` voor intern (leidend blijft: 1 = klant, 2 = intern). Een per ongeluk externe note corrigeer je met `PATCH /Tickets/{id}/Notes` en body `{ id, noteType, publish: 2 }` (DELETE geeft 405).
 
 **Een ticketnotitie hoort ALTIJD op een TimeEntry, nooit als losse Ticket Note.** Elke `POST /TimeEntries` krijgt zowel `summaryNotes` (klant-zichtbare samenvatting) als `internalNotes` (interne notitie voor engineers, CATA-vorm) — zo staan notitie en bestede tijd altijd samen. Losse Ticket Notes alleen voor communicatie zonder bestede tijd (patroon uit xelion-transcriptie, `src/lib/autotask.ts`).
+
+**De auteur van een TaskNote is achteraf niet meer te corrigeren.** `PATCH /TaskNotes` met `creatorResourceID` geeft 200 en verandert niets, ook mét impersonatie, en DELETE geeft 405 op zowel `/TaskNotes/{id}` als `/Tasks/{id}/Notes/{id}`. `title` en `description` zijn wél te patchen.
+- How to apply: zet de creator meteen goed bij het aanmaken. Ging het toch mis, dan is de minst rommelige reparatie de inhoud opnieuw plaatsen mét impersonatie en de oude notitie terugbrengen tot één verwijsregel. Zet in beide gevallen auteur en datum ook in de titel, dan is de herkomst leesbaar zonder de creator uit te lezen.
 
 **Notes zonder impersonatie komen op naam van de API-user te staan.** Stuur bij het plaatsen van notes ALTIJD beide mee: de `ImpersonationResourceId`-header én `creatorResourceID` in de payload. Corrigeren achteraf: DELETE op een note geeft 405; `PATCH /Tickets/{id}/Notes` werkt wél, maar alleen met `noteType` en `publish` in de body (anders 500).
 
