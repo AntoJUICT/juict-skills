@@ -62,6 +62,26 @@ dus pak de eerste waarde in plaats van een vaste sleutel te veronderstellen.
 **`descriptor` is een object, geen string.** In `GET /v2/account` zit daar `deviceLimit`,
 `timeZone` en `bilingEmail` in. Rechtstreeks printen geeft `[object Object]`.
 
+## User defined fields
+
+**Er zijn er 300, niet 30.** De spec definieert `udf1` tot en met `udf300`, aaneengesloten, en een
+device-respons levert alle 300 sleutels terug (lege velden als `null`). "Dertig" was een aanname uit
+het geheugen die de spec meteen weersprak; de eerste versie van deze skill weigerde daardoor
+`udf31` en hoger. Als een UDF-schrijfactie afketst op een validatiefout, kijk dan eerst of de
+validatie klopt en niet of het veld bestaat.
+
+**Een UDF-POST is een gerichte update, geen volledige vervanging.** Gemeten op 2026-08-25 met een
+testdevice waarvan alle UDF's leeg waren: eerst `udf299` en `udf300` samen gezet, daarna een POST
+met alleen `udf299`. `udf300` bleef staan. Niet-meegestuurde velden worden dus niet gewist, wat
+betekent dat een tagging-script dat alleen `udf20` zet een speedtest-waarde in `udf9` met rust laat.
+
+Wat wél gebeurt: een veld dat je noemt wordt zonder waarschuwing overschreven. Lees het device
+eerst als je niet zeker weet of er al iets in staat; de CLI toont dat in de preview onder
+"Overschrijft".
+
+**Leegmaken kan met een lege string.** `udf299=` zet het veld leeg, en het komt daarna als `null`
+terug in de respons (niet als lege string).
+
 ## Sites en Autotask
 
 **Sites dragen hun Autotask-koppeling zelf.** `autotaskCompanyId` en `autotaskCompanyName` staan

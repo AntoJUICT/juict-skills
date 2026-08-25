@@ -27,7 +27,8 @@ machines van klanten aan: een quick job draait code op een endpoint, en een UDF-
 overschrijft een veld dat automatisering elders uitleest. Zonder `--confirm` toont de CLI het
 device, de site, de online-status, het volledige request en de body, en verstuurt niets. Dat is
 geen formaliteit: bij de eerste dry-run op onze eigen server bleek `udf9` al een speedtest-resultaat
-te bevatten, en of een POST met één veld de rest wist, is nog niet gemeten.
+te bevatten. Een UDF-POST blijkt inmiddels een gerichte update (niet-genoemde velden blijven staan),
+maar een veld dat je wél noemt gaat er zonder waarschuwing overheen, en een quick job draait code.
 
 ## Vóór je begint
 

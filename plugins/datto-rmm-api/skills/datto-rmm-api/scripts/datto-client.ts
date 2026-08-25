@@ -359,10 +359,14 @@ export const getDevice = (deviceUid: string) =>
   dattoRequest<DattoDevice>(`v2/device/${encodeURIComponent(deviceUid)}`);
 
 /**
- * Zet user defined fields op een device. Dit is een schrijfactie op een klantomgeving: de CLI
- * dwingt daarvoor een expliciete --confirm af, en in een applicatie hoort er een even bewuste
- * bevestiging voor te staan. Of niet-meegestuurde UDF's blijven staan is niet geverifieerd;
- * lees het device eerst als je zeker wilt weten wat je overschrijft.
+ * Zet user defined fields op een device (udf1 tot en met udf300). Dit is een schrijfactie op een
+ * klantomgeving: de CLI dwingt daarvoor een expliciete --confirm af, en in een applicatie hoort er
+ * een even bewuste bevestiging voor te staan.
+ *
+ * De POST is een gerichte update: velden die je niet meestuurt blijven ongemoeid (gemeten
+ * 2026-08-25). Een veld dat je wél meestuurt wordt zonder waarschuwing overschreven, dus lees het
+ * device eerst als je niet zeker weet of er al iets in staat. Een lege string maakt een veld leeg;
+ * het komt daarna als null terug.
  */
 export const setDeviceUdf = (deviceUid: string, udfs: Record<string, string>) =>
   dattoRequest(`v2/device/${encodeURIComponent(deviceUid)}/udf`, { method: "POST", body: udfs });
