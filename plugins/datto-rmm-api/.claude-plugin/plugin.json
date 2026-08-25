@@ -1,0 +1,12 @@
+{
+  "name": "datto-rmm-api",
+  "version": "1.0.0",
+  "description": "Werken met de Datto RMM REST API v2 in JUICT-projecten — OAuth2-auth via Azure Key Vault, sites/devices/alerts/audit uitlezen, en schrijfacties (UDF's, quick jobs) achter een verplichte bevestiging.",
+  "author": {
+    "name": "AntoJUICT",
+    "email": "anto@juict.nl"
+  },
+  "homepage": "https://github.com/AntoJUICT/juict-skills",
+  "repository": "https://github.com/AntoJUICT/juict-skills",
+  "keywords": ["datto", "rmm", "centrastage", "api", "rest", "keyvault", "juict"]
+}
