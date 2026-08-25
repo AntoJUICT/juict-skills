@@ -168,14 +168,18 @@ test("een variabele zonder isgelijkteken wordt geweigerd", () => {
   assert.throws(() => parseVars(["kaputt"]), /naam=waarde/);
 });
 
-test("UDF-body accepteert udf1 tot en met udf30 en normaliseert de casing", () => {
-  assert.deepEqual(buildUdfBody(["UDF3=hallo", "udf30=x"]), { udf3: "hallo", udf30: "x" });
+test("UDF-body accepteert udf1 tot en met udf300 en normaliseert de casing", () => {
+  // Het bereik is 300, niet 30: de spec definieert udf1..udf300 aaneengesloten en een
+  // device-respons levert alle 300 sleutels terug. Gemeten op 2026-08-25.
+  assert.deepEqual(buildUdfBody(["UDF3=hallo", "udf300=x"]), { udf3: "hallo", udf300: "x" });
+  assert.deepEqual(buildUdfBody(["udf31=x"]), { udf31: "x" });
 });
 
 test("een UDF buiten het bereik wordt geweigerd", () => {
-  assert.throws(() => buildUdfBody(["udf31=x"]), /geldig UDF-veld/);
+  assert.throws(() => buildUdfBody(["udf301=x"]), /geldig UDF-veld/);
   assert.throws(() => buildUdfBody(["udf0=x"]), /geldig UDF-veld/);
   assert.throws(() => buildUdfBody(["naam=x"]), /geldig UDF-veld/);
+  assert.throws(() => buildUdfBody(["udfx=x"]), /geldig UDF-veld/);
 });
 
 test("een lege UDF-opdracht wordt geweigerd in plaats van een lege POST te sturen", () => {

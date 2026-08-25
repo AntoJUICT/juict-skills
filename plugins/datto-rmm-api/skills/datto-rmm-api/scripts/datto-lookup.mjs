@@ -433,8 +433,11 @@ export function buildUdfBody(paren) {
     const idx = String(paar).indexOf("=");
     if (idx <= 0) throw new Error(`UDF '${paar}' moet de vorm udf3=waarde hebben.`);
     const veld = String(paar).slice(0, idx).trim();
-    if (!/^udf([1-9]|[12][0-9]|30)$/i.test(veld)) {
-      throw new Error(`'${veld}' is geen geldig UDF-veld. Gebruik udf1 tot en met udf30.`);
+    // De spec definieert udf1 tot en met udf300, aaneengesloten, en een device-respons levert
+    // alle 300 sleutels. Niet 30: dat was een aanname die de spec meteen weersprak.
+    const nummer = /^udf(\d+)$/i.exec(veld);
+    if (!nummer || Number(nummer[1]) < 1 || Number(nummer[1]) > 300) {
+      throw new Error(`'${veld}' is geen geldig UDF-veld. Gebruik udf1 tot en met udf300.`);
     }
     body[veld.toLowerCase()] = String(paar).slice(idx + 1);
   }
@@ -842,18 +845,21 @@ async function main() {
       if (!uid) throw new Error("Geef een device-uid mee.");
       const body = buildUdfBody(rest.slice(1));
 
-      // Toon eerst wat er nu staat. Of een POST met een deelverzameling de overige UDF's laat
-      // staan of leegmaakt, is nog niet gemeten (zie REFERENCE.md); daarom is de huidige stand
-      // onderdeel van de preview, zodat zichtbaar is wat er op het spel staat.
+      // Toon eerst wat er nu staat. Een POST met een deelverzameling laat de overige UDF's staan
+      // (gemeten 2026-08-25), dus alleen de velden die je noemt veranderen. Die meegestuurde
+      // velden worden wél overschreven, en daarom is de huidige stand onderdeel van de preview.
       const device = await dattoRequest(`v2/device/${encodeURIComponent(uid)}`);
       const huidig = Object.entries(device?.udf ?? {}).filter(([, v]) => v !== null && v !== "");
+      const raakt = Object.keys(body).filter((k) => (device?.udf ?? {})[k]);
 
       await voerSchrijfactieUit({
         omschrijving: "User defined fields zetten",
         context: [
           `Device:   ${device?.hostname ?? "?"} (${device?.siteName ?? "?"})`,
           `Nu gezet: ${huidig.length ? huidig.map(([k, v]) => `${k}=${v}`).join(", ") : "(geen)"}`,
-          "Let op: of niet-meegestuurde UDF's blijven staan is niet geverifieerd.",
+          raakt.length
+            ? `Overschrijft: ${raakt.map((k) => `${k} (was "${device.udf[k]}")`).join(", ")}`
+            : "Overschrijft: niets, alle genoemde velden zijn nu leeg",
         ],
         method: "POST",
         pad: `v2/device/${encodeURIComponent(uid)}/udf`,

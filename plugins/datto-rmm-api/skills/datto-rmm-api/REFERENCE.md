@@ -159,7 +159,7 @@ Alle paden hieronder staan relatief aan `https://merlot-api.centrastage.net/api`
 | 📄 `GET /v2/device/macAddress/{macAddress}` | — | Device op MAC, formaat `XXXXXXXXXXXX` |
 | 📄 `GET /v2/device/{deviceUid}/alerts/open` | page, max, muted | Open alerts van een device |
 | 📄 `GET /v2/device/{deviceUid}/alerts/resolved` | page, max, muted | Opgeloste alerts van een device |
-| 📄 `POST /v2/device/{deviceUid}/udf` | — | **Schrijft.** Zet user defined fields |
+| ✅ `POST /v2/device/{deviceUid}/udf` | — | **Schrijft.** Zet user defined fields (udf1–udf300); gerichte update, wist niet-genoemde velden niet |
 | 📄 `PUT /v2/device/{deviceUid}/quickjob` | — | **Schrijft. Draait code op de machine.** Start een quick job |
 | 📄 `PUT /v2/device/{deviceUid}/site/{siteUid}` | — | **Schrijft.** Verplaatst een device naar een andere site |
 | 📄 `POST /v2/device/{deviceUid}/warranty` | — | **Schrijft.** Zet de garantiedatum |
@@ -298,15 +298,28 @@ het object leeg.
 `GET /v2/account/components`; een variabelenaam moet exact overeenkomen met een variabele van het
 component.
 
-### UDF 📄
+### UDF ✅
 
-`POST /v2/device/{uid}/udf` met `{"udf3": "waarde"}`. De spec definieert udf1 tot en met udf30.
+`POST /v2/device/{uid}/udf` met `{"udf3": "waarde"}`. Het bereik is **udf1 tot en met udf300**,
+aaneengesloten; een device-respons levert alle 300 sleutels terug, ook de lege (als `null`).
+
+Het schrijfgedrag is gemeten op 2026-08-25 met een testdevice waarvan alle UDF's leeg waren:
+
+| Vraag | Antwoord |
+|---|---|
+| Wist een POST met één veld de andere UDF's? | **Nee.** Niet-meegestuurde velden blijven ongemoeid |
+| Wordt een meegestuurd veld overschreven? | Ja, zonder waarschuwing |
+| Kun je een veld leegmaken? | Ja, met een lege string; het veld komt daarna als `null` terug |
+
+De POST is dus een gerichte update en geen volledige vervanging. Dat scheelt: een tagging-script dat
+alleen `udf20` zet, laat een speedtest-waarde in `udf9` met rust. Let wel op de tweede regel — het
+veld dat je noemt gaat er zonder meer overheen, dus lees het device eerst als je niet zeker weet of
+er al iets in staat. De CLI toont dat in de preview onder "Overschrijft".
 
 ## Wat nog niet gemeten is
 
 | Openstaand punt | Waarom het uitmaakt | Hoe je het afvinkt |
 |---|---|---|
-| Wist een UDF-POST met één veld de andere UDF's? | Als het antwoord ja is, wist een tagging-script stil de speedtest-waarde in udf9 | Zet op een testdevice udf29 en udf30, doe daarna een POST met alleen udf29 en lees het device terug |
 | Vorm van de quick job-respons en de jobUid | Zonder jobUid kun je het resultaat niet ophalen | `quickjob ... --confirm` op een testdevice, dan `job <jobUid>` |
 | Rechten van de API-user op `custom-filters` | Vereist administrator-rol; onduidelijk of onze user die heeft | `get "v2/filter/custom-filters"` |
 | Gedrag van `muted` als queryparameter op alerts | Onbekend of het filtert of alleen meta toevoegt | `get "v2/account/alerts/open?muted=true&max=2"` |
