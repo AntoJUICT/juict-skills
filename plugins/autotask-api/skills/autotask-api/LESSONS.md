@@ -66,7 +66,10 @@ Verkeerde resource+role combinatie → "The specified AssignedResourceID and Ass
 
 **Service tickets vereisen een expliciet start/stop-venster.** POST /TimeEntries met alleen `hoursWorked` geeft 500 "TimeEntries for Service tickets require a start and stop time." Geef altijd `startDateTime` en `endDateTime` mee (en optioneel `hoursWorked` erbij).
 
-**Zonder start/stop-venster is `dateWorked` verplicht.** POST /TimeEntries met alleen `hoursWorked` (geen `startDateTime`) geeft 500 "dateWorked is required when no value is supplied for startDateTime". Geef `dateWorked` (ISO, bv. `2026-07-24T09:00:00`) altijd mee; voor Service tickets combineer je het met `startDateTime`/`endDateTime` (zie hierboven).
+**Zonder start/stop-venster is `dateWorked` verplicht.** POST /TimeEntries met alleen `hoursWorked` (geen `startDateTime`) geeft 500 "dateWorked is required when no value is supplied for startDateTime". Geef `dateWorked` (ISO in UTC, bv. `2026-07-24T09:00:00Z`) altijd mee; voor Service tickets combineer je het met `startDateTime`/`endDateTime` (zie hierboven).
+
+**Datum- en tijdvelden zijn UTC; stuur ze altijd met een `Z` mee.** Een tijdloze waarde als `2026-08-26T15:30:00` wordt stil herinterpreteerd: een bedoeld venster van 15:30–15:45 landde als `14:00Z–14:15Z` (zone 19, entry 31233 op 26-08-2026), anderhalf uur verschoven en door geen enkele afrondingsregel te verklaren. Met `2026-08-26T13:30:00Z` komt de waarde er exact zo weer uit en toont de UI 15:30.
+- How to apply: reken lokale tijd zelf om naar UTC en zet de `Z` erop. Verifieer op de ruwe JSON, niet op een geparseerd object: `Invoke-RestMethod` en veel JSON-parsers zetten een `Z`-waarde om naar een lokale `DateTime`, waardoor een verkeerd venster er in je eigen output alsnog goed uitziet.
 
 **How to apply:**
 - Sla standaard IDs op in `AUTOTASK_DEFAULT_RESOURCE_ID` en `AUTOTASK_DEFAULT_ROLE_ID`

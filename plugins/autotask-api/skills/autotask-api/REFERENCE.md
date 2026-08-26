@@ -177,6 +177,10 @@ Response-structuur (geverifieerd zone 19): top-level `{ fields: [...] }`, elk ve
 
 Query-responses bevatten soms minder velden dan `GET /{entity}/{id}`. Controleer altijd of een veld ook aanwezig is in query-context.
 
+## Datum- en tijdvelden
+
+Alle datum- en tijdvelden gaan in UTC over de lijn en komen er met een `Z` uit (`createDate`, `dateWorked`, `startDateTime`, `attachDate`). De Autotask-UI en het klantportaal renderen die naar lokale tijd, in de zomer UTC+2: een TicketNote op `11:28:34Z` verschijnt in het portaal als 13:28. Vergelijk API-tijden dus nooit één op één met wat een engineer of klant in de UI ziet.
+
 ## Filters
 
 De REST API gebruikt POST met een `filter`-array op `*/query` endpoints. Wikkel meerdere condities altijd in een `and`-wrapper:
