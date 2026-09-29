@@ -226,6 +226,8 @@ AUTOTASK_SECRET='abc#def'    # # binnen single quotes = literal hekje
 
 **`showOnInvoice` en `isNonBillable` op TimeEntries zijn in zone 19 constant en dus waardeloos als filter.** Steekproef van alle 595 time entries op de 277 JUICT-tickets (05-08-2026): `showOnInvoice` was `false` op 595/595 en `isNonBillable` `true` op 595/595. Wie hierop filtert om "klant mag dit zien" te bepalen, houdt niets over. Het bruikbare onderscheid is het véld: `summaryNotes` is de klant-zichtbare samenvatting, `internalNotes` de interne aantekening (13 entries hadden alléén internalNotes, 75 hadden beide).
 
+**Eén contract met 0 units gevolgd door een negatieve periode laat elke `ContractServiceUnits/query` die het raakt falen met 500 `"Divide by zero error encountered."`.** Zone 19, 29-09-2026: een contract-service met augustus op 0 en sep-dec op -1 (dubbel verlaagd). Elke periode los opvragen (`startDate eq`) werkt, maar `contractID eq`, `contractServiceID eq` of een bulk `endDate gt nu` faalt in zijn geheel, dus één kapot contract breekt de bulk-fetch van alle klanten. Opsporen: bisect op `contractID in`-chunks. Voorkomen: haal eerst `Contracts/query` met `status eq 1` (actief) op en vraag daarna de units per chunk van 200 op met `contractID in` + `endDate gt nu`; inactieve contracten factureren toch niet.
+
 **Tasks missen `completedPercentage` en `isCompleted` velden.** Bereken zelf: `estimatedHours - remainingHours`. Gebruik `status === 5` voor completed-check.
 
 **Gantt-volgorde is niet beschikbaar via de API.** Sla handmatig op in `config/autotask-sort.json`.

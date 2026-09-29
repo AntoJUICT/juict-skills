@@ -129,8 +129,10 @@ Veldlengtes (zone 19, geverifieerd 05-08-2026): `Ticket.title` 255 (verplicht), 
 - `GET /ServiceLevelAgreements/...` bestaat NIET (404). De SLA-definitie (toegestane doorlooptijd) is via REST niet op te halen.
 
 ### Contracts & Services
-- `GET /Contracts/query` — filter op `companyID`, `status`
+- `GET /Contracts/query` — filter op `companyID`, `status` (1 = actief, 0 = inactief)
 - `GET /ContractServices/query` — filter op `contractID`
+- `POST /ContractServiceUnits/query` — units per periode (`contractServiceID`, `startDate`, `endDate` inclusief, `units`, `price`); filter op `contractID in` + `endDate gt`. Zie LESSONS voor de divide-by-zero-valkuil.
+- `POST /ContractServiceAdjustments` — units wijzigen (`unitChange` als delta, `effectiveDate`). Create-only: `/ContractServiceAdjustments/query` geeft 404.
 - `GET /Services/query`
 
 ### Billing Codes / Work Types
