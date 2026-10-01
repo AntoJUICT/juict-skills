@@ -56,6 +56,11 @@
       "name": "datto-rmm-api",
       "source": "./plugins/datto-rmm-api",
       "description": "Werken met de Datto RMM REST API v2 — OAuth2 via Key Vault, sites/devices/alerts/audit uitlezen, en schrijfacties (UDF, quick job) achter een verplichte bevestiging."
+    },
+    {
+      "name": "netwerk-diagnose",
+      "source": "./plugins/netwerk-diagnose",
+      "description": "Netwerkproblemen diagnosticeren: read-only UniFi-lookup (apparaten, clients, wifi-instellingen, events) plus Grafana-historie en een diagnose-checklist."
     }
   ]
 }

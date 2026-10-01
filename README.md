@@ -18,6 +18,7 @@ De repo is public zodat de skills op elke werkplek binnenkomen, ook bij collega'
 | `ticket-reactie` | Een Autotask-ticket onderzoeken (PDF of live) en een concept klantreactie opstellen in Anto's tone of voice. | Key Vault |
 | `site-scraper` | De technische opbouw van een website in kaart brengen (framework, routes, API-endpoints), ook achter een login. | nee |
 | `azure-architecture-diagram` | Een Azure-architectuurplaat genereren als bewerkbaar `.drawio` bronbestand plus `.svg`, met shape-index en layoutchecks zodat iconen renderen en lijnen niet kruisen. | nee |
+| `netwerk-diagnose` | Netwerkproblemen bij een klant diagnosticeren: read-only UniFi-lookup voor apparaten, radio's, clients, wifi-instellingen en verbind/verbreek/roam-events, plus historie via Grafana en een diagnose-checklist. Wifi-wachtwoorden worden nooit getoond. | Key Vault |
 
 ## Installeren
 
@@ -41,7 +42,7 @@ Updates ophalen: `/plugin marketplace update juict-skills`. Onder de org-uitrol 
 
 De meeste skills draaien standalone. Skills die Autotask of Azure raken hebben runtime-auth nodig:
 
-- **Key Vault** (`autotask-api`, `autotask-approve-post`, `datto-rmm-api`, `itglue-api`, `ticket-aanmaken`, `ticket-reactie`): credentials komen uit de shared Azure Key Vault via je `az`-login of managed identity. De skills bevatten alleen de secret-namen, nooit de waarden.
+- **Key Vault** (`autotask-api`, `autotask-approve-post`, `datto-rmm-api`, `itglue-api`, `netwerk-diagnose`, `ticket-aanmaken`, `ticket-reactie`): credentials komen uit de shared Azure Key Vault via je `az`-login of managed identity. De skills bevatten alleen de secret-namen, nooit de waarden.
 - **az login** (`azure-saas-devops-deploy`): een geldige Azure CLI-sessie met toegang tot de betreffende subscription en Azure DevOps.
 
 ## Structuur
