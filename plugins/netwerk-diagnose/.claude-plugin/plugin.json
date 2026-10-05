@@ -1,0 +1,12 @@
+{
+  "name": "netwerk-diagnose",
+  "version": "0.1.0",
+  "description": "Netwerkproblemen bij klanten diagnosticeren: read-only UniFi-lookup (sites, apparaten, radio's, clients, wifi-instellingen en gebeurtenissen) plus historie via Grafana, met een diagnose-checklist. Wifi-wachtwoorden worden nooit getoond.",
+  "author": {
+    "name": "AntoJUICT",
+    "email": "anto@juict.nl"
+  },
+  "homepage": "https://github.com/AntoJUICT/juict-skills",
+  "repository": "https://github.com/AntoJUICT/juict-skills",
+  "keywords": ["unifi", "wifi", "netwerk", "diagnose", "voip", "keyvault", "juict"]
+}
