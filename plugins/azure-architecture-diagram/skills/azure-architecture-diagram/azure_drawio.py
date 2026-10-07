@@ -92,7 +92,7 @@ def build_index(force=False):
         body = src[st:bounds[i + 1][1] if i + 1 < len(bounds) else len(src)]
         lst = []
         for sv, w, h, lb in re.findall(
-                r"createVertexTemplateEntry\(\s*s\s*\+\s*'([^']+?\.svg);?'\s*,\s*([^,]+?)\s*,"
+                r"createVertexTemplateEntry\(\s*s\s*\+\s*'([^';]+?\.svg)[^']*'\s*,\s*([^,]+?)\s*,"
                 r"\s*([^,]+?)\s*,\s*'[^']*'\s*,\s*'([^']*)'", body):
             W, H = dim(w), dim(h)
             if W and H:
