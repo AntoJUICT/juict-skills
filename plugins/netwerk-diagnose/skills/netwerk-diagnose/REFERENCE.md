@@ -50,9 +50,3 @@ Events in `CLIENT_DEVICES`: `CLIENT_ROAMED`, `CLIENT_CONNECTED_WIRELESS`, `CLIEN
 `CLIENT` (`id` = MAC, `name`, `hostname`, `ip`), `DEVICE_FROM`/`DEVICE_TO`/`DEVICE` (`name`, `model`),
 `SIGNAL_STRENGTH`, `PREVIOUS_SIGNAL_STRENGTH`, `RADIO_BAND`, `CHANNEL`, `WLAN`, `DURATION`.
 
-## Grafana (Prometheus, unpoller)
-
-Label `site_name` = `<desc> (<site-id>)`. Metrics: `unpoller_client_radio_signal_db`, `unpoller_client_rssi_db`
-(signaal boven ruis, niet in dBm), `unpoller_device_radio_stations`, `unpoller_device_radio_channel`,
-`unpoller_device_radio_transmit_power`, `unpoller_device_info`, `unpoller_device_uptime_seconds`,
-`unpoller_client_transmit_retries_total`, `unpoller_client_roam_count_total`.

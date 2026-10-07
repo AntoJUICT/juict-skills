@@ -560,7 +560,7 @@ const GEBRUIK = `Gebruik: node unifi-lookup.mjs <subcommando> [argumenten] [--js
   --kv python    secrets zonder az ophalen (env var, dan scripts/kv-secret.py)
 
 Read-only. Wifi-wachtwoorden en andere geheimen worden nooit getoond. Tijden in Europe/Amsterdam.
-Events: UniFi bewaart de system-log kort (vaak slechts uren); historie via Grafana.
+Events: UniFi bewaart de system-log kort (vaak slechts uren); oudere historie is er niet.
 snapshot, events en client verwachten de korte site-ID uit "site"; zo wordt er nooit stil een site gegokt.`;
 
 export function formatTabel(rijen, kolommen) {
@@ -599,7 +599,7 @@ function formatteer(cmd, u) {
     ].join("\n");
   }
   const eventsRegel = u.oudsteEvent
-    ? `Events beschikbaar vanaf ${u.oudsteEvent} (UniFi bewaart de system-log kort; historie via Grafana).`
+    ? `Events beschikbaar vanaf ${u.oudsteEvent} (UniFi bewaart de system-log kort; oudere events zijn er niet).`
     : "Geen events in de system-log.";
   const eventKolommen = ["tijd", "soort", "toestel", "vanAp", "naarAp", "signaalVoor", "signaal", "band", "duur"];
   if (cmd === "events") return [formatTabel(u.events, eventKolommen), eventsRegel, ...afgekapt].join("\n");

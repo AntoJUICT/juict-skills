@@ -18,7 +18,7 @@ De repo is public zodat de skills op elke werkplek binnenkomen, ook bij collega'
 | `ticket-reactie` | Een Autotask-ticket onderzoeken (PDF of live) en een concept klantreactie opstellen in Anto's tone of voice. | Key Vault |
 | `site-scraper` | De technische opbouw van een website in kaart brengen (framework, routes, API-endpoints), ook achter een login. | nee |
 | `azure-architecture-diagram` | Een Azure-architectuurplaat genereren als bewerkbaar `.drawio` bronbestand plus `.svg`, met shape-index en layoutchecks zodat iconen renderen en lijnen niet kruisen. | nee |
-| `netwerk-diagnose` | Netwerkproblemen bij een klant diagnosticeren: read-only UniFi-lookup voor apparaten, radio's, clients, wifi-instellingen en verbind/verbreek/roam-events, plus historie via Grafana en een diagnose-checklist. Wifi-wachtwoorden worden nooit getoond. | Key Vault |
+| `netwerk-diagnose` | Netwerkproblemen bij een klant diagnosticeren: read-only UniFi-lookup voor apparaten, radio's, clients, wifi-instellingen en verbind/verbreek/roam-events rechtstreeks uit de controller, met een diagnose-checklist. Wifi-wachtwoorden worden nooit getoond. | Key Vault |
 
 ## Installeren
 

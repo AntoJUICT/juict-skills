@@ -1,13 +1,13 @@
 ---
 name: netwerk-diagnose
-description: Netwerkproblemen bij een klant diagnosticeren met read-only UniFi-data (sites, apparaten, radio's, clients, wifi-instellingen, verbind-, verbreek- en roam-events) plus historie via Grafana. Gebruik bij een netwerk- of wifiticket, wegvallende verbindingen, slechte VoIP-kwaliteit, of een vraag over de wifi-instellingen van een klant.
+description: Netwerkproblemen bij een klant diagnosticeren met read-only UniFi-data (sites, apparaten, radio's, clients, wifi-instellingen, verbind-, verbreek- en roam-events), rechtstreeks uit de controller. Gebruik bij een netwerk- of wifiticket, wegvallende verbindingen, slechte VoIP-kwaliteit, of een vraag over de wifi-instellingen van een klant.
 ---
 
 # Netwerk-diagnose
 
 Deze skill helpt bij het uitzoeken van netwerkproblemen bij een klant. Fase 1 dekt UniFi; Sophos volgt later.
-De CLI `scripts/unifi-lookup.mjs` haalt de actuele stand en de gebeurtenissen op; de historie komt uit Grafana.
-Claude maakt daar de diagnose van.
+De CLI `scripts/unifi-lookup.mjs` haalt de actuele stand en de gebeurtenissen rechtstreeks uit de UniFi-controller
+(inlog via Key Vault-secrets). Er is geen andere bron: geen unpoller of Grafana. Claude maakt daar de diagnose van.
 
 ## Harde regels
 
@@ -34,21 +34,16 @@ Claude maakt daar de diagnose van.
    - `node scripts/unifi-lookup.mjs snapshot <site-id> --json`
    - `node scripts/unifi-lookup.mjs events <site-id> --dagen 14 --json`
    - Noemt het ticket een persoon of toestel: `node scripts/unifi-lookup.mjs client <site-id> "<naam|mac|ip>" --json`
-   - De system-log van UniFi bewaart events kort: vaak slechts de laatste uren, ook bij `--dagen 14`. Historie komt
-     uit Grafana; draai `events` kort na een incident en noem altijd de oudste event-tijd (de regel "Events
+   - De system-log van UniFi bewaart events kort: vaak slechts de laatste uren, ook bij `--dagen 14`. Oudere historie
+     is er niet; draai `events` kort na een incident en noem altijd de oudste event-tijd (de regel "Events
      beschikbaar vanaf") in de analyse. `--dagen` accepteert 1 t/m 90 (standaard 14); er worden maximaal 20
      pagina's van 200 events opgehaald, daarna meldt de CLI dat de lijst is afgekapt.
    - Gebruik opties met spatie, niet met `=` (bijv. `--dagen 7`, niet `--dagen=7`); onbekende opties worden geweigerd.
-4. **Historie via de Grafana-MCP** (Prometheus-datasource, unpoller). Het label `site_name` begint met de
-   sitenaam; filter met `site_name=~"<sitenaam>.*"`. Nuttige queries:
-   - `min_over_time(unpoller_client_radio_signal_db{site_name=~"<sitenaam>.*"}[14d])` en `avg_over_time(...)`
-   - `sum by (name, radio) (unpoller_device_radio_stations{site_name=~"<sitenaam>.*"})` als range-query
-   - `unpoller_client_transmit_retries_total` voor retries (niet geverifieerd)
-   - Sitenamen in `site_name=~"..."` zijn een regex: escape tekens als `+ ( ) .` met `\`.
-   Geen data voor de site: meld dat en ga door met snapshot en events.
-5. **Analyse volgens de checklist hieronder.** Lever in de chat: wat speelt er, de oorzaak (of eerlijk: onduidelijk),
+   - Ligt het incident buiten het event-venster: zeg dat eerlijk, baseer de analyse op de actuele stand en stel voor
+     `events` opnieuw te draaien zodra het probleem weer optreedt (of de klant te vragen het tijdstip te noteren).
+4. **Analyse volgens de checklist hieronder.** Lever in de chat: wat speelt er, de oorzaak (of eerlijk: onduidelijk),
    is het een storing of normaal gedrag, en het advies met de afweging.
-6. **Aanbieden:** "Zal ik dit als interne notitie in het ticket zetten?" Stel ook een tijdregistratie en status voor.
+5. **Aanbieden:** "Zal ik dit als interne notitie in het ticket zetten?" Stel ook een tijdregistratie en status voor.
 
 ## Workflow: gerichte vraag
 
@@ -59,7 +54,7 @@ Spring direct naar stap 2 of 3 en haal alleen op wat nodig is. Voorbeelden: "wan
 
 | Onderwerp | Wat bekijken | Drempel / signaal |
 |---|---|---|
-| Dekking | `signaal` en `beoordeling` per client; minimum en gemiddelde uit Grafana | ≥ -67 dBm goed; -67 tot -75 krap; -75 tot -80 slecht; < -80 onbruikbaar voor spraak |
+| Dekking | `signaal` en `beoordeling` per client (momentopname); `signaal` in verbreek- en roam-events | ≥ -67 dBm goed; -67 tot -75 krap; -75 tot -80 slecht; < -80 onbruikbaar voor spraak |
 | Capaciteit | `clients` per radio, `kanaalbezetting` | veel clients op één AP terwijl een andere leeg is; bezetting structureel hoog |
 | Radio's | `kanaal`, `breedte`, `dfs`, `zendvermogen` vs. `maxZendvermogen` (`ruimte`) | 2,4 GHz buiten 1/6/11 of op 40 MHz; DFS-kanaal plus verbreek-events tegelijk op alle clients; `ruimte` ≤ 3 dB betekent dat hoger zetten niets oplevert |
 | Roaming | roam-events (`signaalVoor` → `signaal`), `roams` per client, wifi-instellingen (`bssTransition80211v`, `fastRoaming80211r`, `roamingAssistant5`, `minRate24/5`) | roam naar een signaal < -75 dBm; toestel blijft hangen op een zwakke AP |

@@ -1,7 +1,7 @@
 {
   "name": "netwerk-diagnose",
-  "version": "0.1.0",
-  "description": "Netwerkproblemen bij klanten diagnosticeren: read-only UniFi-lookup (sites, apparaten, radio's, clients, wifi-instellingen en gebeurtenissen) plus historie via Grafana, met een diagnose-checklist. Wifi-wachtwoorden worden nooit getoond.",
+  "version": "0.2.0",
+  "description": "Netwerkproblemen bij klanten diagnosticeren: read-only UniFi-lookup (sites, apparaten, radio's, clients, wifi-instellingen en gebeurtenissen) rechtstreeks uit de controller, met een diagnose-checklist. Wifi-wachtwoorden worden nooit getoond.",
   "author": {
     "name": "AntoJUICT",
     "email": "anto@juict.nl"

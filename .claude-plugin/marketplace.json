@@ -60,7 +60,7 @@
     {
       "name": "netwerk-diagnose",
       "source": "./plugins/netwerk-diagnose",
-      "description": "Netwerkproblemen diagnosticeren: read-only UniFi-lookup (apparaten, clients, wifi-instellingen, events) plus Grafana-historie en een diagnose-checklist."
+      "description": "Netwerkproblemen diagnosticeren: read-only UniFi-lookup (apparaten, clients, wifi-instellingen, events) rechtstreeks uit de controller, met een diagnose-checklist."
     }
   ]
 }

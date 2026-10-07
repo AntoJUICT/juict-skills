@@ -678,7 +678,7 @@ test("runCli: events en client tonen vanaf wanneer events beschikbaar zijn, of d
     return uit.join("\n");
   };
   const ev = [{ event: "CLIENT_ROAMED", timestamp: Date.UTC(2026, 9, 1, 5, 0, 0), parameters: {} }];
-  const regel = "Events beschikbaar vanaf 01-10-2026 07:00:00 (UniFi bewaart de system-log kort; historie via Grafana).";
+  const regel = "Events beschikbaar vanaf 01-10-2026 07:00:00 (UniFi bewaart de system-log kort; oudere events zijn er niet).";
   assert.ok((await run(["events", "aaa11111"], ev)).includes(regel));
   assert.ok((await run(["client", "aaa11111", "Telefoon-A"], ev)).includes(regel));
   assert.ok((await run(["events", "aaa11111"], [])).includes("Geen events in de system-log."));
