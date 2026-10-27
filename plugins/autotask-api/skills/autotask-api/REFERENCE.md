@@ -224,6 +224,7 @@ interface AutotaskTicket {
   estimatedHours?: number;
   dueDateTime?: string;        // ISO-formaat
   lastActivityDate?: string;   // ISO-formaat — handig om "mijn tickets" op te sorteren
+  lastCustomerVisibleActivityDateTime?: string;  // laatste klantzichtbare activiteit (UTC), queryable; bv. "klant reageerde om ..." bij een wachtstatus
 }
 
 interface AutotaskContact {
