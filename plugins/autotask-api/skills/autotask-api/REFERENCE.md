@@ -94,6 +94,8 @@ Veldlengtes (zone 19, geverifieerd 05-08-2026): `Ticket.title` 255 (verplicht), 
 
 ### Time Entries
 - `POST /TimeEntries` — tijdsregistratie aanmaken
+- `POST /TimeEntries/{timeEntryId}/Attachments` — bijlage op een tijdregel (NESTED, zelfde velden als een ticketbijlage: `parentID` = time entry id, `attachmentType: "FILE_ATTACHMENT"`, `publish`, `title`, `fullPath`, `data` base64). `publish: 2` = Internal Users Only. Geverifieerd zone 19 op 29-10-2026.
+- `GET /TimeEntries/{timeEntryId}/Attachments` — metadata van de bijlagen (200, ook bij nul), met `fullPath`; een vaste `fullPath` per bestand voorkomt dubbele uploads bij een nieuwe poging.
 
 ### Service Calls
 - `POST /ServiceCallTickets/query` — filter op `ticketID`, geeft per koppeling een `serviceCallID` (een herpland ticket heeft er meerdere)
