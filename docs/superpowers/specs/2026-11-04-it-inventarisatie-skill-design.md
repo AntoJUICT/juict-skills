@@ -150,3 +150,10 @@ Te verifiëren bij de bouw (nog geen werkend voorbeeld): `PATCH /Projects/{id}/T
 - Welke headless browser wordt gebruikt voor de fit-check (Edge staat op elke Windows-werkplek).
 - Hoe het logo meekomt (als bestand in de skill, bij elke publicatie als asset geüpload).
 - De opdeling van SKILL.md in REFERENCE.md en andere bestanden.
+
+## Lessen uit het voorbeeldrapport (4 november 2026)
+
+1. **Urenpagina:** uren in twee blokken met elk een subtotaal: "nodig" en "keuze, kan later". Per fase de kolommen "Wat jullie daarna hebben" (het resultaat, niet de activiteit), "Rekenbasis" (narekenbaar, bijvoorbeeld "15 laptops × 1,5 uur") en "Uren". Daaronder projectmanagement (ongeveer 10%), het totaal, het totaal van alleen het blok "nodig", wat er niet in de uren zit, en een kader "Zo komen we tot deze uren" met drie korte punten (we rekenen per apparaat, domein of account; wat de klant of de vorige partij zelf doet zit er niet in; het is een indicatie die preciezer wordt na de open vragen). Geen bedragen (zie het besluit "alleen uren").
+2. **Afspraken als afspraak:** wat in het overleg of de offerte al is afgesproken (bijvoorbeeld een EDR toevoegen), staat in "Wat opvalt" en elders als afspraak ("zoals afgesproken komt X erbij"), niet als tekortkoming.
+3. **Telefoons gaan standaard niet in Intune.** Wel inventariseren (aantal, Apple ID's op naam van het bedrijf), niet inrichten of begroten in Intune, tenzij de offerte het noemt.
+4. **VoIP-overname:** als telefonie in scope is, komt er een vaste fase "Telefonie overnemen" in het stappenplan en de uren, met als rekenbasis "nummers en toestellen overzetten (4 uur), oplevering op locatie (4 uur)" (de twee telefonietaken uit het sjabloon Easywork Basic), aan te passen naar het aantal nummers en toestellen. Een open vraag naar het aantal nummers, toestellen en de looptijd van het huidige telefoniecontract hoort er standaard bij.
