@@ -21,7 +21,7 @@ Engineers en consultants van JUICT moeten bij een nieuwe klant of een migratie d
 ## Niet-doelen
 
 - Geen groepsinventarisaties met meerdere bedrijven (geen multitenant-architectuur of B2B-hoofdstuk).
-- Geen prijzen of bedragen. Alleen uren per fase.
+- Geen eigen prijzen bedenken. Uren en bedragen komen alleen uit de offerte.
 - Geen schrijfacties in Microsoft 365, IT Glue of DNS.
 - Geen offerte maken.
 
@@ -38,7 +38,7 @@ Engineers en consultants van JUICT moeten bij een nieuwe klant of een migratie d
 De skill vraagt als allereerste om de offerte (PDF of ander bestand) toe te voegen. Zonder offerte gaat hij niet verder, tenzij de engineer bewust kiest om zonder te werken. Uit de offerte haalt de skill:
 - klantnaam en eventueel Autotask-bedrijf;
 - welke onderdelen in scope zijn (bijvoorbeeld Microsoft 365, werkplekken, server, netwerk, telefonie, applicaties);
-- de uren per fase, als die erin staan.
+- de uren en bedragen per fase of onderdeel, zoals ze in de offerte staan.
 Wat de skill heeft gelezen, vat hij kort samen en laat hij bevestigen.
 
 ### Stap 2: bronnen ophalen (alleen lezen)
@@ -76,7 +76,7 @@ Het rapport heeft dezelfde opbouw als het voorbeeld, zonder de groepsonderdelen:
 4. Wat opvalt (tabel: punt, wat we zien, wat we eraan doen)
 5. Doelinrichting (principes en wat er verandert, uitgaande van de JUICT-standaard Easywork Basic waar dat in de offerte staat)
 6. Stappenplan als tijdlijn per maand
-7. Uren per fase met onderbouwing (uit de offerte, anders geschat door de engineer)
+7. Uren en kosten per fase, overgenomen uit de offerte (uren, tarief en bedrag), met het offertenummer; staat iets niet in de offerte, dan schat de engineer de uren en blijft het bedrag leeg
 8. Open vragen per persoon
 9. Bijlage accounts met de kolommen naam, adres, licentie, voorstel en "Nog nodig?" (vakjes ja/nee)
 
@@ -125,7 +125,7 @@ Te verifiëren bij de bouw (nog geen werkend voorbeeld): `PATCH /Projects/{id}/T
 2. Alleen lezen in Microsoft 365, IT Glue en DNS. De enige schrijfacties: de concept-mail in Outlook, en in Autotask het bijwerken van de taken van het onboardingproject plus de PDF als projectbijlage. Allemaal pas na een voorvertoning en akkoord.
 3. Nooit geheimen overnemen, tonen of opslaan.
 4. Schrijfregels en huisstijl van JUICT volgen (de `juict-vault` skill, `10-JUICT/schrijfregels.md` en `huisstijl.md`, als die beschikbaar is; anders de regels die in de skill zelf staan).
-5. Geen prijzen, alleen uren.
+5. Uren en bedragen alleen uit de offerte, nooit zelf bedacht of uit de directie-vault.
 6. Uitspraken over wat technisch kan of niet kan (bijvoorbeeld van Microsoft), worden alleen opgenomen als ze zijn nagekeken in de documentatie.
 
 ## Plek en vorm (besloten)
@@ -150,3 +150,7 @@ Te verifiëren bij de bouw (nog geen werkend voorbeeld): `PATCH /Projects/{id}/T
 - Welke headless browser wordt gebruikt voor de fit-check (Edge staat op elke Windows-werkplek).
 - Hoe het logo meekomt (als bestand in de skill, bij elke publicatie als asset geüpload).
 - De opdeling van SKILL.md in REFERENCE.md en andere bestanden.
+
+## Wijziging 4 november 2026
+
+Op verzoek van Anto bevat het rapport toch een uren- en kostenindicatie: de uren en bedragen uit de offerte. Eerder stond hier "alleen uren".
