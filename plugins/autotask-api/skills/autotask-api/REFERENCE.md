@@ -148,15 +148,18 @@ Creates zijn genest onder het project, queries zijn top-level. Geverifieerd zone
 - `GET /Projects/{id}` — `actualHours`, `actualBilledHours`, `estimatedTime`, `projectLeadResourceID`, `status`.
 - `POST /Projects/{id}/Phases` — fase aanmaken (verplicht: `projectID`, `title`). Top-level `POST /Phases` geeft 404.
 - `GET /Projects/{id}/Phases` en `POST /Phases/query` — beide werken voor lezen (filter op `projectID`).
-- `POST /Projects/{id}/Tasks` en `PATCH /Projects/{id}/Tasks` — top-level `POST /Tasks` geeft 404. Verplicht: `projectID`, `title`, `taskType`, `status`. Met een toegewezen resource komen `departmentID` en `billingCodeID` er verplicht bij.
+- `POST /Projects/{id}/Tasks` en `PATCH /Projects/{id}/Tasks` — top-level `POST /Tasks` geeft 404. Verplicht: `projectID`, `title`, `taskType` (1 FixedWork, 2 FixedDuration), `status`. Met een toegewezen resource komen `departmentID` en `billingCodeID` er verplicht bij. PATCH-body is `{ id, ...velden }` en geeft `{ itemId }`; geverifieerd voor `status`, `estimatedHours` en `description` (zone 19, 04-11-2026). `Task.description` is maximaal 8000 tekens.
 - `POST /Tasks/query` — lezen, top-level.
 - `POST /Tasks/{id}/SecondaryResources` — resource+rol aan een task hangen (verplicht: `taskID`, `resourceID`, `roleID`). Top-level `/TaskSecondaryResources` geeft 404.
-- `POST /TaskNotes` en `POST /TaskNotes/query` — werken top-level. Verplicht: `taskID`, `description`, `noteType`, `publish`. `noteType` kent hier maar drie waarden: 1 Task Summary, 2 Task Detail, 3 Task Notes.
+- `POST /TaskNotes` en `POST /TaskNotes/query` — werken top-level. Verplicht: `taskID`, `description`, `noteType`, `publish`. `noteType` kent hier maar drie waarden: 1 Task Summary, 2 Task Detail, 3 Task Notes. Aanmaken lukt ook op een task met status 5 (Complete). De query op `taskID` geeft `taskID` en `title` terug, bruikbaar om dubbele notities te voorkomen.
+- `POST /Projects/{id}/Attachments` — bijlage op een project: `parentID` (= project-id), `attachmentType: "FILE_ATTACHMENT"`, `publish`, `title`, `fullPath`, `data` (base64); geeft `{ itemId }`. `GET /Projects/{id}/Attachments` geeft o.a. `id`, `fullPath` (exact zoals gepost), `title`, `attachDate`, `fileSize`; een vaste `fullPath` voorkomt een dubbele upload. Geverifieerd zone 19 op 04-11-2026.
+- Sjablonen: `POST /Projects/query` op `projectType` eq 3. Zone 19: 12 Azure Virtual Desktop, 14 Easywork Basic (29 taken, omschrijvingen leeg), 23 Azure Landing Zone template.
+- Interne projecten: `companyID` 0 (JUICT zelf) met `projectType` 4.
 
 `projectType` (zone 19): 2 Proposal, 3 Template, 4 Internal, 5 Client, 8 Baseline.
 `Project.status`: 0 Inactive, 1 New, 2 In Behandeling, 3 On Hold, 4 Change Order, 5 Complete, 6 Wacht op Leverancier, 7 Wacht op Klant. `Task.status` gebruikt dezelfde picklist als tickets.
 
-Bestaat niet als entity: `ProjectResources`, `ProjectTeamMembers`, `ProjectTeam`, `ProjectPhases`, `TaskSecondaryResources`, `SecurityLevels`. Projecten en tasks kun je niet verwijderen (`canDelete: false`); afsluiten kan alleen met een status.
+Bestaat niet als entity: `ProjectResources`, `ProjectTeamMembers`, `ProjectTeam`, `ProjectPhases`, `TaskSecondaryResources`, `SecurityLevels`. Tasks, Projects, Phases, TaskNotes en ProjectNotes kun je via de API niet verwijderen (`canDelete: false`); afsluiten kan alleen met een status. ProjectAttachments en TaskAttachments kun je wel verwijderen, maar niet bijwerken.
 
 ### Metadata / picklists
 - `GET /Tickets/entityInformation/fields` — picklist-waarden voor status, priority, issueType, subIssueType, etc.
