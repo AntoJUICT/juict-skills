@@ -248,6 +248,10 @@ Autotask-vragen: de `autotask-api` skill.
 | TaskNote | `noteType` 3 (Task Notes), `publish` 2 (Internal Project Team) |
 | Bijlage | `ProjectAttachments` mag aanmaken |
 
-**Schrijf-endpoints:** `PATCH /Projects/{id}/Tasks`, `POST /TaskNotes` en `POST /Projects/{id}/Attachments` zijn per
-4 november 2026 nog niet geverifieerd in zone 19. Draai daarom altijd eerst `plan` of de voorvertoning, en laat bij
-twijfel de projectmanager meekijken voordat je `--toepassen` gebruikt. Werkt een endpoint, zet dan hier de datum bij.
+**Schrijf-endpoints, geverifieerd in zone 19 op 4 november 2026** (op een intern testproject):
+
+- `PATCH /Projects/{id}/Tasks` met `{ id, estimatedHours, description }` en met `{ id, status: 5, estimatedHours: 0 }` geeft `{ itemId }`; de wijziging is daarna zichtbaar via `GET /Tasks/{id}`.
+- `POST /TaskNotes` met `{ taskID, title, description, noteType: 3, publish: 2 }` geeft `{ itemId }`, ook op een taak met status 5. `POST /TaskNotes/query` op `taskID` geeft de notities terug met `taskID` en `title`, zodat de dubbelcheck werkt.
+- `POST /Projects/{id}/Attachments` met `{ parentID, attachmentType: "FILE_ATTACHMENT", publish: 1, title, fullPath, data }` geeft `{ itemId }`. `GET /Projects/{id}/Attachments` geeft `fullPath` exact terug zoals gepost, zodat een tweede run geen dubbele bijlage plaatst.
+
+Draai toch altijd eerst `plan` of de voorvertoning: wat eenmaal is afgesloten of genoteerd, kun je via de API niet verwijderen.

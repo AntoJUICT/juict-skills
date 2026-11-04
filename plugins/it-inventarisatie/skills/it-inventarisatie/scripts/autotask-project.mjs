@@ -339,7 +339,7 @@ export function maakAt({ fetch: doFetch = globalThis.fetch, creds, maxGelijktijd
       }
       return items;
     },
-    // De drie schrijf-endpoints hieronder: nog te verifiëren in zone 19.
+    // De drie schrijf-endpoints hieronder: geverifieerd in zone 19 op 4-11-2026 (zie REFERENCE.md).
     patchTask: (projectId, body) => verzoek("PATCH", `Projects/${projectId}/Tasks`, body),
     postTaskNote: (body) => verzoek("POST", "TaskNotes", body),
     postProjectAttachment: (projectId, body) => verzoek("POST", `Projects/${projectId}/Attachments`, body),
