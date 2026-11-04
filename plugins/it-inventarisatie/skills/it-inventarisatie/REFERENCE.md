@@ -97,7 +97,7 @@ de toestellen en de looptijd van het telefoniecontract er standaard bij.
 | `opvalt` | `[{ punt, zien, doen }]` |
 | `doel` | `intro`, `principes: [{ titel, tekst }]`, optioneel `kaarten: [{ titel, tekst }]` |
 | `stappenplan` | `maanden` (namen), `toelichting`, `fases: [{ code, naam, omschrijving, start, eind }]`; `start` en `eind` zijn indexen in `maanden`, `start < eind`. Projectmanagement: `{ code, naam, omschrijving, pm: true }` zonder start en eind |
-| `uren` | `blokken: [{ titel, soort: "nodig" \| "keuze", fases: [{ fase, resultaat, rekenbasis, uren }] }]` (minstens één blok `nodig`), `projectmanagementPct`, `nietInbegrepen` (lijst), `toelichting` (precies drie zinnen) |
+| `uren` | `blokken: [{ titel, soort: "nodig" \| "keuze", fases: [{ fase, resultaat, rekenbasis, uren }] }]` (minstens één blok `nodig`), `projectmanagementPct`, `nietInbegrepen` (lijst), `toelichting`: lijst van precies drie zinnen |
 | `openVragen` | `[{ aan, rol, vragen: [...] }]`, per persoon |
 | `bijlage` | `intro`, `secties: [{ titel, kolom5: "ja/nee" of een lijst opties, rijen: [{ naam, adres, licentie, voorstel }] }]` |
 
@@ -136,7 +136,8 @@ vaak hangen; installeer dan Chrome of zet de variabele.
 
 ## Uitvraag-mail
 
-Als concept via de Microsoft 365-connector (`outlook_create_draft`), nooit zelf versturen. Een urgent punt staat los
+Toon de volledige tekst eerst in de chat. Na akkoord van de engineer als concept via de Microsoft 365-connector
+(`outlook_create_draft`), nooit zelf versturen. Een urgent punt staat los
 en bovenaan. Per onderdeel een vet kopje en één zin, alleen de onderdelen waar echt iets ontbreekt.
 
 ```

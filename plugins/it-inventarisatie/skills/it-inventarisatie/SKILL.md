@@ -17,7 +17,8 @@ de plugin onder `~/.claude/plugins/cache/...` staat). Hieronder staat die map al
 
 1. **Eerst de offerte.** Zonder offerte ga je niet verder, tenzij de engineer bewust kiest om zonder te werken.
 2. **Alleen lezen** in Microsoft 365, IT Glue en DNS. De enige schrijfacties: een concept-mail in Outlook (nooit zelf
-   versturen) en in Autotask de taken en de PDF-bijlage van het onboardingproject, pas na een voorvertoning en akkoord.
+   versturen) en in Autotask de taken en de PDF-bijlage van het onboardingproject. Allebei pas na een voorvertoning
+   en akkoord van de engineer: de mail eerst als volledige tekst in de chat, Autotask eerst als voorvertoning.
 3. **Nooit geheimen.** Geen wachtwoord, pincode, PUK, licentiesleutel, WPA-key of token in de chat, het werkbestand,
    `rapport.json`, Autotask of de vault. Ook niet uit vrije tekst, zoals een overdrachtsdocument vol wachtwoorden:
    lees het, neem het niet over, schrijf "staat in IT Glue". De scripts filteren sleutelnamen, niet jouw tekst.
@@ -32,7 +33,8 @@ de plugin onder `~/.claude/plugins/cache/...` staat). Hieronder staat die map al
 
 0. **Hervatten.** `node <skill>/scripts/werkbestand.mjs toon <slug>`. Bestaat het, zoek dan in de mailbox van de
    engineer (Microsoft 365-connector) naar mails sinds `laatsteMailcheck`, werk het werkbestand bij en ga verder bij
-   `stap`. Nieuw: `node <skill>/scripts/werkbestand.mjs nieuw "<klantnaam>"`.
+   `stap`. De slug is de klantnaam in kleine letters met alleen `[a-z0-9-]` ("Voorbeeld Techniek B.V." wordt
+   `voorbeeld-techniek-bv`). Nieuw: `node <skill>/scripts/werkbestand.mjs nieuw "<klantnaam>"`; dat print het pad.
 1. **Offerte lezen en scope bevestigen.** Vraag de offerte. Haal klantnaam, Autotask-bedrijf, onderdelen in scope en
    uren per fase eruit. Vat het kort samen, laat het bevestigen en zet het in `offerte`.
 2. **Bronnen ophalen**, alleen lezen:
@@ -46,7 +48,8 @@ de plugin onder `~/.claude/plugins/cache/...` staat). Hieronder staat die map al
 3. **Interview van de gaten.** Leg per onderdeel naast elkaar wat bekend is en wat ontbreekt, en vraag alleen het
    ontbrekende met AskUserQuestion, één onderdeel tegelijk. Volg de checklist in REFERENCE.md.
 4. **Uitvraag-mail.** Wat alleen de klant of de vorige partij weet, gaat in een uitvraag-mail volgens het sjabloon in
-   REFERENCE.md, als concept via `outlook_create_draft`. Versturen doet de engineer.
+   REFERENCE.md. Toon eerst de volledige tekst (onderwerp, aan, inhoud) en maak pas na akkoord het concept via
+   `outlook_create_draft`. Versturen doet de engineer.
 5. **Rapport vullen.** Schrijf `<werkmap>/rapport.json` volgens het schema (voorbeeld:
    `<skill>/voorbeeld/rapport.voorbeeld.json`). Verwijs naar hoofdstukken, nooit naar paginanummers. Bouwen volgt in
    stap 6, omdat `bouw.mjs` de logo-urls nodig heeft.
