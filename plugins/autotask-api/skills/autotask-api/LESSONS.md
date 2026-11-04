@@ -41,6 +41,9 @@ Bekende valkuilen, fouten en hard-geleerde lessen bij werken met de Autotask RES
 
 **`PATCH /Tickets` met `projectID` koppelt een ticket aan een project.** Werkt gewoon, ondanks dat het veld zeldzaam gevuld is (16 van de ruim 20.000 tickets in zone 19). Handig om de historie van een ticket vindbaar te houden onder het project waar het werk verderging.
 
+
+**`canDelete: false` is een eigenschap van de entity, geen rechtenkwestie.** Het security level zegt "Users who can view a project can also edit or delete it", maar dat geldt alleen in de webinterface. Via de API blijft `canDelete` op Tasks, Projects, Phases en TaskNotes false, ook met volledige projectrechten (geverifieerd 04-11-2026). Een taak die niet nodig is, sluit je af met status 5, uren op 0 en een notitie met de reden; echt verwijderen doet een projectmanager in de webinterface.
+
 ---
 
 ## Filters / query-operators
