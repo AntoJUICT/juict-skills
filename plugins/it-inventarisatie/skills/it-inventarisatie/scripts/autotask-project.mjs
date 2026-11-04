@@ -141,6 +141,7 @@ export function planTaskUpdates(taken, werkbestand, { datum, engineer } = {}) {
     if (!koppeling) continue;
 
     const basis = { taskId: taak.id, titel: taak.title };
+    // Alleen een expliciete false is buiten scope; null (onbekend) of een ontbrekende waarde niet.
     if (koppeling.scope && scope[koppeling.scope] === false) {
       wijzigingen.push({
         ...basis,
@@ -232,10 +233,9 @@ export async function pasToe(plan, { at, bestaandeNotities = [] } = {}) {
     if (w.estimatedHours !== undefined) body.estimatedHours = w.estimatedHours;
     if (w.omschrijving !== undefined) body.description = w.omschrijving;
     try {
-      if (Object.keys(body).length > 1) {
-        await at.patchTask(plan.projectId, body);
-        res.taken++;
-      }
+      // Eerst de notitie, dan de patch. Faalt de patch, dan staat de taak nog open en neemt een volgend
+      // plan hem opnieuw mee; de notitie wordt dan op titel herkend en niet dubbel geplaatst. Andersom
+      // zou een nvt-taak op Complete staan zonder notitie, en een nieuw plan slaat Complete-taken over.
       if (w.notitie) {
         if (bestaand.has(`${w.taskId}|${w.notitie.titel}`)) {
           res.overgeslagen.push({ taskId: w.taskId, titel: w.titel, reden: `notitie "${w.notitie.titel}" staat er al` });
@@ -244,6 +244,10 @@ export async function pasToe(plan, { at, bestaandeNotities = [] } = {}) {
           bestaand.add(`${w.taskId}|${w.notitie.titel}`);
           res.notities++;
         }
+      }
+      if (Object.keys(body).length > 1) {
+        await at.patchTask(plan.projectId, body);
+        res.taken++;
       }
     } catch (e) {
       fout(e.message);
@@ -447,5 +451,5 @@ export async function hoofd(argv, deps = {}) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { code, uitvoer } = await hoofd(process.argv.slice(2));
   (code === 0 ? process.stdout : process.stderr).write(uitvoer);
-  process.exit(code);
+  process.exitCode = code;
 }

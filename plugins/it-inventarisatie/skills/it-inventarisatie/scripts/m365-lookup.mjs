@@ -135,6 +135,22 @@ export function vatSamen(ruw, nu = new Date()) {
   };
 }
 
+export function kortOverzicht(s, uitPad) {
+  return {
+    ok: true,
+    uit: uitPad,
+    aantallen: {
+      domeinen: s.domeinen.length,
+      licenties: s.licenties.length,
+      gebruikers: s.gebruikers.length,
+      apparaten: s.apparaten.totaal,
+      conditionalAccess: s.conditionalAccess.length,
+      beheerrollen: s.beheerders.length,
+    },
+    nietOpgehaald: s.nietOpgehaald,
+  };
+}
+
 export async function hoofd(argv, deps = {}) {
   const i = argv.indexOf("--tenant");
   const tenant = i >= 0 ? argv[i + 1] : undefined;
@@ -159,12 +175,14 @@ export async function hoofd(argv, deps = {}) {
   const ruw = await haalRuw(tenantId, { fetch: deps.fetch, token });
   const samenvatting = scrubSecrets(vatSamen(ruw, deps.nu));
   const uitvoer = JSON.stringify(samenvatting, null, 2);
-  if (uitPad) (deps.schrijf ?? writeFileSync)(uitPad, uitvoer);
-  return { code: 0, uitvoer };
+  if (!uitPad) return { code: 0, uitvoer };
+  (deps.schrijf ?? writeFileSync)(uitPad, uitvoer);
+  // Met --uit staat alles in het bestand; op stdout alleen tellingen, zonder namen of adressen.
+  return { code: 0, uitvoer: JSON.stringify(kortOverzicht(samenvatting, uitPad), null, 2) };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { code, uitvoer } = await hoofd(process.argv.slice(2));
   console.log(uitvoer);
-  process.exit(code);
+  process.exitCode = code;
 }

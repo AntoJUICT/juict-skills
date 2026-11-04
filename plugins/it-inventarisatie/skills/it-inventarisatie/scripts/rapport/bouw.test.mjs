@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { bouwPaginas, canvasJson, schrijf } from "./bouw.mjs";
+import { bouwPaginas, canvasJson, schrijf, GEEN_BROWSER } from "./bouw.mjs";
 import { esc, veiligeHtml } from "./onderdelen.mjs";
 
 const voorbeeldPad = fileURLToPath(new URL("../../voorbeeld/rapport.voorbeeld.json", import.meta.url));
@@ -137,14 +137,44 @@ test("schrijf zet de pagina's en canvas.json in <root>/project", () => {
   const root = mkdtempSync(join(tmpdir(), "rapport-"));
   try {
     const p = bouwPaginas(voorbeeld(), LOGO);
-    const geschreven = schrijf(p, root);
+    const { paden: geschreven, verdwenen } = schrijf(p, root);
     assert.equal(geschreven.length, p.length + 1);
+    assert.deepEqual(verdwenen, []);
     for (const x of p) assert.equal(readFileSync(join(root, "project", x.bestand), "utf8"), x.html);
     const c = JSON.parse(readFileSync(join(root, "project", "canvas.json"), "utf8"));
     assert.deepEqual(c.order, p.map((x) => x.bestand));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("schrijf ruimt oude .dc.html-bestanden op en meldt welke verdwenen zijn", () => {
+  const root = mkdtempSync(join(tmpdir(), "rapport-"));
+  try {
+    const eerst = bouwPaginas(voorbeeld(), LOGO);
+    schrijf(eerst, root);
+    writeFileSync(join(root, "project", "notitie.txt"), "blijft staan");
+    const r = voorbeeld();
+    r.openVragen = [];
+    const daarna = bouwPaginas(r, LOGO);
+    const { verdwenen } = schrijf(daarna, root);
+    const nieuw = new Set(daarna.map((x) => x.bestand));
+    const verwacht = eerst.map((x) => x.bestand).filter((b) => !nieuw.has(b)).sort();
+    assert.ok(verwacht.length > 0);
+    assert.deepEqual(verdwenen, verwacht);
+    for (const b of verwacht) assert.ok(!existsSync(join(root, "project", b)), b);
+    for (const b of nieuw) assert.ok(existsSync(join(root, "project", b)), b);
+    assert.ok(existsSync(join(root, "project", "notitie.txt")), "andere bestanden blijven staan");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("melding zonder browser volgt de zoekvolgorde: eerst IT_INVENTARISATIE_BROWSER, dan Chrome, dan Edge", () => {
+  const a = GEEN_BROWSER.indexOf("IT_INVENTARISATIE_BROWSER");
+  const b = GEEN_BROWSER.indexOf("Chrome");
+  const c = GEEN_BROWSER.indexOf("Edge");
+  assert.ok(a >= 0 && b > a && c > b, GEEN_BROWSER);
 });
 
 const cli = (args) => spawnSync(process.execPath, [bouwPad, ...args], { encoding: "utf8" });

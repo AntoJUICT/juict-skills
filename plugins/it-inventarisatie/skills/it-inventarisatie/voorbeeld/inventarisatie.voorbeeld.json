@@ -5,18 +5,25 @@
   "aangemaakt": "2026-11-02T09:00:00.000Z",
   "bijgewerkt": "2026-11-03T14:30:00.000Z",
   "stap": "interview",
+  "engineer": "Voorbeeld Adviseur",
   "offerte": {
     "bestand": "offerte-voorbeeld-techniek.pdf",
-    "scope": { "m365": true, "werkplekken": true, "server": false, "netwerk": true, "printers": true, "applicaties": true, "telefonie": false, "beveiliging": true },
+    "scope": { "m365": true, "werkplekken": true, "server": true, "netwerk": true, "printers": false, "applicaties": null, "telefonie": true, "beveiliging": true },
     "uren": [
-      { "fase": "Voorbereiding", "uren": 4 },
-      { "fase": "Inventarisatie", "uren": 12 },
-      { "fase": "Rapportage", "uren": 6 }
+      { "fase": "Licentie plan maken", "uren": 4 },
+      { "fase": "Setup Microsoft 365", "uren": 24 },
+      { "fase": "RBAC Opmaken", "uren": 8 },
+      { "fase": "Setup Intune", "uren": 24 },
+      { "fase": "Initiële datamigratie", "uren": 6 },
+      { "fase": "Definitieve datamigratie", "uren": 2 },
+      { "fase": "Setup telefonie", "uren": 4 },
+      { "fase": "Telefonie oplevering op locatie", "uren": 4 },
+      { "fase": "Setup netwerk", "uren": 17 }
     ]
   },
   "bronnen": {
     "mail": [],
-    "m365": { "domein": "voorbeeldtechniek.nl", "gebruikers": 24, "licenties": { "Business Premium": 22, "Exchange Online Plan 1": 2 } },
+    "m365": { "domein": "voorbeeldtechniek.nl", "gebruikers": 14, "licenties": { "Business Premium": 5, "Business Standard": 3, "Business Basic": 6 } },
     "itglue": null,
     "autotask": null,
     "dns": [
@@ -25,11 +32,17 @@
     ]
   },
   "antwoorden": {
-    "netwerk": { "aansluiting": "Glasvezel 500/500", "router": "Voorbeeld-router", "wifi": "Twee access points, een gastnetwerk" },
-    "werkplekken": { "aantal": 24, "besturingssysteem": "Windows 11", "beheer": "Intune" }
+    "licenties": { "persoonlijkeAccounts": 12, "nietMeerInGebruik": 3, "gedeeldMetLicentie": ["info", "facturen"] },
+    "mail": { "domeinen": ["voorbeeldtechniek.nl"], "gedeeldeMailboxen": ["info", "facturen"] },
+    "beveiliging": { "mfa": "7 van 12 persoonlijke accounts", "beheeraccounts": "3 beheerders, geen aparte beheeraccounts" },
+    "werkplekken": { "laptops": 11, "besturingssysteem": "Windows 11 Pro", "beheer": "niet in Intune", "telefoons": 9 },
+    "server": { "nas": "Eén NAS met projectbestanden, ongeveer 400 GB", "doel": "naar SharePoint" },
+    "netwerk": { "accessPoints": 3, "beheer": "access points via de controller; switch en firewall niet bijgewerkt" },
+    "telefonie": { "vasteToestellen": 4, "leverancier": "losse leverancier met een eigen contract" }
   },
   "openVragen": [
-    { "aan": "Contactpersoon klant", "vraag": "Welke applicaties zijn bedrijfskritisch?" }
+    { "aan": "Joost Testman", "vraag": "Hoe lang loopt het contract van de telefonieleverancier?" },
+    { "aan": "Sanne de Voorbeeld", "vraag": "Welke applicaties zijn bedrijfskritisch?" }
   ],
   "laatsteMailcheck": null,
   "rapport": { "artifactUrl": null, "pdfPad": null },

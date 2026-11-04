@@ -7,9 +7,9 @@
     { "naam": "Joost Testman", "organisatie": "Voorbeeld Techniek B.V." }
   ],
   "samenvatting": {
-    "besluit": { "label": "Wat we van u nodig hebben", "tekst": "Een akkoord op het stappenplan en de keuze voor de twee optionele onderdelen." },
-    "zagen": "Voorbeeld Techniek werkt met 14 accounts op Microsoft 365. De basis staat, maar MFA staat niet voor iedereen aan, laptops zijn niet beheerd en de telefonie loopt nog via een losse leverancier.",
-    "adviseren": "Wij adviseren om eerst accounts, beveiliging en apparaten op orde te brengen en daarna de telefonie en het netwerk over te nemen. Zo krijgt u in een paar maanden één beheerde omgeving.",
+    "besluit": { "label": "Wat we van jullie nodig hebben", "tekst": "Een akkoord op het stappenplan en de keuze voor de twee optionele onderdelen." },
+    "zagen": "Voorbeeld Techniek werkt met 14 accounts op Microsoft 365. De basis staat, maar MFA staat niet voor iedereen aan, laptops zijn niet beheerd, de projectbestanden staan op een NAS en de telefonie loopt nog via een losse leverancier.",
+    "adviseren": "Wij adviseren om eerst accounts, beveiliging en apparaten op orde te brengen en daarna de bestanden, de telefonie en het netwerk over te nemen. Zo hebben jullie binnen vier maanden één beheerde omgeving.",
     "kerncijfers": [
       { "label": "Accounts", "waarde": "14", "toelichting": "waarvan 2 gedeeld" },
       { "label": "Zonder MFA", "waarde": "5", "toelichting": "van de 12 persoonlijke accounts" },
@@ -52,11 +52,11 @@
       ]
     },
     {
-      "titel": "Apparaten, telefonie en netwerk",
+      "titel": "Apparaten, bestanden, telefonie en netwerk",
       "kicker": "Huidige stand 2 van 2",
       "blokken": [
         { "type": "h2", "tekst": "Apparaten" },
-        { "type": "p", "tekst": "De 11 laptops staan niet in Intune. Updates en versleuteling zijn dus aan de gebruiker zelf overgelaten. De 9 telefoons worden bewust niet door Intune beheerd.<br>Voor de telefoons maken we daarom alleen afspraken over wachtwoordvergrendeling en e-mailtoegang." },
+        { "type": "p", "tekst": "De 11 laptops staan niet in Intune. Updates en versleuteling zijn dus aan de gebruiker zelf overgelaten. De 9 telefoons worden bewust niet door Intune beheerd.<br>Voor de telefoons maken we daarom alleen afspraken over wachtwoordvergrendeling en e-mailtoegang. De projectbestanden staan op een NAS op kantoor." },
         {
           "type": "tabel",
           "kolommen": ["Onderdeel", "Aantal", "Beheerd"],
@@ -64,7 +64,8 @@
             ["Laptops", "11", "nee"],
             ["Telefoons", "9", "nee, niet in Intune"],
             ["Vaste toestellen", "4", "bij de huidige leverancier"],
-            ["Access points", "3", "ja, via de controller"]
+            ["Access points", "3", "ja, via de controller"],
+            ["NAS met projectbestanden", "1", "nee, ongeveer 400 GB"]
           ]
         },
         { "type": "h2", "tekst": "Telefonie en netwerk" },
@@ -72,7 +73,7 @@
         {
           "type": "kaarten",
           "items": [
-            { "titel": "Telefonie", "tekst": "Nummers en toestellen kunnen worden overgezet naar het platform dat u al gebruikt." },
+            { "titel": "Telefonie", "tekst": "Nummers en toestellen kunnen worden overgezet naar het platform dat jullie al gebruiken." },
             { "titel": "Netwerk", "tekst": "Firmware van switch en firewall is niet bijgewerkt." }
           ]
         }
@@ -86,15 +87,15 @@
     { "punt": "Telefonie", "zien": "Zoals afgesproken komt de telefonie erbij, met de nummers en toestellen die nu bij de losse leverancier staan.", "doen": "Nummers en toestellen overzetten en op locatie opleveren." }
   ],
   "doel": {
-    "intro": "Over een half jaar draait Voorbeeld Techniek op één omgeving die we beheren en waar u zelf overzicht op houdt.",
+    "intro": "Over vier maanden draait Voorbeeld Techniek op één omgeving die we beheren en waar jullie zelf overzicht op houden.",
     "principes": [
-      { "titel": "Eén plek", "tekst": "Accounts, apparaten en telefonie zijn op één plek terug te vinden." },
+      { "titel": "Eén plek", "tekst": "Accounts, apparaten, bestanden en telefonie zijn op één plek terug te vinden." },
       { "titel": "Veilig als standaard", "tekst": "MFA en updates staan aan zonder dat iemand eraan hoeft te denken." },
       { "titel": "Duidelijk wie wat doet", "tekst": "Per onderdeel is afgesproken wie het beheert en wie de aanspreekpunten zijn." }
     ],
     "kaarten": [
       { "titel": "Geen verrassingen", "tekst": "Wijzigingen worden vooraf aangekondigd." },
-      { "titel": "Eigen regie", "tekst": "U houdt toegang tot alle documentatie." }
+      { "titel": "Eigen regie", "tekst": "Jullie houden toegang tot alle documentatie." }
     ]
   },
   "stappenplan": {
@@ -106,6 +107,7 @@
       { "code": "F4", "naam": "Back-up en herstel", "omschrijving": "Back-up van Microsoft 365 en herstelproef.", "start": 2, "eind": 3 },
       { "code": "F5", "naam": "Telefonie overnemen", "omschrijving": "Nummers en toestellen overzetten.", "start": 2, "eind": 4 },
       { "code": "F6", "naam": "Netwerk en wifi", "omschrijving": "Firmware bijwerken en netwerk vastleggen.", "start": 1, "eind": 4 },
+      { "code": "F7", "naam": "Bestanden naar SharePoint", "omschrijving": "Projectbestanden van de NAS overzetten.", "start": 1, "eind": 3 },
       { "code": "PM", "naam": "Projectmanagement", "omschrijving": "Planning, overleg en terugkoppeling.", "pm": true }
     ],
     "toelichting": "De fases lopen deels naast elkaar. De telefonie volgt pas als de accounts en licenties zijn opgeschoond."
@@ -121,7 +123,8 @@
           { "fase": "Apparaten in Intune", "resultaat": "Alle laptops beheerd en versleuteld", "rekenbasis": "11 laptops aanmelden en controleren", "uren": 24 },
           { "fase": "Back-up en herstel", "resultaat": "Back-up van Microsoft 365 met een geslaagde herstelproef", "rekenbasis": "inrichten (8 uur), herstelproef (4 uur)", "uren": 12 },
           { "fase": "Telefonie overnemen", "resultaat": "Nummers en toestellen draaien op het nieuwe platform", "rekenbasis": "nummers en toestellen overzetten (4 uur), oplevering op locatie (4 uur)", "uren": 8 },
-          { "fase": "Netwerk en wifi", "resultaat": "Bijgewerkte switch en firewall, vastgelegd netwerk", "rekenbasis": "firmware en configuratie (16 uur), documentatie (9 uur)", "uren": 25 }
+          { "fase": "Netwerk en wifi", "resultaat": "Bijgewerkte switch en firewall, vastgelegd netwerk", "rekenbasis": "firmware en configuratie (12 uur), documentatie (5 uur)", "uren": 17 },
+          { "fase": "Bestanden naar SharePoint", "resultaat": "Projectbestanden in SharePoint, de NAS kan uit", "rekenbasis": "400 GB overzetten (6 uur), controle met gebruikers (2 uur)", "uren": 8 }
         ]
       },
       {
@@ -141,7 +144,7 @@
     "toelichting": [
       "De uren zijn een inschatting op basis van wat we in de inventarisatie hebben gezien.",
       "Projectmanagement komt er als percentage bovenop de uren voor de fases.",
-      "Wijzigt de omvang tijdens het werk, dan stemmen we dat eerst met u af."
+      "Wijzigt de omvang tijdens het werk, dan stemmen we dat eerst met jullie af."
     ]
   },
   "openVragen": [
@@ -164,11 +167,11 @@
           { "naam": "Femke Inkoop", "adres": "femke@voorbeeldtechniek.nl", "licentie": "Business Standard", "voorstel": "behouden" },
           { "naam": "Tim Magazijn", "adres": "tim@voorbeeldtechniek.nl", "licentie": "Business Basic", "voorstel": "behouden" },
           { "naam": "Eva Administratie", "adres": "eva@voorbeeldtechniek.nl", "licentie": "Business Standard", "voorstel": "behouden" },
-          { "naam": "Bas Uitvoerder", "adres": "bas@voorbeeldtechniek.nl", "licentie": "Business Basic", "voorstel": "behouden" },
           { "naam": "Oud Medewerker Een", "adres": "oud1@voorbeeldtechniek.nl", "licentie": "Business Standard", "voorstel": "blokkeren" },
           { "naam": "Oud Medewerker Twee", "adres": "oud2@voorbeeldtechniek.nl", "licentie": "Business Basic", "voorstel": "blokkeren" },
           { "naam": "Oud Medewerker Drie", "adres": "oud3@voorbeeldtechniek.nl", "licentie": "Business Basic", "voorstel": "blokkeren" },
-          { "naam": "Algemeen postvak", "adres": "info@voorbeeldtechniek.nl", "licentie": "Business Basic", "voorstel": "omzetten naar gedeeld postvak" }
+          { "naam": "Algemeen postvak", "adres": "info@voorbeeldtechniek.nl", "licentie": "Business Basic", "voorstel": "omzetten naar gedeeld postvak" },
+          { "naam": "Facturen postvak", "adres": "facturen@voorbeeldtechniek.nl", "licentie": "Business Basic", "voorstel": "omzetten naar gedeeld postvak" }
         ]
       },
       {

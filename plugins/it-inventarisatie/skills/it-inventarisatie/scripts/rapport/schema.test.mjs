@@ -89,3 +89,40 @@ test("ongeldig blok en niet-object", () => {
   assert.ok(validateRapport(r).some((x) => x.includes("stand.0.blokken")));
   assert.ok(validateRapport(null).length > 0);
 });
+
+const inventarisatie = () => JSON.parse(readFileSync(new URL("../../voorbeeld/inventarisatie.voorbeeld.json", import.meta.url), "utf8"));
+
+// Alle teksten uit een object, om aanspreekvorm en tijdsduur te controleren.
+const teksten = (v) => (typeof v === "string" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(teksten) : []);
+
+test("voorbeeldrapport: accounts kloppen tussen kerncijfers, stand en bijlage", () => {
+  const r = voorbeeld();
+  const accounts = r.bijlage.secties.find((s) => s.titel === "Accounts").rijen;
+  const gedeeld = accounts.filter((a) => /gedeeld postvak/.test(a.voorstel));
+  const persoonlijk = accounts.length - gedeeld.length;
+  assert.equal(r.samenvatting.kerncijfers.find((k) => k.label === "Accounts").waarde, String(accounts.length));
+  assert.match(r.samenvatting.kerncijfers.find((k) => k.label === "Accounts").toelichting, new RegExp(`waarvan ${gedeeld.length} gedeeld`));
+  assert.match(r.samenvatting.kerncijfers.find((k) => k.label === "Zonder MFA").toelichting, new RegExp(`van de ${persoonlijk} persoonlijke`));
+  const tabel = r.stand[0].blokken.find((b) => b.type === "tabel").rijen;
+  assert.equal(tabel.find((x) => x[0] === "Persoonlijke accounts")[1], String(persoonlijk));
+  assert.equal(tabel.find((x) => x[0] === "Gedeelde postvakken")[1], String(gedeeld.length));
+});
+
+test("voorbeeldrapport: jullie in plaats van u, en de looptijd past bij het stappenplan", () => {
+  const r = voorbeeld();
+  for (const t of teksten(r)) assert.ok(!/\b(u|uw)\b/i.test(t), t);
+  assert.equal(r.stappenplan.maanden.length, 4);
+  assert.match(r.doel.intro, /vier maanden/);
+  assert.ok(!teksten(r).some((t) => /half jaar/.test(t)));
+});
+
+test("voorbeeldwerkbestand beschrijft dezelfde klant als het voorbeeldrapport", () => {
+  const r = voorbeeld();
+  const w = inventarisatie();
+  assert.equal(w.klant, r.klant);
+  assert.equal(w.offerte.scope.telefonie, true);
+  assert.equal(w.offerte.scope.server, true);
+  const accounts = r.bijlage.secties.find((s) => s.titel === "Accounts").rijen;
+  assert.equal(w.bronnen.m365.gebruikers, accounts.length);
+  assert.equal(Object.values(w.bronnen.m365.licenties).reduce((a, b) => a + b, 0), accounts.length);
+});

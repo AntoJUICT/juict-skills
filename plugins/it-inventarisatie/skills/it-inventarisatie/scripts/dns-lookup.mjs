@@ -58,9 +58,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const domeinen = process.argv.slice(2);
   if (!domeinen.length) {
     console.error('Gebruik: dns-lookup.mjs <domein> [<domein>...]');
-    process.exit(1);
+    process.exitCode = 1;
+  } else {
+    const resultaat = [];
+    for (const d of domeinen) resultaat.push(await lookupDomein(d));
+    console.log(JSON.stringify(scrubSecrets(resultaat), null, 2));
   }
-  const resultaat = [];
-  for (const d of domeinen) resultaat.push(await lookupDomein(d));
-  console.log(JSON.stringify(scrubSecrets(resultaat), null, 2));
 }

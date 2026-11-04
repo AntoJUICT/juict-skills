@@ -37,3 +37,10 @@ test("bewaar en laad: round-trip, stript geheimen, ontbrekend is null", async ()
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("nieuw: scope is per onderdeel null (onbekend), niet false", () => {
+  const w = nieuw("Voorbeeld Techniek B.V.");
+  const scope = w.offerte.scope;
+  assert.deepEqual(Object.keys(scope).sort(), ["applicaties", "beveiliging", "m365", "netwerk", "printers", "server", "telefonie", "werkplekken"]);
+  for (const [k, v] of Object.entries(scope)) assert.equal(v, null, k);
+});

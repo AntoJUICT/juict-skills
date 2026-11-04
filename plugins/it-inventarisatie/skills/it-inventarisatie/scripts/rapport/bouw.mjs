@@ -2,7 +2,7 @@
 // Bouwt de artboards van het rapport voor Claude Design uit rapport.json.
 // Gebruik: node bouw.mjs --rapport <pad> --uit <map> --logo-pos <url> --logo-dia <url> [--fit]
 // Met --fit meet een headless browser elke pagina en worden te lange tabellen over vervolgpagina's verdeeld.
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { validateRapport } from "./schema.mjs";
@@ -255,10 +255,19 @@ export function canvasJson(paginas, nu = new Date(), titel = "IT-inventarisatie"
   };
 }
 
-// Schrijft de pagina's en canvas.json naar <root>/project. Geeft de geschreven paden terug.
+// Zelfde volgorde als browserPad() in fit-check.mjs: eerst de variabele, dan Chrome, dan Edge.
+export const GEEN_BROWSER = "Geen browser gevonden voor --fit. Zet IT_INVENTARISATIE_BROWSER op het pad van een Chromium-browser, of installeer Chrome (Edge werkt ook, maar een beheerde Edge blijft headless vaak hangen).";
+
+// Schrijft de pagina's en canvas.json naar <root>/project. Oude *.dc.html in die map gaan eerst weg, zodat er
+// geen vervolgpagina van een vorige bouw blijft staan. Geeft de geschreven paden terug, plus de bestandsnamen die
+// er de vorige keer wel waren en nu niet (die publiceer je met null).
 export function schrijf(paginas, root, { titel, nu } = {}) {
   const map = join(root, "project");
   mkdirSync(map, { recursive: true });
+  const nieuw = new Set(paginas.map((pg) => pg.bestand));
+  const oud = readdirSync(map).filter((n) => n.endsWith(".dc.html"));
+  for (const n of oud) rmSync(join(map, n), { force: true });
+  const verdwenen = oud.filter((n) => !nieuw.has(n)).sort();
   const paden = [];
   for (const pg of paginas) {
     const pad = join(map, pg.bestand);
@@ -268,7 +277,7 @@ export function schrijf(paginas, root, { titel, nu } = {}) {
   const pad = join(map, "canvas.json");
   writeFileSync(pad, JSON.stringify(canvasJson(paginas, nu, titel), null, 1), "utf8");
   paden.push(pad);
-  return paden;
+  return { paden, verdwenen };
 }
 
 function leesArgs(argv) {
@@ -317,7 +326,7 @@ async function main(argv) {
   if (args.fit) {
     const browser = browserPad();
     if (!browser) {
-      console.error("Geen browser gevonden voor --fit. Installeer Edge of Chrome, of zet IT_INVENTARISATIE_BROWSER op het pad van een Chromium-browser.");
+      console.error(GEEN_BROWSER);
       return 1;
     }
     try {
@@ -331,8 +340,11 @@ async function main(argv) {
   } else {
     paginas = bouwPaginas(rapport, logos);
   }
-  const paden = schrijf(paginas, args.uit, { titel: `IT-inventarisatie ${rapport.klant}` });
+  const { paden, verdwenen } = schrijf(paginas, args.uit, { titel: `IT-inventarisatie ${rapport.klant}` });
   console.log(paden.join("\n"));
+  if (verdwenen.length) {
+    console.error(`Niet meer in dit rapport; verwijder bij het publiceren met null:\n${verdwenen.map((n) => `- project/${n}`).join("\n")}`);
+  }
   return 0;
 }
 

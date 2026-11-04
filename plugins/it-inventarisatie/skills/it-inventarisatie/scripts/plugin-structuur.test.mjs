@@ -55,3 +55,14 @@ test("SKILL.md heeft frontmatter met name en description", () => {
   assert.match(inhoud, /^---\r?\nname: it-inventarisatie\r?\n/);
   assert.match(inhoud, /\ndescription: .{40,}/);
 });
+
+test("CLI's zetten process.exitCode in plaats van process.exit(), zodat stdout volledig wordt geschreven", async () => {
+  const { readdirSync } = await import("node:fs");
+  const mappen = [here, resolve(here, "rapport")];
+  for (const map of mappen) {
+    for (const naam of readdirSync(map).filter((n) => n.endsWith(".mjs") && !n.endsWith(".test.mjs"))) {
+      const inhoud = readFileSync(resolve(map, naam), "utf-8");
+      assert.ok(!inhoud.includes("process.exit("), `${naam} gebruikt process.exit()`);
+    }
+  }
+});

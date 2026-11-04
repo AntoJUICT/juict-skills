@@ -5,7 +5,8 @@ const GEHEIME_WOORDEN = new Set([
   "pass", "password", "passwd", "wachtwoord", "ww", "secret", "psk", "pin", "puk", "token", "apikey", "wpa",
 ]);
 const GEHEIME_DEELSTRINGS = ["licensekey", "licencekey", "productkey"];
-const VRIJE_TEKST = /(wachtwoord|password|ww)\s*[:=]\s*\S+/i;
+// Een geheim-woord met daarna ":" of "=" en een waarde ("PSK: ...", "pincode = ..."), op woordgrenzen.
+const VRIJE_TEKST = /\b(wachtwoord|password|passwd|ww|pin(code)?|puk|psk|wpa2?(-?key)?|token|wifi-?key|api-?key)\s*[:=]\s*\S+/i;
 
 function woorden(naam) {
   return String(naam)

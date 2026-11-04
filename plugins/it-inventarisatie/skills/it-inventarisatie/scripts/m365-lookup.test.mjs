@@ -107,3 +107,30 @@ test("haalRuw volgt @odata.nextLink over twee pagina's en vangt fouten", async (
   assert.deepEqual(res.devices, { fout: "401" });
   assert.deepEqual(res.groups.value, []);
 });
+
+test("hoofd met --uit: volledige samenvatting naar het bestand, op stdout alleen tellingen en nietOpgehaald", async () => {
+  const r = ruw();
+  r.mfa = { fout: "403" };
+  const bestanden = {};
+  const res = await hoofd(["--tenant", TENANT, "--uit", "m365.json"], {
+    exec: () => "tok",
+    fetch: async (url) => {
+      const pad = url.replace("https://graph.microsoft.com/", "");
+      const naam = GRAPH_CALLS.find((c) => c.url === pad)?.naam;
+      if (naam === "mfa") return { ok: false, status: 403, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => r[naam] };
+    },
+    schrijf: (pad, inhoud) => { bestanden[pad] = inhoud; },
+    nu: NU,
+  });
+  assert.equal(res.code, 0);
+  const vol = JSON.parse(bestanden["m365.json"]);
+  assert.equal(vol.gebruikers.length, 4);
+  const kort = JSON.parse(res.uitvoer);
+  assert.equal(kort.ok, true);
+  assert.equal(kort.uit, "m365.json");
+  assert.deepEqual(kort.aantallen, { domeinen: vol.domeinen.length, licenties: 1, gebruikers: 4, apparaten: 3, conditionalAccess: vol.conditionalAccess.length, beheerrollen: vol.beheerders.length });
+  assert.deepEqual(kort.nietOpgehaald, ["mfa"]);
+  assert.ok(!res.uitvoer.includes("voorbeeldtechniek.nl"), "geen adressen of domeinen op stdout");
+  assert.ok(!res.uitvoer.includes("Anna"), "geen namen op stdout");
+});

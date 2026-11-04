@@ -5,6 +5,7 @@ import {
   SJABLOON_TAKEN, TAAK_KOPPELING, normaliseerTitel, planTaskUpdates, toonPlan, pasToe,
   haalCredentials, maakAt, hoofd,
 } from "./autotask-project.mjs";
+import { nieuw } from "./werkbestand.mjs";
 
 const fixture = () => JSON.parse(readFileSync(new URL("./fixtures/autotask-taken.voorbeeld.json", import.meta.url), "utf8"));
 const OPTIES = { datum: "04-11-2026", engineer: "Voorbeeld Engineer" };
@@ -133,6 +134,21 @@ test("taken met status 5 worden overgeslagen", () => {
   assert.ok(!p.ontbrekend.includes("Setup telefonie"));
 });
 
+test("nieuw werkbestand (scope onbekend): geen enkele taak wordt nvt", () => {
+  const p = planTaskUpdates(fixture().taken, nieuw("Voorbeeld Techniek B.V."), OPTIES);
+  assert.deepEqual(p.wijzigingen.filter((w) => w.actie === "nvt"), []);
+});
+
+test("alleen scope false is buiten scope; null en true niet", () => {
+  const wb = werkbestand();
+  wb.offerte.scope.telefonie = null;
+  wb.offerte.scope.server = true;
+  const p = planTaskUpdates(fixture().taken, wb, OPTIES);
+  assert.notEqual(wijziging(p, "Setup telefonie")?.actie, "nvt");
+  assert.notEqual(wijziging(p, "Initiele datamigratie")?.actie, "nvt");
+  assert.equal(p.wijzigingen.filter((w) => w.actie === "nvt").length, 0);
+});
+
 test("opnieuw plannen voegt de samenvatting niet nog eens toe aan de omschrijving", () => {
   const eerste = wijziging(plan(), "Setup netwerk");
   const taken = fixture().taken.map((t) => (t.id === 910002 ? { ...t, description: eerste.omschrijving, estimatedHours: 6 } : t));
@@ -219,7 +235,33 @@ test("pasToe gaat door na een fout en meldt die zonder stacktrace", async () => 
   assert.equal(r.fouten.length, 1);
   assert.equal(r.fouten[0].taskId, 910001);
   assert.ok(at.calls.some((c) => c[0] === "patchTask" && c[2].id === 910002));
-  assert.ok(!at.calls.some((c) => c[0] === "postTaskNote" && c[1].taskID === 910001), "geen notitie als de patch faalde");
+});
+
+test("pasToe nvt: notitie eerst; faalt de notitie, dan geen patch", async () => {
+  const at = nepAt();
+  at.postTaskNote = async (body) => { if (body.taskID === 910001) throw new Error("Autotask API fout 500"); at.calls.push(["postTaskNote", body]); };
+  const r = await pasToe(plan(), { at, bestaandeNotities: [] });
+  assert.ok(r.fouten.some((f) => f.taskId === 910001));
+  assert.ok(!at.calls.some((c) => c[0] === "patchTask" && c[2].id === 910001), "geen status 5 zonder notitie");
+  assert.ok(at.calls.some((c) => c[0] === "patchTask" && c[2].id === 910002), "andere taken gaan door");
+});
+
+test("pasToe nvt: patch faalt na de notitie; een tweede run patcht wel en dupliceert de notitie niet", async () => {
+  const at = nepAt();
+  const geplaatst = [];
+  at.postTaskNote = async (body) => { geplaatst.push({ taskID: body.taskID, title: body.title }); at.calls.push(["postTaskNote", body]); };
+  let faal = true;
+  at.patchTask = async (projectId, body) => { if (faal && body.id === 910001) throw new Error("Autotask API fout 500"); at.calls.push(["patchTask", projectId, body]); };
+  const eerste = await pasToe(plan(), { at, bestaandeNotities: [] });
+  assert.ok(eerste.fouten.some((f) => f.taskId === 910001));
+  assert.equal(geplaatst.filter((n) => n.taskID === 910001).length, 1);
+
+  faal = false;
+  // de taak staat nog open, dus het nieuwe plan bevat de nvt-actie opnieuw
+  const tweede = await pasToe(plan(), { at, bestaandeNotities: geplaatst });
+  assert.equal(tweede.fouten.length, 0);
+  assert.deepEqual(at.calls.find((c) => c[0] === "patchTask" && c[2].id === 910001), ["patchTask", 900001, { id: 910001, status: 5, estimatedHours: 0 }]);
+  assert.equal(geplaatst.filter((n) => n.taskID === 910001).length, 1, "geen tweede notitie");
 });
 
 // --- Credentials en HTTP-laag ---
@@ -450,4 +492,15 @@ test("cli: API-fout wordt een nette melding met code 2", async () => {
   assert.equal(r.code, 2);
   assert.match(r.uitvoer, /500/);
   assert.ok(!r.uitvoer.includes("    at "), "geen stacktrace");
+});
+
+test("voorbeeldwerkbestand: offerte.uren gebruikt Easywork-taaktitels uit de taakkoppeling", () => {
+  const wb = JSON.parse(readFileSync(new URL("../voorbeeld/inventarisatie.voorbeeld.json", import.meta.url), "utf8"));
+  assert.ok(wb.offerte.uren.length > 0);
+  for (const { fase } of wb.offerte.uren) assert.ok(Object.keys(TAAK_KOPPELING).includes(fase), fase);
+  // de uren komen dan ook echt op de taken
+  const taken = Object.keys(TAAK_KOPPELING).map((title, i) => ({ id: 920000 + i, projectID: 900001, title, status: 1, estimatedHours: null }));
+  const p = planTaskUpdates(taken, wb, OPTIES);
+  for (const { fase, uren } of wb.offerte.uren) assert.equal(wijziging(p, fase)?.estimatedHours, uren, fase);
+  assert.deepEqual(p.wijzigingen.filter((w) => w.actie === "nvt"), [], "geen scope op false bij gekoppelde taken");
 });

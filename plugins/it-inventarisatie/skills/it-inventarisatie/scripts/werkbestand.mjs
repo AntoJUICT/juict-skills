@@ -52,7 +52,8 @@ export function nieuw(klant) {
     stap: "offerte",
     offerte: {
       bestand: null,
-      scope: { m365: false, werkplekken: false, server: false, netwerk: false, printers: false, applicaties: false, telefonie: false, beveiliging: false },
+      // Per onderdeel true (in de offerte), false (buiten scope) of null (nog onbekend). Alleen false maakt taken nvt.
+      scope: { m365: null, werkplekken: null, server: null, netwerk: null, printers: null, applicaties: null, telefonie: null, beveiliging: null },
       uren: [],
     },
     bronnen: { mail: [], m365: null, itglue: null, autotask: null, dns: [] },
