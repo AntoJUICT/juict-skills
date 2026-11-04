@@ -1,0 +1,184 @@
+{
+  "klant": "Voorbeeld Techniek B.V.",
+  "datum": "november 2026",
+  "opsteller": { "naam": "Voorbeeld Adviseur", "mail": "adviseur@voorbeeld.example", "telefoon": "000 0000000" },
+  "lezers": [
+    { "naam": "Sanne de Voorbeeld", "organisatie": "Voorbeeld Techniek B.V." },
+    { "naam": "Joost Testman", "organisatie": "Voorbeeld Techniek B.V." }
+  ],
+  "samenvatting": {
+    "besluit": { "label": "Wat we van u nodig hebben", "tekst": "Een akkoord op het stappenplan en de keuze voor de twee optionele onderdelen." },
+    "zagen": "Voorbeeld Techniek werkt met 14 accounts op Microsoft 365. De basis staat, maar MFA staat niet voor iedereen aan, laptops zijn niet beheerd en de telefonie loopt nog via een losse leverancier.",
+    "adviseren": "Wij adviseren om eerst accounts, beveiliging en apparaten op orde te brengen en daarna de telefonie en het netwerk over te nemen. Zo krijgt u in een paar maanden één beheerde omgeving.",
+    "kerncijfers": [
+      { "label": "Accounts", "waarde": "14", "toelichting": "waarvan 2 gedeeld" },
+      { "label": "Zonder MFA", "waarde": "5", "toelichting": "van de 12 persoonlijke accounts" },
+      { "label": "Laptops in Intune", "waarde": "0 van 11", "toelichting": "nu niet beheerd" },
+      { "label": "Telefoons", "waarde": "9", "toelichting": "niet in Intune" }
+    ],
+    "stappen": [
+      { "stap": "Akkoord op het stappenplan", "wie": "Sanne de Voorbeeld" },
+      { "stap": "Keuze voor de optionele onderdelen", "wie": "Sanne de Voorbeeld" },
+      { "stap": "Beheerder aanwijzen voor het overleg met de leverancier", "wie": "Joost Testman" }
+    ]
+  },
+  "stand": [
+    {
+      "titel": "Accounts en beveiliging",
+      "kicker": "Huidige stand 1 van 2",
+      "blokken": [
+        { "type": "h2", "tekst": "Accounts en licenties" },
+        { "type": "p", "tekst": "Er zijn 14 accounts in de tenant. Drie accounts horen bij mensen die niet meer bij het bedrijf werken en twee zijn gedeelde postvakken met een eigen licentie." },
+        {
+          "type": "tabel",
+          "kolommen": ["Onderdeel", "Nu", "Opmerking"],
+          "rijen": [
+            ["Persoonlijke accounts", "12", "waarvan 3 niet meer in gebruik"],
+            ["Gedeelde postvakken", "2", "beide met een betaalde licentie"],
+            ["MFA ingeschakeld", "7 van 12", "geen vaste methode afgesproken"],
+            ["Beheerders", "3", "geen aparte beheeraccounts"]
+          ],
+          "breedtes": ["40%", "20%", "40%"]
+        },
+        { "type": "h2", "tekst": "Wat dit betekent" },
+        {
+          "type": "kaarten",
+          "items": [
+            { "titel": "Risico", "tekst": "Accounts zonder MFA zijn de makkelijkste ingang voor misbruik." },
+            { "titel": "Kosten", "tekst": "Licenties van oud-medewerkers lopen door zolang niemand ze opzegt." },
+            { "titel": "Overzicht", "tekst": "Beheerders werken met hun gewone account, dat maakt controle lastig." }
+          ]
+        }
+      ]
+    },
+    {
+      "titel": "Apparaten, telefonie en netwerk",
+      "kicker": "Huidige stand 2 van 2",
+      "blokken": [
+        { "type": "h2", "tekst": "Apparaten" },
+        { "type": "p", "tekst": "De 11 laptops staan niet in Intune. Updates en versleuteling zijn dus aan de gebruiker zelf overgelaten. De 9 telefoons worden bewust niet door Intune beheerd.<br>Voor de telefoons maken we daarom alleen afspraken over wachtwoordvergrendeling en e-mailtoegang." },
+        {
+          "type": "tabel",
+          "kolommen": ["Onderdeel", "Aantal", "Beheerd"],
+          "rijen": [
+            ["Laptops", "11", "nee"],
+            ["Telefoons", "9", "nee, niet in Intune"],
+            ["Vaste toestellen", "4", "bij de huidige leverancier"],
+            ["Access points", "3", "ja, via de controller"]
+          ]
+        },
+        { "type": "h2", "tekst": "Telefonie en netwerk" },
+        { "type": "p", "tekst": "De vaste telefonie loopt via een losse leverancier met een eigen contract. Het wifi-netwerk is <b>wel</b> beheerd, maar de switch en de firewall zijn niet eerder bijgewerkt." },
+        {
+          "type": "kaarten",
+          "items": [
+            { "titel": "Telefonie", "tekst": "Nummers en toestellen kunnen worden overgezet naar het platform dat u al gebruikt." },
+            { "titel": "Netwerk", "tekst": "Firmware van switch en firewall is niet bijgewerkt." }
+          ]
+        }
+      ]
+    }
+  ],
+  "opvalt": [
+    { "punt": "MFA niet voor iedereen", "zien": "Vijf persoonlijke accounts loggen in met alleen een wachtwoord.", "doen": "MFA verplicht stellen voor alle accounts." },
+    { "punt": "Oude accounts", "zien": "Drie accounts van oud-medewerkers zijn nog actief en gelicentieerd.", "doen": "Accounts blokkeren, postvak bewaren en licenties vrijmaken." },
+    { "punt": "Laptops buiten beheer", "zien": "Geen enkele laptop staat in Intune.", "doen": "Laptops aanmelden en een standaardinrichting uitrollen." },
+    { "punt": "Telefonie", "zien": "Zoals afgesproken komt de telefonie erbij, met de nummers en toestellen die nu bij de losse leverancier staan.", "doen": "Nummers en toestellen overzetten en op locatie opleveren." }
+  ],
+  "doel": {
+    "intro": "Over een half jaar draait Voorbeeld Techniek op één omgeving die we beheren en waar u zelf overzicht op houdt.",
+    "principes": [
+      { "titel": "Eén plek", "tekst": "Accounts, apparaten en telefonie zijn op één plek terug te vinden." },
+      { "titel": "Veilig als standaard", "tekst": "MFA en updates staan aan zonder dat iemand eraan hoeft te denken." },
+      { "titel": "Duidelijk wie wat doet", "tekst": "Per onderdeel is afgesproken wie het beheert en wie de aanspreekpunten zijn." }
+    ],
+    "kaarten": [
+      { "titel": "Geen verrassingen", "tekst": "Wijzigingen worden vooraf aangekondigd." },
+      { "titel": "Eigen regie", "tekst": "U houdt toegang tot alle documentatie." }
+    ]
+  },
+  "stappenplan": {
+    "maanden": ["december", "januari", "februari", "maart"],
+    "fases": [
+      { "code": "F1", "naam": "Accounts en licenties opschonen", "omschrijving": "Oude accounts blokkeren, licenties herverdelen.", "start": 0, "eind": 1 },
+      { "code": "F2", "naam": "Beveiliging", "omschrijving": "MFA verplicht en beheeraccounts scheiden.", "start": 0, "eind": 2 },
+      { "code": "F3", "naam": "Apparaten in Intune", "omschrijving": "Laptops aanmelden en standaardinrichting.", "start": 1, "eind": 3 },
+      { "code": "F4", "naam": "Back-up en herstel", "omschrijving": "Back-up van Microsoft 365 en herstelproef.", "start": 2, "eind": 3 },
+      { "code": "F5", "naam": "Telefonie overnemen", "omschrijving": "Nummers en toestellen overzetten.", "start": 2, "eind": 4 },
+      { "code": "F6", "naam": "Netwerk en wifi", "omschrijving": "Firmware bijwerken en netwerk vastleggen.", "start": 1, "eind": 4 },
+      { "code": "PM", "naam": "Projectmanagement", "omschrijving": "Planning, overleg en terugkoppeling.", "pm": true }
+    ],
+    "toelichting": "De fases lopen deels naast elkaar. De telefonie volgt pas als de accounts en licenties zijn opgeschoond."
+  },
+  "uren": {
+    "blokken": [
+      {
+        "titel": "Nodig voor een beheerde omgeving",
+        "soort": "nodig",
+        "fases": [
+          { "fase": "Accounts en licenties opschonen", "resultaat": "Alleen actieve accounts met de juiste licentie", "rekenbasis": "14 accounts nalopen en opschonen", "uren": 16 },
+          { "fase": "Beveiliging", "resultaat": "MFA voor iedereen en aparte beheeraccounts", "rekenbasis": "beleid instellen (8 uur), gebruikers begeleiden (12 uur)", "uren": 20 },
+          { "fase": "Apparaten in Intune", "resultaat": "Alle laptops beheerd en versleuteld", "rekenbasis": "11 laptops aanmelden en controleren", "uren": 24 },
+          { "fase": "Back-up en herstel", "resultaat": "Back-up van Microsoft 365 met een geslaagde herstelproef", "rekenbasis": "inrichten (8 uur), herstelproef (4 uur)", "uren": 12 },
+          { "fase": "Telefonie overnemen", "resultaat": "Nummers en toestellen draaien op het nieuwe platform", "rekenbasis": "nummers en toestellen overzetten (4 uur), oplevering op locatie (4 uur)", "uren": 8 },
+          { "fase": "Netwerk en wifi", "resultaat": "Bijgewerkte switch en firewall, vastgelegd netwerk", "rekenbasis": "firmware en configuratie (16 uur), documentatie (9 uur)", "uren": 25 }
+        ]
+      },
+      {
+        "titel": "Naar keuze",
+        "soort": "keuze",
+        "fases": [
+          { "fase": "Awareness training", "resultaat": "Medewerkers herkennen phishing", "rekenbasis": "twee sessies met voorbereiding", "uren": 10 },
+          { "fase": "Extra locatie", "resultaat": "Tweede kantoor op hetzelfde netwerkbeheer", "rekenbasis": "inventarisatie en inrichting", "uren": 16 }
+        ]
+      }
+    ],
+    "projectmanagementPct": 10,
+    "nietInbegrepen": [
+      "Hardware en licenties van derden",
+      "Werk dat voortkomt uit nieuwe wensen na akkoord"
+    ],
+    "toelichting": [
+      "De uren zijn een inschatting op basis van wat we in de inventarisatie hebben gezien.",
+      "Projectmanagement komt er als percentage bovenop de uren voor de fases.",
+      "Wijzigt de omvang tijdens het werk, dan stemmen we dat eerst met u af."
+    ]
+  },
+  "openVragen": [
+    { "aan": "Sanne de Voorbeeld", "rol": "Directie", "vragen": ["Welke twee optionele onderdelen willen jullie meenemen?", "Wanneer mag de telefonie worden overgezet?"] },
+    { "aan": "Joost Testman", "rol": "Kantoorbeheer", "vragen": ["Wie is het aanspreekpunt bij de huidige telefonieleverancier?", "Hoe lang loopt het contract van de leverancier?"] }
+  ],
+  "bijlage": {
+    "intro": "Overzicht van alle accounts, met de licentie en ons voorstel per account.",
+    "secties": [
+      {
+        "titel": "Accounts",
+        "kolom5": "ja/nee",
+        "rijen": [
+          { "naam": "Sanne de Voorbeeld", "adres": "sanne@voorbeeldtechniek.nl", "licentie": "Business Premium", "voorstel": "behouden" },
+          { "naam": "Joost Testman", "adres": "joost@voorbeeldtechniek.nl", "licentie": "Business Premium", "voorstel": "behouden" },
+          { "naam": "Mila Planner", "adres": "mila@voorbeeldtechniek.nl", "licentie": "Business Premium", "voorstel": "behouden" },
+          { "naam": "Daan Monteur", "adres": "daan@voorbeeldtechniek.nl", "licentie": "Business Basic", "voorstel": "behouden" },
+          { "naam": "Lotte Werkvoorbereider", "adres": "lotte@voorbeeldtechniek.nl", "licentie": "Business Premium", "voorstel": "behouden" },
+          { "naam": "Ruben Tekenaar", "adres": "ruben@voorbeeldtechniek.nl", "licentie": "Business Premium", "voorstel": "behouden" },
+          { "naam": "Femke Inkoop", "adres": "femke@voorbeeldtechniek.nl", "licentie": "Business Standard", "voorstel": "behouden" },
+          { "naam": "Tim Magazijn", "adres": "tim@voorbeeldtechniek.nl", "licentie": "Business Basic", "voorstel": "behouden" },
+          { "naam": "Eva Administratie", "adres": "eva@voorbeeldtechniek.nl", "licentie": "Business Standard", "voorstel": "behouden" },
+          { "naam": "Bas Uitvoerder", "adres": "bas@voorbeeldtechniek.nl", "licentie": "Business Basic", "voorstel": "behouden" },
+          { "naam": "Oud Medewerker Een", "adres": "oud1@voorbeeldtechniek.nl", "licentie": "Business Standard", "voorstel": "blokkeren" },
+          { "naam": "Oud Medewerker Twee", "adres": "oud2@voorbeeldtechniek.nl", "licentie": "Business Basic", "voorstel": "blokkeren" },
+          { "naam": "Oud Medewerker Drie", "adres": "oud3@voorbeeldtechniek.nl", "licentie": "Business Basic", "voorstel": "blokkeren" },
+          { "naam": "Algemeen postvak", "adres": "info@voorbeeldtechniek.nl", "licentie": "Business Basic", "voorstel": "omzetten naar gedeeld postvak" }
+        ]
+      },
+      {
+        "titel": "Apparaten",
+        "kolom5": ["Intune", "Telefoon"],
+        "rijen": [
+          { "naam": "Laptop planning", "adres": "locatie kantoor", "licentie": "Windows 11 Pro", "voorstel": "aanmelden in Intune" },
+          { "naam": "Telefoon uitvoering", "adres": "locatie buiten", "licentie": "geen", "voorstel": "afspraken over vergrendeling, niet in Intune" }
+        ]
+      }
+    ]
+  }
+}
