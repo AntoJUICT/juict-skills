@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "klant": "Voorbeeld Techniek B.V.",
+  "slug": "voorbeeld-techniek-bv",
+  "aangemaakt": "2026-11-02T09:00:00.000Z",
+  "bijgewerkt": "2026-11-03T14:30:00.000Z",
+  "stap": "interview",
+  "offerte": {
+    "bestand": "offerte-voorbeeld-techniek.pdf",
+    "scope": { "m365": true, "werkplekken": true, "server": false, "netwerk": true, "printers": true, "applicaties": true, "telefonie": false, "beveiliging": true },
+    "uren": [
+      { "fase": "Voorbereiding", "uren": 4 },
+      { "fase": "Inventarisatie", "uren": 12 },
+      { "fase": "Rapportage", "uren": 6 }
+    ]
+  },
+  "bronnen": {
+    "mail": [],
+    "m365": { "domein": "voorbeeldtechniek.nl", "gebruikers": 24, "licenties": { "Business Premium": 22, "Exchange Online Plan 1": 2 } },
+    "itglue": null,
+    "autotask": null,
+    "dns": [
+      { "type": "MX", "waarde": "voorbeeldtechniek-nl.mail.protection.outlook.com" },
+      { "type": "TXT", "waarde": "v=spf1 include:spf.protection.outlook.com -all" }
+    ]
+  },
+  "antwoorden": {
+    "netwerk": { "aansluiting": "Glasvezel 500/500", "router": "Voorbeeld-router", "wifi": "Twee access points, een gastnetwerk" },
+    "werkplekken": { "aantal": 24, "besturingssysteem": "Windows 11", "beheer": "Intune" }
+  },
+  "openVragen": [
+    { "aan": "Contactpersoon klant", "vraag": "Welke applicaties zijn bedrijfskritisch?" }
+  ],
+  "laatsteMailcheck": null,
+  "rapport": { "artifactUrl": null, "pdfPad": null },
+  "autotask": { "companyId": null, "projectId": null, "toegepast": false }
+}
