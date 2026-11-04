@@ -36,7 +36,9 @@ de plugin onder `~/.claude/plugins/cache/...` staat). Hieronder staat die map al
    `stap`. De slug is de klantnaam in kleine letters met alleen `[a-z0-9-]` ("Voorbeeld Techniek B.V." wordt
    `voorbeeld-techniek-bv`). Nieuw: `node <skill>/scripts/werkbestand.mjs nieuw "<klantnaam>"`; dat print het pad.
 1. **Offerte lezen en scope bevestigen.** Vraag de offerte. Haal klantnaam, Autotask-bedrijf, onderdelen in scope en
-   uren per fase eruit. Vat het kort samen, laat het bevestigen en zet het in `offerte`.
+   uren per fase eruit. Zet de scope per onderdeel op `true` of `false`; wat de offerte niet noemt blijft `null`.
+   Vertaal de uren naar Easywork-taaktitels uit de taakkoppeling in REFERENCE.md, anders zet `plan` geen uren.
+   Vat het kort samen, laat het bevestigen en zet het in `offerte`.
 2. **Bronnen ophalen**, alleen lezen:
    - DNS en tenant-ID: `node <skill>/scripts/dns-lookup.mjs <domein> [<domein>...]`
    - Microsoft 365 via GDAP: `node <skill>/scripts/m365-lookup.mjs --tenant <guid|domein> --uit <werkmap>/m365.json`.
@@ -62,6 +64,7 @@ de plugin onder `~/.claude/plugins/cache/...` staat). Hieronder staat die map al
       `MSYS_NO_PATHCONV=1 node <skill>/scripts/rapport/bouw.mjs --rapport <werkmap>/rapport.json --uit <werkmap>/rapport --logo-pos /_blob/<id-pos> --logo-dia /_blob/<id-dia> --fit`
    5. Publiceer eerst `project/canvas.json` als `file_path` met `files: {"project/Main.dc.html": "project/Main.dc.html"}`
       en `root: "<werkmap>/rapport"` (volledig pad, geen 8.3-kortpad), daarna de overige `project/*.dc.html` in één call.
+      Meldt `bouw.mjs` bij een herbouw bestanden die er niet meer zijn, publiceer die met `"project/<bestand>": null`.
    Details, wijzigingen en problemen: REFERENCE.md.
 7. **PDF op het project.** De engineer exporteert de PDF in Claude Design (Share, Export, PDF). Zoek het project met
    `node <skill>/scripts/autotask-project.mjs zoek --company <id>` en laat het bevestigen. Geen project: meld het en

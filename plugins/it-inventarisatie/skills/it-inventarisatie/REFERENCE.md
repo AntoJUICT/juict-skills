@@ -12,8 +12,8 @@ Alle scripts zijn Node 18+ zonder npm-dependencies. Opties met een spatie, niet 
 |---|---|---|
 | `scripts/werkbestand.mjs` | `nieuw "<klant>"`, `toon <slug>`, `stap <slug> <stap>` | Pad van het werkbestand, of de inhoud. Exit 1 bij een fout. |
 | `scripts/dns-lookup.mjs` | `<domein> [<domein>...]` | JSON per domein: `domein`, `mx` (op prioriteit), `ns`, `m365Mail`, `reserveMx`, `verificatieMx`, `tenantId`, eventueel `fout`. |
-| `scripts/m365-lookup.mjs` | `--tenant <guid\|domein> [--uit <pad>]` | Samenvatting als JSON. Exit 1 zonder `--tenant`, exit 2 met `{ ok: false, reden }` bij geen GDAP, geen az-login of onbekend domein. |
-| `scripts/rapport/bouw.mjs` | `--rapport <pad> --uit <map> --logo-pos <url> --logo-dia <url> [--fit]` | Schrijft `<map>/project/Main.dc.html`, `NN-<naam>.dc.html` en `canvas.json`. Exit 1 bij een ongeldig rapport of een te volle pagina; dan is er niets geschreven. |
+| `scripts/m365-lookup.mjs` | `--tenant <guid\|domein> [--uit <pad>]` | Samenvatting als JSON. Met `--uit` staat de samenvatting in het bestand en print het script alleen `aantallen` en `nietOpgehaald`. Exit 1 zonder `--tenant`, exit 2 met `{ ok: false, reden }` bij geen GDAP, geen az-login of onbekend domein. |
+| `scripts/rapport/bouw.mjs` | `--rapport <pad> --uit <map> --logo-pos <url> --logo-dia <url> [--fit]` | Schrijft `<map>/project/Main.dc.html`, `NN-<naam>.dc.html` en `canvas.json`. Oude `*.dc.html` in `<map>/project` gaan eerst weg; wat er de vorige keer wel was en nu niet, meldt het script op stderr. Exit 1 bij een ongeldig rapport of een te volle pagina; dan is er niets geschreven. |
 | `scripts/autotask-project.mjs` | `zoek --company <id>` | Open klantprojecten (`projectType` 5, status niet 5): id, naam, status. |
 | | `plan --project <id> --werkbestand <pad> [--uit plan.json] [--engineer <naam>] [--datum dd-mm-jjjj]` | Voorvertoning per taak, en met `--uit` het plan als JSON. |
 | | `toepassen --plan plan.json [--toepassen]` | Zonder vlag de voorvertoning, met vlag de schrijfacties. Exit 2 als een taak mislukt. |
@@ -37,8 +37,8 @@ Alle scripts zijn Node 18+ zonder npm-dependencies. Opties met een spatie, niet 
 | `klant`, `slug` | Naam en slug (kleine letters, `[a-z0-9-]`) |
 | `stap` | Waar de inventarisatie staat, zie de stappen hierboven |
 | `offerte.bestand` | Bestandsnaam van de offerte |
-| `offerte.scope` | `m365`, `werkplekken`, `server`, `netwerk`, `printers`, `applicaties`, `telefonie`, `beveiliging`: `true` of `false` |
-| `offerte.uren` | `[{ fase, uren }]`. Heet een fase precies als een Autotask-taak, dan zet `plan` die uren op de taak |
+| `offerte.scope` | `m365`, `werkplekken`, `server`, `netwerk`, `printers`, `applicaties`, `telefonie`, `beveiliging`: `true` (in de offerte), `false` (buiten scope) of `null` (onbekend). `nieuw` zet alles op `null`. Alleen `false` maakt de gekoppelde taken niet van toepassing |
+| `offerte.uren` | `[{ fase, uren }]`, met als `fase` de titel van een Easywork-taak uit de taakkoppeling (zie onder) |
 | `bronnen` | `mail` (lijst), `m365`, `itglue`, `autotask`, `dns` (lijst): wat de bronnen opleverden, zonder geheimen |
 | `antwoorden` | Per onderdeel een object met wat bekend is. Sleutels: zie de checklist hieronder |
 | `openVragen` | `[{ aan, vraag }]` |
@@ -47,7 +47,13 @@ Alle scripts zijn Node 18+ zonder npm-dependencies. Opties met een spatie, niet 
 | `autotask` | `companyId`, `projectId`, `toegepast` |
 | `engineer` | Optioneel: naam voor de Autotask-notities |
 
-Voorbeeld: `<skill>/voorbeeld/inventarisatie.voorbeeld.json`.
+**Uren uit de offerte:** een offerte noemt fases in eigen woorden ("Netwerk", "Migratie bestanden"). Vertaal die bij
+stap 1 naar de taaktitels uit de taakkoppeling, want `plan` zet alleen uren op een taak die precies zo heet
+(hoofdletters, accenten en extra spaties tellen niet). Verdeel een fase over meer taken als dat nodig is
+("Telefonie, 8 uur" wordt "Setup telefonie" 4 en "Telefonie oplevering op locatie" 4). Een fase zonder gekoppelde
+taak (bijvoorbeeld back-up) laat je weg uit `offerte.uren`; die uren staan alleen in het rapport.
+
+Voorbeeld: `<skill>/voorbeeld/inventarisatie.voorbeeld.json`, dezelfde klant als het voorbeeldrapport.
 
 ## Interviewchecklist
 
@@ -102,7 +108,7 @@ de toestellen en de looptijd van het telefoniecontract er standaard bij.
 | `bijlage` | `intro`, `secties: [{ titel, kolom5: "ja/nee" of een lijst opties, rijen: [{ naam, adres, licentie, voorstel }] }]` |
 
 In alle tekst: geen em-dash, geen `{{`, geen bedragen (`€` of `EUR`), geen geheimen in vrije tekst
-(`wachtwoord:` en dergelijke), en alleen de tags `<b>` en `<br>`. Verwijs naar hoofdstukken ("de bijlage", "de open
+(`wachtwoord:`, `pincode:`, `PUK:`, `PSK:`, `WPA:`, `token:`, `wifi-key:`, `API-key:` en dergelijke), en alleen de tags `<b>` en `<br>`. Verwijs naar hoofdstukken ("de bijlage", "de open
 vragen"), nooit naar een paginanummer: `--fit` kan pagina's splitsen.
 
 **Urenpagina:** "resultaat" is wat de klant daarna heeft, niet de activiteit. "Rekenbasis" is narekenbaar
@@ -123,10 +129,11 @@ open vragen.
 4. Bouw met `--fit` (zie SKILL.md). In Git Bash is `MSYS_NO_PATHCONV=1` nodig, anders maakt Git Bash van
    `/_blob/...` een Windows-pad; `bouw.mjs` weigert dat met een melding.
 5. Publiceer eerst `project/canvas.json` als `file_path` met `files: {"project/Main.dc.html": "project/Main.dc.html"}`
-   en `root` = `<werkmap>/rapport`. Gebruik het volledige lange pad: met een 8.3-kortpad (zoals `ANTOTE~1`) weigert
-   het tool. Daarna de overige `project/*.dc.html` in één call.
-6. Bij een wijziging: opnieuw bouwen en alleen de gewijzigde bestanden plus `canvas.json` publiceren. Een pagina die
-   is weggevallen (bijvoorbeeld een vervolgpagina) verwijder je met `"project/<bestand>": null`.
+   en `root` = `<werkmap>/rapport`. Gebruik het volledige lange pad: met een 8.3-kortpad (zoals
+   `C:\Users\VOORBE~1\...`) weigert het tool. Daarna de overige `project/*.dc.html` in één call.
+6. Bij een wijziging: opnieuw bouwen en alleen de gewijzigde bestanden plus `canvas.json` publiceren. `bouw.mjs`
+   verwijdert eerst de oude `*.dc.html` uit `<werkmap>/rapport/project` en meldt welke bestandsnamen er niet meer
+   zijn (bijvoorbeeld een vervolgpagina). Verwijder elk daarvan in Claude Design met `"project/<bestand>": null`.
 7. Delen doet de engineer zelf via het Share-menu. De PDF komt uit Share, Export, PDF.
 
 **Fit-check:** `--fit` meet elke pagina in een headless browser en splitst te lange tabellen over vervolgpagina's,
@@ -180,7 +187,7 @@ Gebruik de regels uit de `juict-vault` skill als die er is. Anders deze korte ve
 
 `plan` raakt alleen deze taken aan. Afgeronde taken (status 5) en taken die niet in het sjabloon staan, blijven
 ongemoeid; ontbrekende sjabloontaken worden gemeld. Staat de scope in de offerte op `false`, dan is de taak niet van
-toepassing.
+toepassing. `null` (onbekend) of `true` maakt een taak nooit niet van toepassing.
 
 | Taak | Onderdelen uit `antwoorden` | Scope |
 |---|---|---|
@@ -202,7 +209,9 @@ toepassing.
 - **Wel van toepassing:** een korte samenvatting (maximaal 1000 tekens) achter de bestaande omschrijving, en de
   details in een notitie "Inventarisatie <datum>". Een waarde die op een wachtwoord lijkt, wordt "staat in IT Glue".
 - **Opnieuw draaien:** een notitie met dezelfde titel op dezelfde taak wordt overgeslagen, en een samenvatting van
-  dezelfde datum komt er niet nog eens bij.
+  dezelfde datum komt er niet nog eens bij. `toepassen` plaatst per taak eerst de notitie en past daarna de taak aan.
+  Faalt de notitie, dan blijft de taak zoals hij was. Faalt de aanpassing, dan staat de taak nog open: maak een nieuw
+  plan en pas het opnieuw toe, de notitie komt er dan niet dubbel op.
 - **Bijlage:** `fullPath` is `it-inventarisatie-<slug>.pdf`, titel "IT-inventarisatie <klant>". Staat die `fullPath`
   er al, dan komt er geen tweede.
 
