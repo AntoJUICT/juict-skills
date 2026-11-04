@@ -1,0 +1,45 @@
+{
+  "organization": { "value": [{ "displayName": "Voorbeeld Techniek B.V.", "id": "11111111-2222-3333-4444-555555555555" }] },
+  "domains": { "value": [
+    { "id": "voorbeeldtechniek.nl", "isDefault": true },
+    { "id": "voorbeeldtechniek.onmicrosoft.com", "isDefault": false }
+  ] },
+  "subscribedSkus": { "value": [
+    { "skuId": "aaaaaaaa-0000-0000-0000-000000000001", "skuPartNumber": "SPB", "prepaidUnits": { "enabled": 3 }, "consumedUnits": 3 },
+    { "skuId": "aaaaaaaa-0000-0000-0000-000000000002", "skuPartNumber": "FLOW_FREE", "prepaidUnits": { "enabled": 10000 }, "consumedUnits": 2 }
+  ] },
+  "users": { "value": [
+    { "displayName": "Anna Voorbeeld", "userPrincipalName": "anna@voorbeeldtechniek.nl", "accountEnabled": true, "userType": "Member",
+      "assignedLicenses": [{ "skuId": "aaaaaaaa-0000-0000-0000-000000000001" }, { "skuId": "aaaaaaaa-0000-0000-0000-000000000002" }] },
+    { "displayName": "Bram Voorbeeld", "userPrincipalName": "bram@voorbeeldtechniek.nl", "accountEnabled": true, "userType": "Member",
+      "assignedLicenses": [{ "skuId": "aaaaaaaa-0000-0000-0000-000000000001" }] },
+    { "displayName": "Carla Voorbeeld", "userPrincipalName": "carla@voorbeeldtechniek.nl", "accountEnabled": true, "userType": "Member",
+      "assignedLicenses": [{ "skuId": "aaaaaaaa-0000-0000-0000-000000000001" }] },
+    { "displayName": "Oud Medewerker", "userPrincipalName": "oud@voorbeeldtechniek.nl", "accountEnabled": false, "userType": "Member",
+      "assignedLicenses": [] }
+  ] },
+  "signins": { "value": [
+    { "userPrincipalName": "anna@voorbeeldtechniek.nl", "signInActivity": { "lastSignInDateTime": "2026-10-30T08:00:00Z" } },
+    { "userPrincipalName": "bram@voorbeeldtechniek.nl", "signInActivity": { "lastSignInDateTime": "2026-09-15T12:30:00Z" } },
+    { "userPrincipalName": "carla@voorbeeldtechniek.nl", "signInActivity": {} }
+  ] },
+  "mfa": { "value": [
+    { "userPrincipalName": "anna@voorbeeldtechniek.nl", "isMfaRegistered": true },
+    { "userPrincipalName": "bram@voorbeeldtechniek.nl", "isMfaRegistered": false },
+    { "userPrincipalName": "carla@voorbeeldtechniek.nl", "isMfaRegistered": true }
+  ] },
+  "groups": { "value": [{ "displayName": "Alle medewerkers" }] },
+  "devices": { "value": [
+    { "displayName": "VT-LAPTOP-01", "trustType": "AzureAd", "isCompliant": true, "approximateLastSignInDateTime": "2026-10-31T09:00:00Z" },
+    { "displayName": "VT-LAPTOP-02", "trustType": "AzureAd", "isCompliant": false, "approximateLastSignInDateTime": "2026-02-01T09:00:00Z" },
+    { "displayName": "VT-OUD-03", "trustType": "ServerAd", "isCompliant": null, "approximateLastSignInDateTime": null }
+  ] },
+  "conditionalAccess": { "value": [
+    { "displayName": "MFA voor alle gebruikers", "state": "enabled" },
+    { "displayName": "Legacy-authenticatie blokkeren", "state": "enabledForReportingButNotEnforced" }
+  ] },
+  "directoryRoles": { "value": [
+    { "displayName": "Global Administrator", "members": [{ "displayName": "Anna Voorbeeld" }] },
+    { "displayName": "Helpdesk Administrator", "members": [] }
+  ] }
+}
