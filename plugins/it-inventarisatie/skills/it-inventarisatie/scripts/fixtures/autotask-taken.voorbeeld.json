@@ -1,0 +1,13 @@
+{
+  "_toelichting": "Verzonnen klantproject van het sjabloon Easywork Basic: 6 sjabloontaken en 1 eigen taak. Alle ID's zijn verzonnen.",
+  "project": { "id": 900001, "projectName": "Onboarding Voorbeeld Techniek B.V.", "companyID": 900100, "projectType": 5, "status": 1 },
+  "taken": [
+    { "id": 910001, "projectID": 900001, "title": "Setup telefonie", "status": 1, "estimatedHours": 4, "description": "" },
+    { "id": 910002, "projectID": 900001, "title": "Setup netwerk", "status": 1, "estimatedHours": 8, "description": "" },
+    { "id": 910003, "projectID": 900001, "title": "Setup Microsoft 365", "status": 1, "estimatedHours": 6, "description": "Afstemmen met de klant over de tenant." },
+    { "id": 910004, "projectID": 900001, "title": "Mailmigratie Microsoft 365", "status": 1, "estimatedHours": 4, "description": null },
+    { "id": 910005, "projectID": 900001, "title": "Initiele datamigratie", "status": 1, "estimatedHours": 8, "description": "" },
+    { "id": 910006, "projectID": 900001, "title": "Project opstart", "status": 1, "estimatedHours": 2, "description": "" },
+    { "id": 910007, "projectID": 900001, "title": "Koffieautomaat aansluiten op het netwerk", "status": 1, "estimatedHours": 1, "description": "" }
+  ]
+}
