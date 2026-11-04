@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // Bouwt de artboards van het rapport voor Claude Design uit rapport.json.
-// Gebruik: node bouw.mjs --rapport <pad> --uit <map> --logo-pos <url> --logo-dia <url>
+// Gebruik: node bouw.mjs --rapport <pad> --uit <map> --logo-pos <url> --logo-dia <url> [--fit]
+// Met --fit meet een headless browser elke pagina en worden te lange tabellen over vervolgpagina's verdeeld.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { validateRapport } from "./schema.mjs";
+import { browserPad, meet, splitsTabel, MARGE } from "./fit-check.mjs";
 import {
   W, H, NAVY, PINK, MUTED, BG, GRAD, ROOT_STYLE_PAGINA, ROOT_STYLE_VOORBLAD,
   esc, veiligeHtml, html, doc, pagina, h2, p, tabel, kaart, label, raster, vakjes, tijdlijn,
@@ -49,13 +51,19 @@ function samenvatting(r) {
     body += h2("De eerstvolgende stappen") +
       tabel(["", "Stap", "Wie"], st.map((x, i) => [String(i + 1), x.stap, x.wie]), { breedtes: ["26px", "auto", "150px"] });
   }
-  return { naam: "Samenvatting", titel: "Samenvatting", kicker: "Samenvatting", h1: "Wat we zagen en wat we adviseren", body };
+  return { naam: "Samenvatting", titel: "Samenvatting", kicker: "Samenvatting", h1: "Wat we zagen en wat we adviseren", blokken: [htmlBlok(body)] };
+}
+
+// Een blok met al opgebouwde HTML; nooit te splitsen.
+function htmlBlok(h) {
+  return { type: "html", html: h };
 }
 
 function blok(b) {
+  if (b.type === "html") return b.html;
   if (b.type === "h2") return h2(b.tekst);
   if (b.type === "p") return p(b.tekst);
-  if (b.type === "tabel") return tabel(b.kolommen, b.rijen, { breedtes: b.breedtes });
+  if (b.type === "tabel") return tabel(b.kolommen, b.rijen, { breedtes: b.breedtes, fs: b.fs, uitlijning: b.uitlijning, vast: b.vast });
   if (b.type === "kaarten") {
     return raster(Math.min(b.items.length, 3), b.items.map((k) =>
       kaart(`<div style="font-weight: 700; color: ${NAVY}">${t(k.titel)}</div><div style="font-size: 13px">${t(k.tekst)}</div>`)));
@@ -65,8 +73,8 @@ function blok(b) {
 
 function opvalt(r) {
   const rijen = lijst(r.opvalt).map((o) => [html(`<b>${t(o.punt)}</b>`), o.zien, o.doen]);
-  const body = tabel(["Punt", "Wat we zien", "Wat we eraan doen"], rijen, { breedtes: ["170px", "auto", "220px"] });
-  return { naam: "Wat-opvalt", titel: "Wat opvalt", kicker: "Aandachtspunten", h1: "Wat opvalt", body };
+  const blokken = [{ type: "tabel", kolommen: ["Punt", "Wat we zien", "Wat we eraan doen"], rijen, breedtes: ["170px", "auto", "220px"] }];
+  return { naam: "Wat-opvalt", titel: "Wat opvalt", kicker: "Aandachtspunten", h1: "Wat opvalt", blokken, splitsbaar: true };
 }
 
 function doelinrichting(d) {
@@ -81,13 +89,13 @@ function doelinrichting(d) {
     body += raster(Math.min(ka.length, 3), ka.map((k) =>
       kaart(`<div style="font-weight: 700; color: ${NAVY}">${t(k.titel)}</div><div style="font-size: 13px">${t(k.tekst)}</div>`)));
   }
-  return { naam: "Doelinrichting", titel: "Doelinrichting", kicker: "Advies", h1: "De doelinrichting", body };
+  return { naam: "Doelinrichting", titel: "Doelinrichting", kicker: "Advies", h1: "De doelinrichting", blokken: [htmlBlok(body)] };
 }
 
 function stappenplan(sp) {
   let body = tijdlijn(lijst(sp.maanden), lijst(sp.fases));
   if (sp.toelichting) body += p(sp.toelichting);
-  return { naam: "Stappenplan", titel: "Stappenplan", kicker: "Stappenplan", h1: "Zo pakken we het aan", body };
+  return { naam: "Stappenplan", titel: "Stappenplan", kicker: "Stappenplan", h1: "Zo pakken we het aan", blokken: [htmlBlok(body)] };
 }
 
 export function urenTotalen(u) {
@@ -122,7 +130,7 @@ function uren(u) {
   if (toel.length) {
     body += kaart(`<div style="font-weight: 700; color: ${NAVY}">Zo komen we tot deze uren</div><div style="font-size: 13px">${toel.map(t).join(" ")}</div>`);
   }
-  return { naam: "Uren", titel: "Uren", kicker: "Urenindicatie", h1: "Uren per fase", body };
+  return { naam: "Uren", titel: "Uren", kicker: "Urenindicatie", h1: "Uren per fase", blokken: [htmlBlok(body)] };
 }
 
 function openVragen(vragen) {
@@ -131,7 +139,7 @@ function openVragen(vragen) {
     return kaart(`<div style="display: flex; align-items: baseline; gap: 10px"><div style="font-size: 16px; font-weight: 700; color: ${NAVY}">${t(v.aan)}</div><div style="font-size: 12px; color: ${MUTED}">${t(v.rol)}</div></div>` + li);
   };
   const body = p("Met deze antwoorden maken we de planning definitief. Een kort antwoord per mail is genoeg.") + vragen.map(kaartVoor).join("");
-  return { naam: "Open-vragen", titel: "Open vragen", kicker: "Open vragen", h1: "Wat we nog van jullie nodig hebben", body };
+  return { naam: "Open-vragen", titel: "Open vragen", kicker: "Open vragen", h1: "Wat we nog van jullie nodig hebben", blokken: [htmlBlok(body)] };
 }
 
 function bijlageSectie(sec, i, intro) {
@@ -144,15 +152,19 @@ function bijlageSectie(sec, i, intro) {
     x.voorstel,
     html(vakjes(opties)),
   ]);
-  const body = (i === 0 && intro ? p(intro, "; font-size: 13px") : "") +
-    tabel(["Naam", "Adres", "Licentie", "Voorstel", jaNee ? "Nog nodig?" : "Keuze"], rijen,
-      { breedtes: ["118px", "150px", "100px", "160px", "auto"], fs: 12, vast: true });
-  return { naam: `Bijlage-${i + 1}`, titel: `Bijlage ${sec.titel}`, kicker: `Bijlage, deel ${i + 1}`, h1: sec.titel, body };
+  const blokken = [
+    ...(i === 0 && intro ? [htmlBlok(p(intro, "; font-size: 13px"))] : []),
+    { type: "tabel", kolommen: ["Naam", "Adres", "Licentie", "Voorstel", jaNee ? "Nog nodig?" : "Keuze"], rijen,
+      breedtes: ["118px", "150px", "100px", "160px", "auto"], fs: 12, vast: true },
+  ];
+  return { naam: `Bijlage-${i + 1}`, titel: `Bijlage ${sec.titel}`, kicker: `Bijlage, deel ${i + 1}`, h1: sec.titel, blokken, splitsbaar: true };
 }
 
-export function bouwPaginas(r, { logoPos, logoDia }) {
+// De delen na het voorblad, elk met blokken. Een deel met splitsbaar: true mag zijn laatste
+// tabel over een vervolgpagina verdelen (stand, wat opvalt, bijlage).
+export function bouwDelen(r) {
   const delen = [samenvatting(r)];
-  lijst(r.stand).forEach((s, i) => delen.push({ naam: `Stand-${i + 1}`, titel: s.titel, kicker: s.kicker, h1: s.titel, body: lijst(s.blokken).map(blok).join("") }));
+  lijst(r.stand).forEach((s, i) => delen.push({ naam: `Stand-${i + 1}`, titel: s.titel, kicker: s.kicker, h1: s.titel, blokken: lijst(s.blokken), splitsbaar: true }));
   if (lijst(r.opvalt).length) delen.push(opvalt(r));
   if (r.doel && (r.doel.intro || lijst(r.doel.principes).length)) delen.push(doelinrichting(r.doel));
   if (r.stappenplan && lijst(r.stappenplan.fases).length) delen.push(stappenplan(r.stappenplan));
@@ -160,18 +172,68 @@ export function bouwPaginas(r, { logoPos, logoDia }) {
   if (lijst(r.openVragen).length) delen.push(openVragen(r.openVragen));
   const secties = lijst(r.bijlage?.secties);
   secties.forEach((sec, i) => delen.push(bijlageSectie(sec, i, r.bijlage.intro)));
+  return delen;
+}
 
+// Zet de delen om in pagina's. Bestandsnaam en paginanummer volgen de positie. Een vervolgpagina
+// heet als zijn deel plus "-vervolg" (vanaf de tweede met een volgnummer) en krijgt de kicker "<kicker>, vervolg".
+export function paginasUitDelen(delen, r, { logoPos, logoDia }) {
   const opties = { logo: logoPos, lopendeTitel: `IT-inventarisatie ${r.klant}`, datum: r.datum };
   const paginas = [{ bestand: "Main.dc.html", titel: "Voorblad", html: doc("Voorblad", voorblad(r, logoDia), ROOT_STYLE_VOORBLAD) }];
+  const gezien = new Map();
   delen.forEach((d, i) => {
     const nr = i + 2;
+    const k = gezien.get(d.naam) ?? 0;
+    gezien.set(d.naam, k + 1);
+    const naam = k === 0 ? d.naam : k === 1 ? `${d.naam}-vervolg` : `${d.naam}-vervolg-${k}`;
+    const titel = d.vervolg ? `${d.titel}, vervolg` : d.titel;
+    const kicker = d.vervolg ? `${d.kicker}, vervolg` : d.kicker;
     paginas.push({
-      bestand: `${String(nr).padStart(2, "0")}-${d.naam}.dc.html`,
-      titel: d.titel,
-      html: doc(d.titel, pagina(nr, d.kicker, d.h1, d.body, opties), ROOT_STYLE_PAGINA),
+      bestand: `${String(nr).padStart(2, "0")}-${naam}.dc.html`,
+      titel,
+      html: doc(titel, pagina(nr, kicker, d.h1, d.blokken.map(blok).join(""), opties), ROOT_STYLE_PAGINA),
     });
   });
   return paginas;
+}
+
+export function bouwPaginas(r, logos) {
+  return paginasUitDelen(bouwDelen(r), r, logos);
+}
+
+const teVol = (m) => `Pagina ${m.bestand} is ${m.inhoud - (m.footer - MARGE)}px te vol; maak de tekst korter`;
+
+function laatsteTabel(blokken) {
+  return [...blokken].reverse().find((b) => b && b.type === "tabel") ?? null;
+}
+
+// Meet de pagina's en verdeelt te lange tabellen over vervolgpagina's tot alles past,
+// in maximaal maxRondes metingen. Gooit een fout met de te volle pagina als dat niet lukt.
+export async function pasIn(r, logos, { meetFn = meet, browser = browserPad(), maxRondes = 6 } = {}) {
+  const delen = bouwDelen(r);
+  for (let ronde = 1; ; ronde++) {
+    const paginas = paginasUitDelen(delen, r, logos);
+    const metingen = await meetFn(paginas, browser);
+    // pagina i hoort bij deel i - 1 (pagina 0 is het voorblad)
+    const vol = [];
+    metingen.forEach((m, i) => { if (m.over) vol.push({ m, d: i - 1 }); });
+    if (!vol.length) return { paginas, rondes: ronde };
+    if (ronde >= maxRondes) throw new Error(teVol(vol[0].m));
+    const plan = vol.map(({ m, d }) => {
+      const deel = delen[d];
+      const tab = deel?.splitsbaar ? laatsteTabel(deel.blokken) : null;
+      const n = tab ? tab.rijen.length : 0;
+      if (n < 2 || !(m.tabel > 0)) throw new Error(teVol(m));
+      const teveel = m.inhoud - (m.footer - MARGE);
+      return { d, aantal: Math.min(Math.ceil(n * (teveel / m.tabel)) + 1, n - 1) };
+    });
+    // achteraan beginnen, zodat de indexen van de eerdere delen kloppen
+    for (const { d, aantal } of plan.reverse()) {
+      const deel = delen[d];
+      const { hier, vervolg } = splitsTabel(deel.blokken, aantal);
+      delen.splice(d, 1, { ...deel, blokken: hier }, { ...deel, blokken: vervolg, vervolg: true });
+    }
+  }
 }
 
 export function canvasJson(paginas, nu = new Date(), titel = "IT-inventarisatie") {
@@ -213,6 +275,7 @@ function leesArgs(argv) {
   const args = {};
   const bekend = new Set(["--rapport", "--uit", "--logo-pos", "--logo-dia"]);
   for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--fit") { args.fit = true; continue; }
     if (!bekend.has(argv[i])) throw new Error(`onbekend argument: ${argv[i]}`);
     const waarde = argv[i + 1];
     if (waarde === undefined || waarde.startsWith("--")) throw new Error(`${argv[i]} mist een waarde`);
@@ -229,12 +292,12 @@ function leesArgs(argv) {
   return args;
 }
 
-function main(argv) {
+async function main(argv) {
   let args;
   try {
     args = leesArgs(argv);
   } catch (e) {
-    console.error(`${e.message}\nGebruik: node bouw.mjs --rapport <pad> --uit <map> --logo-pos <url> --logo-dia <url>`);
+    console.error(`${e.message}\nGebruik: node bouw.mjs --rapport <pad> --uit <map> --logo-pos <url> --logo-dia <url> [--fit]`);
     return 1;
   }
   let rapport;
@@ -249,12 +312,30 @@ function main(argv) {
     console.error(`Het rapport is niet geldig, er is niets geschreven:\n${fouten.map((f) => `- ${f}`).join("\n")}`);
     return 1;
   }
-  const paginas = bouwPaginas(rapport, { logoPos: args["logo-pos"], logoDia: args["logo-dia"] });
+  const logos = { logoPos: args["logo-pos"], logoDia: args["logo-dia"] };
+  let paginas;
+  if (args.fit) {
+    const browser = browserPad();
+    if (!browser) {
+      console.error("Geen browser gevonden voor --fit. Installeer Edge of Chrome, of zet IT_INVENTARISATIE_BROWSER op het pad van een Chromium-browser.");
+      return 1;
+    }
+    try {
+      const res = await pasIn(rapport, logos, { browser });
+      paginas = res.paginas;
+      console.error(`Alle pagina's passen na ${res.rondes} meetronde(s).`);
+    } catch (e) {
+      console.error(`${e.message}\nEr is niets geschreven.`);
+      return 1;
+    }
+  } else {
+    paginas = bouwPaginas(rapport, logos);
+  }
   const paden = schrijf(paginas, args.uit, { titel: `IT-inventarisatie ${rapport.klant}` });
   console.log(paden.join("\n"));
   return 0;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exitCode = main(process.argv.slice(2));
+  main(process.argv.slice(2)).then((code) => { process.exitCode = code; });
 }
