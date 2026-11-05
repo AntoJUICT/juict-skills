@@ -1,7 +1,7 @@
 {
   "name": "smart-numbers",
-  "version": "0.2.0",
-  "description": "De maandelijkse TruPeer SMART Numbers (TruMethods) voor JUICT invullen: seats, agreements, reactieve tickets en uren, omzet en MRR-mutaties uit Autotask, FTE per rol uit het intranet, de rest uitgevraagd, als tabel in de volgorde van het formulier. Codes, prijzen en afspraken komen op runtime uit de directie-vault.",
+  "version": "0.3.0",
+  "description": "De maandelijkse TruPeer SMART Numbers (TruMethods) voor JUICT invullen: seats, agreements, reactieve tickets en uren, omzet en MRR-mutaties uit Autotask, FTE per rol en kosten uit het intranet, de rest uitgevraagd, als tabel in de volgorde van het formulier. Codes, prijzen en afspraken komen op runtime uit de directie-vault.",
   "author": {
     "name": "AntoJUICT",
     "email": "anto@juict.nl"
