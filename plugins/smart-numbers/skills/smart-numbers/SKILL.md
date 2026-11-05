@@ -1,6 +1,6 @@
 ---
 name: smart-numbers
-description: Vult de maandelijkse TruPeer SMART Numbers (TruMethods) voor JUICT in. Rekent seats, agreements, reactieve tickets en uren, omzet (NRR, MRR, ORR, product, misc), MRR-mutaties en churn uit Autotask, vraagt FTE per rol, salesactiviteit en kosten uit, en levert een tabel in de volgorde van het TruPeer-formulier (items 1-52). Gebruik wanneer iemand /smart-numbers typt, de SMART Numbers van een maand wil invullen of terugrekenen, of vraagt om de maandcijfers voor TruPeer of de SMART Numbers-meeting. Vereist de directie-vault.
+description: Vult de maandelijkse TruPeer SMART Numbers (TruMethods) voor JUICT in. Rekent seats, agreements, reactieve tickets en uren, omzet (NRR, MRR, ORR, product, misc), MRR-mutaties en churn uit Autotask, haalt de FTE per rol uit het intranet, vraagt salesactiviteit en kosten uit, en levert een tabel in de volgorde van het TruPeer-formulier (items 1-52). Gebruik wanneer iemand /smart-numbers typt, de SMART Numbers van een maand wil invullen of terugrekenen, of vraagt om de maandcijfers voor TruPeer of de SMART Numbers-meeting. Vereist de directie-vault en de intranet-MCP (juict-intranet).
 ---
 
 # SMART Numbers (TruPeer)
@@ -14,7 +14,7 @@ Deze skill staat in een publieke repo. Alles wat JUICT-specifiek of gevoelig is 
 | Bestand | Inhoud |
 |---|---|
 | `besluiten.md` | Alle definities en keuzes per item. **Leidend: lees dit eerst en volg het letterlijk.** |
-| `config.json` | Billing codes, indeling MRR/ORR, inkoopprijzen die van MRR naar ORR schuiven, regels voor losse charges |
+| `config.json` | Billing codes, indeling MRR/ORR, inkoopprijzen die van MRR naar ORR schuiven, regels voor losse charges, rolverdeling per medewerker |
 | `JJJJ-MM.md` | De uitkomst per maand |
 
 Standaardpad van de vault: `%USERPROFILE%\JUICT-Brain\vault-juict-directie` (Mac: `~/JUICT-Brain/vault-juict-directie`). Een afwijkende config geef je mee met de omgevingsvariabele `SMART_NUMBERS_CONFIG`.
@@ -35,13 +35,18 @@ Standaardpad van de vault: `%USERPROFILE%\JUICT-Brain\vault-juict-directie` (Mac
    - `onbekendeBillingCodes`: een billing code die nog nergens is ingedeeld. Vraag waar hij hoort, zet hem in `config.json` en reken opnieuw.
    - `nieuw` en `verloren`: noem de klanten. Vraag bij churn of de opzegging klopt.
    - `controle_urenGeregistreerdTotaal`: is dit flink lager dan de beschikbare technische uren, meld dan dat de reactieve uren waarschijnlijk te laag zijn.
-5. **Uitvragen wat niet uit een systeem komt**, in één bericht, met de waarden van de vorige maand (uit de vorige `JJJJ-MM.md`) als voorstel:
-   - FTE per rol (items 3-9), volgens de regels in `besluiten.md`.
+5. **FTE uit het intranet** (items 3-9), via de intranet-MCP (`juict-intranet`):
+   - Haal met `medewerkers_zoeken` de actieve medewerkers op en per medewerker het dossier met `medewerker_ophalen` (alleen management mag dat). Dossiers zijn groot; Claude Code slaat het antwoord dan op als bestand. Staat het antwoord inline, schrijf het dan als JSON naar de scratchpad. Lees zelf geen loon of persoonsgegevens uit de dossiers voor.
+   - Reken uit met `node "<deze skill>/scripts/fte.mjs" JJJJ-MM <dossierbestanden...>`. Het script gebruikt `werkweek` uit het profiel, de rolverdeling uit `config.json` en de regels uit `besluiten.md` (wie meetelt, eigenaren, afronden op 0,25).
+   - Leg `signalen` voor: `zonderRol` (nieuwe medewerker: vraag de rol en zet hem in `rolverdeling`), `afwijkingSalarisregel` (uren in profiel en salarisregel verschillen: laten rechtzetten in het intranet), `nietOpgehaald` (in de rolverdeling maar geen dossier: uit dienst of vergeten).
+   - Geen intranet-MCP of geen managementrechten? Vraag de FTE dan uit, met de waarden van de vorige maand als voorstel.
+   - Het intranet kent alleen de huidige uren. Reken je een oudere maand terug, controleer dan of er sindsdien iemand van uren of rol is gewisseld.
+6. **Uitvragen wat niet uit een systeem komt**, in één bericht, met de waarden van de vorige maand (uit de vorige `JJJJ-MM.md`) als voorstel:
    - Telemarketing Dials, First Time Appointments, Prospects to Hit PBR (items 39-41). Mag uit de agenda van de salesverantwoordelijke worden voorgesteld (Microsoft 365-connector, agenda over de maand), altijd laten bevestigen.
    - **Kosten (items 32-37): voorlopig uitvragen**, met de toelichting per post uit `besluiten.md`. Komt later uit Exact Online via de MCP van het intranet.
    - Minimum MRR (item 45): volgens `besluiten.md`.
-6. **Tabel opleveren** in de volgorde hieronder, met per regel de bron. Afronden zoals `besluiten.md` voorschrijft. Daaronder de controlegetallen die de portal zelf uitrekent: RHEM (reactieve uren / seats), AISP (MRR / seats), Total Close % (closed / created), reactieve tickets per seat, en Net Profit als de kosten bekend zijn.
-7. **Vastleggen** als `financien/smart-numbers/JJJJ-MM.md` in de directie-vault, met de frontmatter van de vault (`type: analyse`), de tabel, de uitgevraagde waarden en de bijzonderheden. Niet committen zonder te vragen.
+7. **Tabel opleveren** in de volgorde hieronder, met per regel de bron. Afronden zoals `besluiten.md` voorschrijft. Daaronder de controlegetallen die de portal zelf uitrekent: RHEM (reactieve uren / seats), AISP (MRR / seats), Total Close % (closed / created), reactieve tickets per seat, en Net Profit als de kosten bekend zijn.
+8. **Vastleggen** als `financien/smart-numbers/JJJJ-MM.md` in de directie-vault, met de frontmatter van de vault (`type: analyse`), de tabel, de uitgevraagde waarden en de bijzonderheden. Niet committen zonder te vragen.
 
 ## Formuliervolgorde
 
@@ -49,13 +54,13 @@ Standaardpad van de vault: `%USERPROFILE%\JUICT-Brain\vault-juict-directie` (Mac
 |---|---|---|
 | 1 | # of Seats Managed | `general.seatsManaged` |
 | 2 | # of Managed Services Agreements | `general.managedServicesAgreements` |
-| 3 | # of Employees (FTE) | opgave |
-| 4 | # of Support Desk Employees | opgave |
-| 5 | # of Professional Services Employees | opgave |
-| 6 | # of Alignment Engineers | opgave |
-| 7 | # of Centralized Services Employees | opgave |
-| 8 | # of vCIO Employees | opgave |
-| 9 | # of (Other) Technical Resources | opgave |
+| 3 | # of Employees (FTE) | intranet (`fte.mjs`) |
+| 4 | # of Support Desk Employees | intranet (`fte.mjs`) |
+| 5 | # of Professional Services Employees | intranet (`fte.mjs`) |
+| 6 | # of Alignment Engineers | intranet (`fte.mjs`) |
+| 7 | # of Centralized Services Employees | intranet (`fte.mjs`) |
+| 8 | # of vCIO Employees | intranet (`fte.mjs`) |
+| 9 | # of (Other) Technical Resources | intranet (`fte.mjs`) |
 | 11 | # of Reactive Tickets Created | `operations.reactiveTicketsCreated` |
 | 12 | # of Reactive Tickets Closed | `operations.reactiveTicketsClosed` |
 | 13 | Total Time on Reactive Tickets (hrs) | `operations.totalTimeReactiveHours` |
