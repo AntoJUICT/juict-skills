@@ -103,7 +103,8 @@ export function mutaties(was, nu, drempel = 0.5) {
 
 // Geboekte omzet buiten de abonnementen: NRR, Product Sales, Misc en wat niet meetelt.
 export function deelGeboektIn(items, R) {
-  const t = { NRR: 0, SALES: 0, MISC: 0, EXCL: 0 };
+  // ORR hier = losse charges die als licentie tellen (bv. een afkoop), geboekt in de factuurmaand.
+  const t = { NRR: 0, SALES: 0, MISC: 0, ORR: 0, EXCL: 0 };
   const beoordelen = [], onbekend = [], overig = [];
   for (const b of items) {
     const c = b.billingCodeID, n = b.itemName || "", a = b.extendedPrice || 0;
@@ -128,6 +129,18 @@ export function deelGeboektIn(items, R) {
 export function isReactief(ticket, msa, R) {
   return ticket.companyID !== 0 && msa.has(ticket.companyID) && ticket.ticketType !== 4 && ticket.ticketType !== 5
     && !R.machine.has(ticket.source) && !R.ps.has(ticket.billingCodeID);
+}
+
+// Eenmalige omzet telt op factuurdatum, zodat hij aansluit op Exact: alle BillingItems op de
+// (niet-vervallen) facturen met een factuurdatum in de maand. Terugkerende regels filtert
+// deelGeboektIn er zelf uit. `query` is de Autotask-query (in tests een nep).
+export async function gefactureerdeRegels(query, FROM, TO) {
+  const facturen = (await query("Invoices", [{ field: "invoiceDateTime", op: "gte", value: FROM }, { field: "invoiceDateTime", op: "lt", value: TO }]))
+    .filter((x) => !x.isVoided);
+  const regels = [];
+  for (let i = 0; i < facturen.length; i += 200)
+    regels.push(...await query("BillingItems", [{ field: "invoiceID", op: "in", value: facturen.slice(i, i + 200).map((x) => x.id) }]));
+  return { facturen: facturen.length, regels };
 }
 
 // ---- Autotask ----
@@ -170,8 +183,8 @@ export async function bereken(maand, R, query) {
   const nu = normaliseer(abo, Y, M, R), was = normaliseer(abo, ...vorige, R);
   const msa = new Set(Object.entries(nu.mrr).filter(([k, v]) => v > 0.5 && nu.beheerd.has(Number(k))).map(([k]) => Number(k)));
 
-  const geboekt = await query("BillingItems", [{ field: "itemDate", op: "gte", value: FROM }, { field: "itemDate", op: "lt", value: TO }]);
-  const { t, beoordelen, onbekend, overig } = deelGeboektIn(geboekt, R);
+  const gefactureerd = await gefactureerdeRegels(query, FROM, TO);
+  const { t, beoordelen, onbekend, overig } = deelGeboektIn(gefactureerd.regels, R);
   const mut = mutaties(was.mrr, nu.mrr);
 
   const f = FROM + "T00:00:00", e = TO + "T00:00:00";
@@ -196,8 +209,8 @@ export async function bereken(maand, R, query) {
     general: { seatsManaged: nu.seats, managedServicesAgreements: msa.size, seatsPerVariant: nu.seatsPerVariant },
     operations: { reactiveTicketsCreated: aangemaakt.filter(reactief).length, reactiveTicketsClosed: gesloten.filter(reactief).length,
       totalTimeReactiveHours: r2(reactieveUren), controle_urenGeregistreerdTotaal: r2(urenTotaal) },
-    revenue: { NRR: r2(t.NRR), MRR: r2(som(nu.mrr)), ORR: r2(som(nu.orr)), productSales: r2(t.SALES), misc: r2(t.MISC),
-      nietMeegenomen: r2(t.EXCL), licentieVerschuivingNaarORR: r2(nu.shift) },
+    revenue: { NRR: r2(t.NRR), MRR: r2(som(nu.mrr)), ORR: r2(som(nu.orr) + t.ORR), productSales: r2(t.SALES), misc: r2(t.MISC),
+      nietMeegenomen: r2(t.EXCL), licentieVerschuivingNaarORR: r2(nu.shift), controle_losseChargeORR: r2(t.ORR), controle_facturen: gefactureerd.facturen },
     sales: { newAgreements: mut.nieuw.length, newLogoMRR: r2(mut.nieuwBedrag),
       goToMarketSeatPrice: Math.round(R.goToMarket.verkoop - R.goToMarket.licentieInkoop) },
     mrrChanges: { existingGrowth: r2(mut.groei), existingDecrease: r2(mut.daling), lostMRR: r2(mut.verlorenBedrag),

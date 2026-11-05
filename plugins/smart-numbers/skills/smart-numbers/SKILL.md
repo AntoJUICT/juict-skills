@@ -31,7 +31,7 @@ Standaardpad van de vault: `%USERPROFILE%\JUICT-Brain\vault-juict-directie` (Mac
    ```
    Credentials komen via `az` uit `juict-shared-kv`; print ze nooit. Faalt het met 401 of een az-fout, controleer `az login`.
 4. **Nalopen wat het script meldt** in `details`:
-   - `beoordelen`: regels onder "Losse charge overig" die geen regel matchen. Leg ze voor (NRR, Product Sales, Misc of niet meenemen). Bij een terugkerend patroon een regel toevoegen aan `overigRegels` in `config.json`.
+   - `beoordelen`: regels onder "Losse charge overig" die geen regel matchen. Leg ze voor (NRR, Product Sales, Misc, ORR of niet meenemen; categorieën `NRR`, `SALES`, `MISC`, `ORR`, `EXCL`). Bij een terugkerend patroon een regel toevoegen aan `overigRegels` in `config.json`.
    - `onbekendeBillingCodes`: een billing code die nog nergens is ingedeeld. Vraag waar hij hoort, zet hem in `config.json` en reken opnieuw.
    - `nieuw` en `verloren`: noem de klanten. Vraag bij churn of de opzegging klopt.
    - `controle_urenGeregistreerdTotaal`: is dit flink lager dan de beschikbare technische uren, meld dan dat de reactieve uren waarschijnlijk te laag zijn.
@@ -94,7 +94,7 @@ Standaardpad van de vault: `%USERPROFILE%\JUICT-Brain\vault-juict-directie` (Mac
 
 ## Valkuilen
 
-- MRR, ORR, seats en agreements zijn **genormaliseerd**: elke abonnementsregel telt naar rato van de dagen van zijn factuurperiode in de maand, zodat kwartaal- en jaarfacturen en credits geen valse groei of churn geven. NRR, Product Sales en Misc zijn **geboekt** in de maand. Vergelijk ze dus niet één op één met de facturatie of met de boekhouding.
+- MRR, ORR, seats en agreements zijn **genormaliseerd**: elke abonnementsregel telt naar rato van de dagen van zijn factuurperiode in de maand, zodat kwartaal- en jaarfacturen en credits geen valse groei of churn geven. NRR, Product Sales en Misc tellen op **factuurdatum**: de regels op de Autotask-facturen van de maand (vervallen facturen niet). Daardoor sluit de eenmalige omzet aan op Exact; werk dat pas de maand erna gefactureerd wordt, telt die maand. Wijkt de totale omzet meer dan een paar procent af van de omzetrekeningen (8xxx) in `exact_grootboek`, zoek dan uit waarom.
 - De factuurperiode komt uit `lineItemFullDescription` (`dd-mm-jjjj - dd-mm-jjjj`). Regels zonder periode tellen alleen mee als verbruik (ORR) op hun boekdatum.
 - Paginering van een Autotask-query: de `nextPageUrl` moet met POST en dezelfde body, een GET geeft 405.
 - Bij een nieuwe prijsronde de inkoopprijzen in `config.json` bijwerken. Voor terugrekenen van oudere maanden horen de prijzen die toen golden.
