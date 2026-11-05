@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bouwRegels, configPad, laadConfig, periode, normaliseer, mutaties, deelGeboektIn, isReactief, som } from "./bereken.mjs";
+import { gefactureerdeRegels, bouwRegels, configPad, laadConfig, periode, normaliseer, mutaties, deelGeboektIn, isReactief, som } from "./bereken.mjs";
 
 // Nepconfig: verzonnen codes en prijzen, niets van JUICT.
 const NEP = {
@@ -15,7 +15,7 @@ const NEP = {
   productCodes: { "400": "Hardware" },
   dienstOnderProductcode: ["^Installatie"],
   overigCode: 500,
-  overigRegels: [{ patroon: "partnerfee", categorie: "MISC" }, { patroon: "Auto", categorie: "EXCL" }],
+  overigRegels: [{ patroon: "partnerfee", categorie: "MISC" }, { patroon: "Auto", categorie: "EXCL" }, { patroon: "afkoop", categorie: "ORR" }],
   licentieVerschuiving: { _toelichting: "x", "11": 10 },
   seatServicesUitgesloten: { "13": "Lite", "14": "Hold" },
   alleenLitePatroon: "Lite",
@@ -136,4 +136,26 @@ test("config: zonder bestand een duidelijke fout, met SMART_NUMBERS_CONFIG het o
 
 test("go-to-market seat price wordt op hele euro's afgerond", () => {
   assert.equal(Math.round(R.goToMarket.verkoop - R.goToMarket.licentieInkoop), 50);
+});
+
+test("eenmalige omzet: de regels van de facturen in de maand, vervallen facturen niet", async () => {
+  const aanroepen = [];
+  const query = async (entity, filter) => {
+    aanroepen.push([entity, filter]);
+    if (entity === "Invoices") return [{ id: 1 }, { id: 2, isVoided: true }, { id: 3 }];
+    if (entity === "BillingItems") return filter[0].value.map((id) => regel({ invoiceID: id, billingCodeID: 400, extendedPrice: 10 }));
+    return [];
+  };
+  const u = await gefactureerdeRegels(query, "2026-10-01", "2026-11-01");
+  assert.equal(u.facturen, 2);
+  assert.deepEqual(u.regels.map((r) => r.invoiceID), [1, 3]);
+  assert.deepEqual(aanroepen[0], ["Invoices", [{ field: "invoiceDateTime", op: "gte", value: "2026-10-01" }, { field: "invoiceDateTime", op: "lt", value: "2026-11-01" }]]);
+  assert.equal(deelGeboektIn(u.regels, R).t.SALES, 20);
+});
+
+test("een losse charge met een ORR-regel telt als ORR", () => {
+  const { t, beoordelen } = deelGeboektIn([regel({ billingCodeID: 500, itemName: "Licentie afkoop t/m 2027", extendedPrice: 120 })], R);
+  assert.equal(t.ORR, 120);
+  assert.equal(t.NRR, 0);
+  assert.deepEqual(beoordelen, []);
 });
