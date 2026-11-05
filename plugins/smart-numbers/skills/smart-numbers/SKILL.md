@@ -1,6 +1,6 @@
 ---
 name: smart-numbers
-description: Vult de maandelijkse TruPeer SMART Numbers (TruMethods) voor JUICT in. Rekent seats, agreements, reactieve tickets en uren, omzet (NRR, MRR, ORR, product, misc), MRR-mutaties en churn uit Autotask, haalt de FTE per rol uit het intranet, vraagt salesactiviteit en kosten uit, en levert een tabel in de volgorde van het TruPeer-formulier (items 1-52). Gebruik wanneer iemand /smart-numbers typt, de SMART Numbers van een maand wil invullen of terugrekenen, of vraagt om de maandcijfers voor TruPeer of de SMART Numbers-meeting. Vereist de directie-vault en de intranet-MCP (juict-intranet).
+description: Vult de maandelijkse TruPeer SMART Numbers (TruMethods) voor JUICT in. Rekent seats, agreements, reactieve tickets en uren, omzet (NRR, MRR, ORR, product, misc), MRR-mutaties en churn uit Autotask, haalt de FTE per rol en de kosten (Exact) uit het intranet, vraagt de salesactiviteit uit, en levert een tabel in de volgorde van het TruPeer-formulier (items 1-52). Gebruik wanneer iemand /smart-numbers typt, de SMART Numbers van een maand wil invullen of terugrekenen, of vraagt om de maandcijfers voor TruPeer of de SMART Numbers-meeting. Vereist de directie-vault en de intranet-MCP (juict-intranet).
 ---
 
 # SMART Numbers (TruPeer)
@@ -14,7 +14,7 @@ Deze skill staat in een publieke repo. Alles wat JUICT-specifiek of gevoelig is 
 | Bestand | Inhoud |
 |---|---|
 | `besluiten.md` | Alle definities en keuzes per item. **Leidend: lees dit eerst en volg het letterlijk.** |
-| `config.json` | Billing codes, indeling MRR/ORR, inkoopprijzen die van MRR naar ORR schuiven, regels voor losse charges, rolverdeling per medewerker |
+| `config.json` | Billing codes, indeling MRR/ORR, inkoopprijzen die van MRR naar ORR schuiven, regels voor losse charges, rolverdeling per medewerker, indeling van de grootboekrekeningen naar de kostenposten |
 | `JJJJ-MM.md` | De uitkomst per maand |
 
 Standaardpad van de vault: `%USERPROFILE%\JUICT-Brain\vault-juict-directie` (Mac: `~/JUICT-Brain/vault-juict-directie`). Een afwijkende config geef je mee met de omgevingsvariabele `SMART_NUMBERS_CONFIG`.
@@ -41,12 +41,17 @@ Standaardpad van de vault: `%USERPROFILE%\JUICT-Brain\vault-juict-directie` (Mac
    - Leg `signalen` voor: `zonderRol` (nieuwe medewerker: vraag de rol en zet hem in `rolverdeling`), `afwijkingSalarisregel` (uren in profiel en salarisregel verschillen: laten rechtzetten in het intranet), `nietOpgehaald` (in de rolverdeling maar geen dossier: uit dienst of vergeten).
    - Geen intranet-MCP of geen managementrechten? Vraag de FTE dan uit, met de waarden van de vorige maand als voorstel.
    - Het intranet kent alleen de huidige uren. Reken je een oudere maand terug, controleer dan of er sindsdien iemand van uren of rol is gewisseld.
-6. **Uitvragen wat niet uit een systeem komt**, in één bericht, met de waarden van de vorige maand (uit de vorige `JJJJ-MM.md`) als voorstel:
+6. **Kosten uit Exact** (items 32-37), via de intranet-MCP:
+   - Haal de W&V van de maand op met `exact_grootboek` (`van`: JJJJ-MM, zonder `tot`). Controleer `sync.gesyncdOp`: ligt de laatste sync vóór het einde van de maand of staat de status op fout, meld dat dan, want dan zijn de kosten onvolledig. Schrijf het antwoord als JSON naar de scratchpad als het niet al in een bestand staat.
+   - Reken uit met `node "<deze skill>/scripts/kosten.mjs" <grootboek.json> <bereken.json>`, met als tweede bestand de uitvoer van stap 3 (`--json`), voor het licentiedeel dat van MRR Tools COGS naar ORR COGS schuift.
+   - `miscOpbrengst` komt bij Misc revenue (item 26). Leg `signalen.beoordelen` voor (een inkooprekening die nergens is ingedeeld: vraag waar hij hoort en zet hem in `kosten` in `config.json`) en `licentieGroterDanMtcogs`.
+   - Boekt Exact de maand nog niet volledig (bijvoorbeeld de loonjournaalpost ontbreekt), vraag dan of de kosten moeten wachten.
+   - Geen intranet-MCP of geen managementrechten? Vraag de kosten dan uit, met de toelichting per post uit `besluiten.md`.
+7. **Uitvragen wat niet uit een systeem komt**, in één bericht, met de waarden van de vorige maand (uit de vorige `JJJJ-MM.md`) als voorstel:
    - Telemarketing Dials, First Time Appointments, Prospects to Hit PBR (items 39-41). Mag uit de agenda van de salesverantwoordelijke worden voorgesteld (Microsoft 365-connector, agenda over de maand), altijd laten bevestigen.
-   - **Kosten (items 32-37): voorlopig uitvragen**, met de toelichting per post uit `besluiten.md`. Komt later uit Exact Online via de MCP van het intranet.
    - Minimum MRR (item 45): volgens `besluiten.md`.
-7. **Tabel opleveren** in de volgorde hieronder, met per regel de bron. Afronden zoals `besluiten.md` voorschrijft. Daaronder de controlegetallen die de portal zelf uitrekent: RHEM (reactieve uren / seats), AISP (MRR / seats), Total Close % (closed / created), reactieve tickets per seat, en Net Profit als de kosten bekend zijn.
-8. **Vastleggen** als `financien/smart-numbers/JJJJ-MM.md` in de directie-vault, met de frontmatter van de vault (`type: analyse`), de tabel, de uitgevraagde waarden en de bijzonderheden. Niet committen zonder te vragen.
+8. **Tabel opleveren** in de volgorde hieronder, met per regel de bron. Afronden zoals `besluiten.md` voorschrijft. Daaronder de controlegetallen die de portal zelf uitrekent: RHEM (reactieve uren / seats), AISP (MRR / seats), Total Close % (closed / created), reactieve tickets per seat, en Net Profit als de kosten bekend zijn.
+9. **Vastleggen** als `financien/smart-numbers/JJJJ-MM.md` in de directie-vault, met de frontmatter van de vault (`type: analyse`), de tabel, de uitgevraagde waarden en de bijzonderheden. Niet committen zonder te vragen.
 
 ## Formuliervolgorde
 
@@ -69,12 +74,12 @@ Standaardpad van de vault: `%USERPROFILE%\JUICT-Brain\vault-juict-directie` (Mac
 | 24 | Other Recurring Revenue (ORR) | `revenue.ORR` |
 | 25 | Product Sales | `revenue.productSales` |
 | 26 | Miscellaneous revenue | `revenue.misc` |
-| 32 | Total Employee Expense | opgave (later Exact) |
-| 33 | Owners Compensation | opgave (later Exact) |
-| 34 | Product COGS | opgave (later Exact) |
-| 35 | MRR Tools COGS | opgave (later Exact) |
-| 36 | ORR Total COGS | opgave (later Exact) |
-| 37 | All Other Expenses | opgave (later Exact) |
+| 32 | Total Employee Expense | Exact via intranet (`kosten.mjs`) |
+| 33 | Owners Compensation | Exact via intranet (`kosten.mjs`) |
+| 34 | Product COGS | Exact via intranet (`kosten.mjs`) |
+| 35 | MRR Tools COGS | Exact via intranet (`kosten.mjs`) |
+| 36 | ORR Total COGS | Exact via intranet (`kosten.mjs`) |
+| 37 | All Other Expenses | Exact via intranet (`kosten.mjs`) |
 | 39 | # of Telemarketing Dials | opgave |
 | 40 | # of First Time Appointments (FTA) | opgave |
 | 41 | # of Prospects to Hit PBR | opgave |

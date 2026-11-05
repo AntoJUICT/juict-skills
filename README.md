@@ -19,7 +19,7 @@ De repo is public zodat de skills op elke werkplek binnenkomen, ook bij collega'
 | `site-scraper` | De technische opbouw van een website in kaart brengen (framework, routes, API-endpoints), ook achter een login. | nee |
 | `azure-architecture-diagram` | Een Azure-architectuurplaat genereren als bewerkbaar `.drawio` bronbestand plus `.svg`, met shape-index en layoutchecks zodat iconen renderen en lijnen niet kruisen. | nee |
 | `netwerk-diagnose` | Netwerkproblemen bij een klant diagnosticeren: read-only UniFi-lookup voor apparaten, radio's, clients, wifi-instellingen en verbind/verbreek/roam-events, plus historie via Grafana en een diagnose-checklist. Wifi-wachtwoorden worden nooit getoond. | Key Vault |
-| `smart-numbers` | De maandelijkse TruPeer SMART Numbers invullen: seats, agreements, reactieve tickets en uren, omzet en MRR-mutaties uit Autotask, FTE uit het intranet, de rest uitgevraagd, als tabel in de volgorde van het formulier. Codes, prijzen en uitkomsten staan in de directie-vault, niet in deze repo. | Key Vault + directie-vault + intranet-MCP |
+| `smart-numbers` | De maandelijkse TruPeer SMART Numbers invullen: seats, agreements, reactieve tickets en uren, omzet en MRR-mutaties uit Autotask, FTE en kosten uit het intranet, de rest uitgevraagd, als tabel in de volgorde van het formulier. Codes, prijzen en uitkomsten staan in de directie-vault, niet in deze repo. | Key Vault + directie-vault + intranet-MCP |
 
 ## Installeren
 
@@ -46,7 +46,7 @@ De meeste skills draaien standalone. Skills die Autotask of Azure raken hebben r
 - **Key Vault** (`autotask-api`, `autotask-approve-post`, `datto-rmm-api`, `itglue-api`, `netwerk-diagnose`, `smart-numbers`, `ticket-aanmaken`, `ticket-reactie`): credentials komen uit de shared Azure Key Vault via je `az`-login of managed identity. De skills bevatten alleen de secret-namen, nooit de waarden.
 - **az login** (`azure-saas-devops-deploy`): een geldige Azure CLI-sessie met toegang tot de betreffende subscription en Azure DevOps.
 - **Directie-vault** (`smart-numbers`): naast Key Vault ook een lokale clone van de directie-vault, waar de config en de afspraken staan. Zonder die vault stopt de skill zonder cijfers te geven.
-- **Intranet-MCP** (`smart-numbers`): de MCP-server `juict-intranet` met een token van iemand met managementrechten, voor de FTE per rol. Zonder die server vraagt de skill de FTE uit.
+- **Intranet-MCP** (`smart-numbers`): de MCP-server `juict-intranet` met een token van iemand met managementrechten, voor de FTE per rol en de kosten uit Exact. Zonder die server vraagt de skill die uit.
 
 ## Structuur
 
