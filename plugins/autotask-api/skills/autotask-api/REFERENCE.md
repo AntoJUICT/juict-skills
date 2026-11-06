@@ -151,7 +151,7 @@ Creates zijn genest onder het project, queries zijn top-level. Geverifieerd zone
 - `POST /Projects/{id}/Tasks` en `PATCH /Projects/{id}/Tasks` — top-level `POST /Tasks` geeft 404. Verplicht: `projectID`, `title`, `taskType`, `status`. Met een toegewezen resource komen `departmentID` en `billingCodeID` er verplicht bij.
 - `POST /Tasks/query` — lezen, top-level.
 - `POST /Tasks/{id}/SecondaryResources` — resource+rol aan een task hangen (verplicht: `taskID`, `resourceID`, `roleID`). Top-level `/TaskSecondaryResources` geeft 404.
-- `POST /TaskNotes` en `POST /TaskNotes/query` — werken top-level. Verplicht: `taskID`, `description`, `noteType`, `publish`. `noteType` kent hier maar drie waarden: 1 Task Summary, 2 Task Detail, 3 Task Notes.
+- `POST /TaskNotes`, `POST /Tasks/{id}/Notes` en `POST /TaskNotes/query` — aanmaken werkt zowel top-level als genest (genest geverifieerd 06-11-2026, respons `{ itemId }`). Verplicht: `taskID`, `description`, `noteType`, `publish`. `noteType` kent hier maar drie waarden: 1 Task Summary, 2 Task Detail, 3 Task Notes.
 
 `projectType` (zone 19): 2 Proposal, 3 Template, 4 Internal, 5 Client, 8 Baseline.
 `Project.status`: 0 Inactive, 1 New, 2 In Behandeling, 3 On Hold, 4 Change Order, 5 Complete, 6 Wacht op Leverancier, 7 Wacht op Klant. `Task.status` gebruikt dezelfde picklist als tickets.

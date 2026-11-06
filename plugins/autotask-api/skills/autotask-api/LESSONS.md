@@ -39,6 +39,8 @@ Bekende valkuilen, fouten en hard-geleerde lessen bij werken met de Autotask RES
 **Tijd boeken op een task kan alleen voor een resource die aan die task hangt.** Een `POST /TimeEntries` met `taskID` voor een collega die er niet op staat geeft 500 "This roleID is not valid for this Task and Resource", ook als de resource+rol-combinatie op zich geldig is. Bij tickets speelt dit niet, daar mag iedereen boeken.
 - How to apply: zet eerst `POST /Tasks/{id}/SecondaryResources` met dezelfde `resourceID` en `roleID` als de tijdregistratie, en pas daarna de entry.
 
+**Een tasknummer heeft hetzelfde formaat als een ticketnummer.** `T20261023.0025` was een projecttaak, geen ticket: `Tickets/query` op `ticketNumber` gaf niets, en in de ticketreeks van die dag ontbrak het nummer gewoon. Zoek bij een onvindbaar ticketnummer daarom ook via `Tasks/query` op `taskNumber`.
+
 **`PATCH /Tickets` met `projectID` koppelt een ticket aan een project.** Werkt gewoon, ondanks dat het veld zeldzaam gevuld is (16 van de ruim 20.000 tickets in zone 19). Handig om de historie van een ticket vindbaar te houden onder het project waar het werk verderging.
 
 ---
@@ -202,6 +204,9 @@ AUTOTASK_SECRET='abc#def'    # # binnen single quotes = literal hekje
 2. Account geblokkeerd? (vraag gebruiker te verifiëren)
 3. Endpoint pad correct / bestaat het?
 4. Vereiste scopes/permissies aanwezig?
+
+**Er zijn twee Autotask API-accounts in Key Vault, met verschillende rechten.** Het account in `juict-shared-kv` mag Projects en Tasks lezen, dat in `ju-hermes-emmanuel` niet (zone 19, 06-11-2026). Het verschil hoor je niet altijd: `Projects/query` geeft 500 "The logged in Resource does not have the adequate permissions to query this entity projectType", maar `Tasks/query` geeft stil 200 met nul items, ook zonder filter.
+- How to apply: krijg je een lege lijst op Tasks of een rechtenfout op Projects, probeer dan eerst het account uit `juict-shared-kv` voordat je aan filters of endpoints gaat twijfelen.
 
 **Plotselinge 401/S2S17001 bij het ophalen van Key Vault-secrets via `az`: check `az account show`.** Een andere sessie kan de default subscription naar een klanttenant hebben gezet, waardoor de JUICT-vault onbereikbaar is en de Autotask-headers leeg blijven. Fix: `az account set --subscription JUICTAzure`.
 
