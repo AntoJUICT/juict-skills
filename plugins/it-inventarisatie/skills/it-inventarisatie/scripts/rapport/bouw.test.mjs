@@ -118,6 +118,21 @@ test("bijlage toont vakjes ja/nee of de keuzelabels", () => {
   assert.match(tekstVan(p[1].html), /Intune\s+Telefoon/);
 });
 
+test("bijlage: een rij met antwoord toont het antwoord in plaats van vakjes", () => {
+  const r = voorbeeld();
+  const sec = r.bijlage.secties[0];
+  sec.rijen[0].antwoord = "nee, uit dienst";
+  sec.nogOpen = false;
+  r.bijlage.secties[1].nogOpen = true;
+  const p = bouwPaginas(r, LOGO).filter((x) => x.bestand.includes("Bijlage"));
+  const tekst0 = tekstVan(p[0].html);
+  assert.ok(p[0].html.includes("<b>nee, uit dienst</b>"));
+  const vakjesVoor = (rijen) => (bouwPaginas(rijen, LOGO).filter((x) => x.bestand.includes("Bijlage"))[0].html.match(/border-radius: 3px/g) || []).length;
+  assert.equal(vakjesVoor(r), vakjesVoor(voorbeeld()) - 2);
+  assert.ok(!tekst0.includes("nog niet beantwoord"));
+  assert.ok(tekstVan(p[1].html).includes("nog niet beantwoord"));
+});
+
 test("canvasJson: een board per pagina in leesvolgorde", () => {
   const p = bouwPaginas(voorbeeld(), LOGO);
   const nu = new Date("2026-11-04T10:00:00.123Z");

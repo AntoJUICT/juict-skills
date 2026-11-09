@@ -142,6 +142,8 @@ function openVragen(vragen) {
   return { naam: "Open-vragen", titel: "Open vragen", kicker: "Open vragen", h1: "Wat we nog van jullie nodig hebben", blokken: [htmlBlok(body)] };
 }
 
+const isTekstWaarde = (v) => typeof v === "string" && v.trim() !== "";
+
 function bijlageSectie(sec, i, intro) {
   const jaNee = sec.kolom5 === "ja/nee";
   const opties = jaNee ? ["ja", "nee"] : lijst(sec.kolom5);
@@ -150,14 +152,15 @@ function bijlageSectie(sec, i, intro) {
     html(`<span style="color: ${MUTED}; overflow-wrap: anywhere">${t(x.adres)}</span>`),
     x.licentie,
     x.voorstel,
-    html(vakjes(opties)),
+    // Een beantwoorde rij toont het antwoord; alleen open punten houden vakjes.
+    isTekstWaarde(x.antwoord) ? html(`<b>${t(x.antwoord)}</b>`) : html(vakjes(opties)),
   ]);
   const blokken = [
     ...(i === 0 && intro ? [htmlBlok(p(intro, "; font-size: 13px"))] : []),
     { type: "tabel", kolommen: ["Naam", "Adres", "Licentie", "Voorstel", jaNee ? "Nog nodig?" : "Keuze"], rijen,
       breedtes: ["118px", "150px", "100px", "160px", "auto"], fs: 12, vast: true },
   ];
-  return { naam: `Bijlage-${i + 1}`, titel: `Bijlage ${sec.titel}`, kicker: `Bijlage, deel ${i + 1}`, h1: sec.titel, blokken, splitsbaar: true };
+  return { naam: `Bijlage-${i + 1}`, titel: `Bijlage ${sec.titel}`, kicker: `Bijlage, deel ${i + 1}`, h1: sec.nogOpen ? `${sec.titel}, nog niet beantwoord` : sec.titel, blokken, splitsbaar: true };
 }
 
 // De delen na het voorblad, elk met blokken. Een deel met splitsbaar: true mag zijn laatste

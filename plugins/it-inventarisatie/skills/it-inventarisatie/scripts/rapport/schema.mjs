@@ -82,7 +82,11 @@ export function validateRapport(r) {
   lijst("bijlage.secties", b.secties).forEach((sec, i) => {
     tekst(`bijlage.secties.${i}.titel`, sec?.titel);
     if (sec?.kolom5 !== "ja/nee" && !(Array.isArray(sec?.kolom5) && sec.kolom5.length > 0 && sec.kolom5.every(isTekst))) fouten.push(`bijlage.secties.${i}.kolom5 moet ja/nee of een lijst met teksten zijn`);
-    lijst(`bijlage.secties.${i}.rijen`, sec?.rijen).forEach((rij, j) => ["naam", "adres", "licentie", "voorstel"].forEach((k) => tekst(`bijlage.secties.${i}.rijen.${j}.${k}`, rij?.[k])));
+    if (sec?.nogOpen !== undefined && typeof sec.nogOpen !== "boolean") fouten.push(`bijlage.secties.${i}.nogOpen moet true of false zijn`);
+    lijst(`bijlage.secties.${i}.rijen`, sec?.rijen).forEach((rij, j) => {
+      ["naam", "adres", "licentie", "voorstel"].forEach((k) => tekst(`bijlage.secties.${i}.rijen.${j}.${k}`, rij?.[k]));
+      if (rij?.antwoord !== undefined) tekst(`bijlage.secties.${i}.rijen.${j}.antwoord`, rij.antwoord);
+    });
   });
 
   // Hele document: verboden tekens en patronen.

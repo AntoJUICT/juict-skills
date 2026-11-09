@@ -65,14 +65,17 @@ Vraag per onderdeel alleen wat de bronnen niet opleverden. Gebruik AskUserQuesti
 2. **Domeinen en mail** (`mail`): alle domeinen; waar de DNS staat en wie erbij kan; gedeelde mailboxen;
    doorsturingen; mail die niet in Microsoft 365 binnenkomt (een reserve-MX of een ander systeem).
 3. **Server en data** (`server`): welke servers en rollen; hoeveel data; wat weg kan of naar een archief.
-4. **Werkplekken en telefoons** (`werkplekken`): aantal laptops en desktops; besturingssysteem; hoe ze nu beheerd
+4. **Werkplekken en telefoons** (`werkplekken`): aantal laptops en apart het aantal vaste werkplekken (noemt een
+   antwoord alleen laptops, vraag dan expliciet naar vaste pc's); besturingssysteem, ook verouderde versies; hoe ze nu beheerd
    worden; welke vervangen moeten. Telefoons: aantal en of de Apple ID's op naam van het bedrijf staan. Telefoons
    gaan standaard niet in Intune; inventariseren wel, inrichten of begroten alleen als de offerte het noemt.
 5. **Netwerk** (`netwerk`): firewall; switches met aantal poorten; access points; IP-plan; internetverbinding en
    provider.
 6. **Printers** (`printers`): aantal, merk en type, hoe er geprint wordt, wie het contract heeft.
-7. **Applicaties en koppelingen** (`applicaties`): welke applicaties, wie de leverancier is, wat lokaal draait en wat
-   in de cloud, koppelingen tussen applicaties.
+7. **Applicaties en koppelingen** (`applicaties`): welke applicaties, wie de leverancier is of wie ze zelf heeft
+   gebouwd, wie de support doet na de overstap, wat lokaal draait en wat in de cloud (waar precies en op wiens naam),
+   koppelingen tussen applicaties. Een applicatie die de vertrekkende partij zelf heeft gebouwd, is een afhankelijkheid:
+   zet die bij wat opvalt.
 8. **Beveiliging** (`beveiliging`): MFA; antivirus of EDR; back-up en wanneer er voor het laatst is teruggezet;
    beheeraccounts en wie ze gebruikt.
 9. **Telefonie** (`telefonie`), alleen als het in de offerte staat: gebruikers; nummerplan; provider; toestellen;
@@ -105,7 +108,7 @@ de toestellen en de looptijd van het telefoniecontract er standaard bij.
 | `stappenplan` | `maanden` (namen), `toelichting`, `fases: [{ code, naam, omschrijving, start, eind }]`; `start` en `eind` zijn indexen in `maanden`, `start < eind`. Projectmanagement: `{ code, naam, omschrijving, pm: true }` zonder start en eind |
 | `uren` | `blokken: [{ titel, soort: "nodig" \| "keuze", fases: [{ fase, resultaat, rekenbasis, uren }] }]` (minstens één blok `nodig`), `projectmanagementPct`, `nietInbegrepen` (lijst), `toelichting`: lijst van precies drie zinnen |
 | `openVragen` | `[{ aan, rol, vragen: [...] }]`, per persoon |
-| `bijlage` | `intro`, `secties: [{ titel, kolom5: "ja/nee" of een lijst opties, rijen: [{ naam, adres, licentie, voorstel }] }]` |
+| `bijlage` | `intro`, `secties: [{ titel, kolom5: "ja/nee" of een lijst opties, nogOpen?, rijen: [{ naam, adres, licentie, voorstel, antwoord? }] }]`. Een rij met `antwoord` toont het antwoord vet in plaats van vakjes; alleen open punten houden vakjes. `nogOpen: true` zet ", nog niet beantwoord" achter de titel van de sectie |
 
 In alle tekst: geen em-dash, geen `{{`, geen bedragen (`€` of `EUR`), geen geheimen in vrije tekst
 (`wachtwoord:`, `pincode:`, `PUK:`, `PSK:`, `WPA:`, `token:`, `wifi-key:`, `API-key:` en dergelijke), en alleen de tags `<b>` en `<br>`. Verwijs naar hoofdstukken ("de bijlage", "de open
@@ -177,7 +180,8 @@ Gebruik de regels uit de `juict-vault` skill als die er is. Anders deze korte ve
 
 - Geen em-dashes. Geen buzzwords zoals ontzorgen, totaaloplossing, naadloos, synergie of robuust.
 - Actief en concreet. Getallen boven bijvoeglijke naamwoorden ("5 van de 12 accounts", niet "veel accounts").
-- Spelling: JUICT, Easywork, Microsoft 365, Microsoft Entra ID, ISO 27001.
+- Spelling: JUICT, Easywork, Microsoft 365, Microsoft Entra ID, ISO 27001. Schrijf "Teamsite" voor een site met
+  een Team erbij, niet "SharePoint-site": dat begrijpt de klant beter.
 - Spreek de klant aan met jij en jullie.
 - Afspraken uit overleg of offerte als afspraak, niet als tekortkoming.
 - Beveiligingspunten neutraal als actiepunt voor de overgang. Wijs de vorige partij nooit aan.

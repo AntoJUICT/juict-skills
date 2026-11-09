@@ -36,7 +36,8 @@ de plugin onder `~/.claude/plugins/cache/...` staat). Hieronder staat die map al
    `stap`. De slug is de klantnaam in kleine letters met alleen `[a-z0-9-]` ("Voorbeeld Techniek B.V." wordt
    `voorbeeld-techniek-bv`). Nieuw: `node <skill>/scripts/werkbestand.mjs nieuw "<klantnaam>"`; dat print het pad.
 1. **Offerte lezen en scope bevestigen.** Vraag de offerte. Haal klantnaam, Autotask-bedrijf, onderdelen in scope en
-   uren per fase eruit. Zet de scope per onderdeel op `true` of `false`; wat de offerte niet noemt blijft `null`.
+   uren per fase eruit. Neem de klantnaam letterlijk over uit Autotask of het tenantdomein, niet uit een maildomein
+   (een bedrijf kan Voorbeeldtech heten en ook voorbeeld-tech.nl hebben), en laat de schrijfwijze bevestigen. Zet de scope per onderdeel op `true` of `false`; wat de offerte niet noemt blijft `null`.
    Vertaal de uren naar Easywork-taaktitels uit de taakkoppeling in REFERENCE.md, anders zet `plan` geen uren.
    Vat het kort samen, laat het bevestigen en zet het in `offerte`.
 2. **Bronnen ophalen**, alleen lezen:
@@ -75,6 +76,21 @@ de plugin onder `~/.claude/plugins/cache/...` staat). Hieronder staat die map al
    Toon de voorvertoning. Na akkoord:
    `node <skill>/scripts/autotask-project.mjs toepassen --plan <werkmap>/plan.json --toepassen`
    Zonder `--toepassen` schrijft geen enkel commando naar Autotask.
+
+**Antwoordrondes.** Antwoorden komen in losse mails, vaak tussen de geciteerde vragen ("AB-> ...") en in elke map
+van de mailbox, ook in zelfgemaakte mappen als "Af te handelen". Zoek daarom op afzender en onderwerp zonder
+`folderName`, en lees elke mail sinds de vorige ronde helemaal. Verwerk daarna een ronde altijd in het hele rapport,
+niet alleen op de pagina waar het antwoord over gaat: datum op het voorblad, samenvatting en de drie stappen,
+stappenplan en "wie doet wat", uren (met de reden van een wijziging in de samenvatting), open vragen (met wat er is
+beantwoord) en de bijlage (`antwoord` per rij, `nogOpen` per sectie). Een vaag antwoord neem je over als "volgens
+<naam>" en je vraagt door; maak het nooit stelliger dan het is.
+
+**Mailconcepten.** Lees een concept opnieuw voordat je het aanpast: de engineer kan het al gewijzigd of verstuurd
+hebben. Maak een antwoord in één keer met `outlook_create_reply_draft` of `outlook_create_reply_all_draft` en de
+volledige tekst. `outlook_update_draft` vervangt de hele body en accepteert geen opmaak, dus een opgemaakte
+Outlook-handtekening gaat dan verloren; stel in dat geval de wijziging voor in de chat. Geeft het maken van een
+antwoordconcept een 412-fout, dan staat er een leeg concept: verwijder dat en probeer opnieuw, of zet de body met het
+citaat zelf.
 
 Werk na elke stap het werkbestand bij en zet de stap met `werkbestand.mjs stap <slug> <stap>`. Dat bewaart het
 bestand opnieuw via het geheimenfilter.

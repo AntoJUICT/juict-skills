@@ -32,6 +32,18 @@ test("uren.toelichting met twee zinnen geeft een fout", () => {
   assert.ok(validateRapport(r).some((f) => f.includes("uren.toelichting")));
 });
 
+test("bijlage: antwoord en nogOpen zijn optioneel, maar moeten het juiste type hebben", () => {
+  const r = voorbeeld();
+  r.bijlage.secties[0].rijen[0].antwoord = "ja";
+  r.bijlage.secties[0].nogOpen = true;
+  assert.deepEqual(validateRapport(r), []);
+  r.bijlage.secties[0].rijen[0].antwoord = "";
+  r.bijlage.secties[0].nogOpen = "ja";
+  const f = validateRapport(r);
+  assert.ok(f.some((x) => x.includes("bijlage.secties.0.rijen.0.antwoord")));
+  assert.ok(f.some((x) => x.includes("bijlage.secties.0.nogOpen")));
+});
+
 test("zonder klant: klant ontbreekt", () => {
   const r = voorbeeld();
   delete r.klant;
