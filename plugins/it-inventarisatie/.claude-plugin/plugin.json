@@ -1,0 +1,12 @@
+{
+  "name": "it-inventarisatie",
+  "version": "0.2.0",
+  "description": "IT-inventarisatie van een klantomgeving: offerte, bronnen (mail, Microsoft 365, IT Glue, Autotask, DNS) en interview naar een rapport in Claude Design, plus een ingevuld Easywork Basic-project in Autotask.",
+  "author": {
+    "name": "AntoJUICT",
+    "email": "anto@juict.nl"
+  },
+  "homepage": "https://github.com/AntoJUICT/juict-skills",
+  "repository": "https://github.com/AntoJUICT/juict-skills",
+  "keywords": ["inventarisatie", "onboarding", "autotask", "m365", "claude-design", "juict"]
+}

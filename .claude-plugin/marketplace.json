@@ -53,6 +53,11 @@
       "description": "Werken met de IT Glue REST API in JUICT-projecten — Key Vault-auth, read-only lookups, endpoints en valkuilen; wachtwoorden alleen als deeplink."
     },
     {
+      "name": "it-inventarisatie",
+      "source": "./plugins/it-inventarisatie",
+      "description": "IT-inventarisatie van een klantomgeving: offerte, bronnen en interview naar een rapport in Claude Design, plus een ingevuld Easywork Basic-project in Autotask."
+    },
+    {
       "name": "datto-rmm-api",
       "source": "./plugins/datto-rmm-api",
       "description": "Werken met de Datto RMM REST API v2 — OAuth2 via Key Vault, sites/devices/alerts/audit uitlezen, en schrijfacties (UDF, quick job) achter een verplichte bevestiging."
