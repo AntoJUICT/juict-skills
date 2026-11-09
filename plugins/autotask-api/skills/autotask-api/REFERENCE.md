@@ -110,6 +110,7 @@ Veldlengtes (zone 19, geverifieerd 05-08-2026): `Ticket.title` 255 (verplicht), 
 - `POST /Companies/{companyID}/ToDos` — CRM to-do aanmaken (top-level `/CompanyToDos` en `/ToDos` geven 404)
 - `GET /Companies/{companyID}/ToDos` en `GET /Companies/{companyID}/ToDos/{id}` — ophalen
 - `PATCH /Companies/{companyID}/ToDos` — bijwerken; body met `id` + de te wijzigen velden (bijv. `activityDescription`). Geneste PATCH net als Ticket Notes; een top-level PATCH-pad bestaat niet. Response `{ itemId }` (geverifieerd 17-08-2026, zone 19).
+- `POST /CompanyToDos/query` — zoeken werkt wél top-level (bijv. op `id` als je de company niet weet). Een to-do zonder klant heeft `companyID: 0`; bijwerken gaat dan via `PATCH /Companies/0/ToDos`. Afronden = `completedDate` zetten (geverifieerd 09-11-2026, zone 19).
 - Verplichte velden: `companyID`, `assignedToResourceID`, `actionType`, `startDateTime`, `endDateTime`. Optioneel o.a. `activityDescription`, `ticketID` (koppelt de to-do aan een ticket), `creatorResourceID`.
 - `actionType` is een picklist; zone 19 heeft o.a. `29682841 = Administratie` (handig voor facturatie-to-do's), naast standaardwaarden als `3 = Algemeen` en `1 = Telefoongesprek`.
 
