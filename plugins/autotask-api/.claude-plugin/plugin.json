@@ -1,6 +1,6 @@
 {
   "name": "autotask-api",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "description": "Werken met de Autotask REST API in JUICT-projecten — Key Vault-auth, geverifieerde endpoints, env vars, data structures en lessons learned.",
   "author": {
     "name": "AntoJUICT",

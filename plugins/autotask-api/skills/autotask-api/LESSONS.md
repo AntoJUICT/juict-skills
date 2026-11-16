@@ -242,6 +242,9 @@ AUTOTASK_SECRET='abc#def'    # # binnen single quotes = literal hekje
 
 **Query-responses bevatten soms minder velden dan `GET /{id}`-responses.** Controleer altijd of een veld ook aanwezig is bij query-gebruik.
 
+**Mojibake in een response hoeft niet in Autotask te staan.** Op Windows leest `json.load(sys.stdin)` in Python de UTF-8-response van curl als cp1252, waardoor "financiële" als "financiÃ«le" verschijnt terwijl de note in Autotask goed is (16-11-2026). Een PATCH om het te "herstellen" verandert dan niets.
+- How to apply: lees met `sys.stdin.buffer.read().decode('utf-8')` voordat je concludeert dat de data kapot is, en stuur bodies met `json.dump(..., ensure_ascii=True)` zodat de shell-codepage er nooit tussen kan zitten.
+
 ---
 
 ## Notes
