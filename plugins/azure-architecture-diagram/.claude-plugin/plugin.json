@@ -1,6 +1,6 @@
 {
   "name": "azure-architecture-diagram",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Genereert een Azure-architectuurplaat als bewerkbaar .drawio bronbestand plus standalone .svg — shape-index tegen verzonnen icoonpaden, layoutchecks tegen kruisende lijnen, en het diagram staat als code in git.",
   "author": {
     "name": "AntoJUICT",
