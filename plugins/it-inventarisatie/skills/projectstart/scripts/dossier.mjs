@@ -69,9 +69,13 @@ function controleerVorm(d, f) {
     });
   }
   const optTn = (veld) => [veld, (v) => v === undefined || isTekstOfNull(v), "tekst of null verplicht"];
-  rij("besluiten", d.besluiten, [t("vraag"), tn("beslisser"), tn("uiterlijk"), t("alsNiet"), optTn("besluit")]);
+  rij("besluiten", d.besluiten, [t("vraag"), tn("beslisser"), tn("uiterlijk"), t("alsNiet"), optTn("besluit"), optTn("bron")]);
   rij("aanleveren", d.aanleveren, [t("wat"), tn("wie"), tn("datum"), tn("tijd")]);
-  rij("afspraken", d.afspraken, [t("tekst"), b("intern"), t("bron")]);
+  const optB = (veld) => [veld, (v) => v === undefined || typeof v === "boolean", "true of false verplicht"];
+  rij("afspraken", d.afspraken, [t("tekst"), b("intern"), t("bron"), optB("financieel"), optB("controleren")]);
+  if (isLijst(d.afspraken)) d.afspraken.forEach((a, i) => {
+    if (a?.controleren === true && a?.financieel !== true) f.push(`afspraken[${i}].controleren: alleen voor een financiële afspraak (financieel: true)`);
+  });
   rij("technischeVragen", d.technischeVragen, [t("vraag"), t("aan"), t("bron")]);
   rij("extraOnderwerpen", d.extraOnderwerpen, [
     ["soort", (v) => v === "beveiliging", 'moet "beveiliging" zijn'],
@@ -85,6 +89,10 @@ function controleerVorm(d, f) {
   const optioneel = (pad, waarde, ok, tekst) => { if (waarde !== undefined) eis(pad, ok(waarde), tekst); };
   optioneel("kickoffDatum", d.kickoffDatum, isTekstOfNull, "tekst of null verplicht");
   optioneel("vervolgOfferte", d.vervolgOfferte, isTekstOfNull, "tekst of null verplicht");
+  optioneel("projectNaam", d.projectNaam, isTekstOfNull, "tekst of null verplicht");
+  // Bron van een bevestigd feit (mail met datum, "kick-off <datum>"). Zonder bron is het een uitgangspunt.
+  optioneel("doelBron", d.doelBron, isTekstOfNull, "tekst of null verplicht");
+  optioneel("hardeDatum.bron", d.hardeDatum?.bron, isTekstOfNull, "tekst of null verplicht");
   if (d.migratieplan !== undefined) {
     const mp = d.migratieplan;
     if (!mp || typeof mp !== "object" || Array.isArray(mp)) f.push("migratieplan: object met datum verplicht");

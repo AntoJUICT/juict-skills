@@ -237,3 +237,12 @@ test("uitvraagMail noemt het overlegritme niet dubbel als een afspraak het overl
   const { tekst } = uitvraagMail(d, {});
   assert.equal(tekst.split(/overleg/i).length - 1, 1);
 });
+
+test("uitvraag-mail laat een afspraak weg die nog tegen de offerte gecontroleerd moet worden", () => {
+  const d = vers();
+  d.afspraken.push({ tekst: "Het voortgangsgesprek wordt elke maand ingepland.", intern: false, bron: "Mail 2026-11-12" },
+    { tekst: "Korting op de werkelijk bestede uren volgens de mail.", intern: false, financieel: true, controleren: true, bron: "Mail 2026-11-12" });
+  const m = uitvraagMail(d);
+  assert.match(m.tekst, /elke maand ingepland/);
+  assert.doesNotMatch(m.tekst, /Korting/);
+});

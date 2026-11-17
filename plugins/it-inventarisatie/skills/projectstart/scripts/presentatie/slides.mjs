@@ -8,10 +8,10 @@ import { MART_BESTANDEN } from "./mart-bestanden.mjs";
 
 const OPEN_BESLUIT = "bepalen we vandaag";
 const OPEN_PUNT = "nog te bepalen";
-const TELEFOON = "053 7400 240";
-const NOODNUMMER = "053 7400 450";
-const SUPPORT_MAIL = "support@juict.nl";
-const SUPPORT_PORTAAL = "klantportaal.juict.nl";
+export const TELEFOON = "053 7400 240";
+export const NOODNUMMER = "053 7400 450";
+export const SUPPORT_MAIL = "support@juict.nl";
+export const SUPPORT_PORTAAL = "klantportaal.juict.nl";
 
 // --- Tekst ---
 

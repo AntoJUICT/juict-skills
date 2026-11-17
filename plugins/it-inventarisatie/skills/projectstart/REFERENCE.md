@@ -18,8 +18,9 @@ controlefout, 2 is mislukt (Autotask, Word, bestand). Geen enkel script schrijft
 | | `bewaar --project <id> --dossier <pad> [--toepassen]` | Valideert, filtert geheimen en zet `projectstart-dossier-v<N+1>.json` op het project. Geen wijziging: er wordt niets geschreven. |
 | | `nieuw --dossier <pad> --bronnen <bronnen.json>` | JSON met `aantal` en de bijlagen en notities die nog niet in `verwerkt` staan (zonder inhoud). De eigen uitvoer van de skill telt niet mee: `projectstart-dossier-v<N>.json`, `Mini PVA <klant> v<N>.docx`, `IT-inventarisatie <klant> v<N>.docx` en notities die met "Projectstart:" beginnen. |
 | `scripts/presentatie/bouw.mjs` | `--dossier <pad> --uit <map> [--datum jjjj-mm-dd]` | `<map>/Kick-off <klant>.html` en `<map>/files.json`. `--datum` gaat voor `kickoffDatum`. |
-| `scripts/pva/vul.mjs` | `--dossier <pad> --uit <docx>` | Mini PVA uit `assets/mini-pva-template.docx`. Exit 2 als er een plaatshouder overblijft. |
-| `scripts/pva/afronden.ps1` | `powershell -NoProfile -ExecutionPolicy Bypass -File <skill>/scripts/pva/afronden.ps1 -Bron <docx> -Doel <docx> [-Pdf <pdf>]` | Werkt via Word-COM de inhoudsopgave bij, slaat op en maakt eventueel een PDF. Print het aantal pagina's. |
+| `scripts/pva/pva.mjs` | `--dossier <pad> --uit <html> [--versie N] [--datum jjjj-mm-dd] [--logo <svg>] [--voorblad <png>]` | Mini PVA als Word-vriendelijke HTML: voorblad, markering `[[INHOUDSOPGAVE]]`, hoofdstukken in de volgorde van de kick-off (lege vallen weg), Financiële afspraken met bron, Open punten, Goedkeuring. Standaard het witte logo `<it>/assets/juict-logo-dia.svg` en de kleurband `assets/pva-voorblad.png`. Exit 1 bij een gebruiksfout, een ongeldig dossier of uitvoer die de regels breekt (instructietekst, lege tabel, em-dash, BC, M365, "raming", "n.t.b.", wachtwoordachtige tekst); exit 2 als een bestand niet te lezen of te schrijven is. Bedragen mogen: het PVA is intern. |
+| `scripts/pva/naar-pva.ps1` | `powershell -NoProfile -ExecutionPolicy Bypass -File <skill>/scripts/pva/naar-pva.ps1 -Bron <html> -Doel <docx> [-Pdf <pdf>]` | Word-COM: afbeeldingen ingesloten, A4, kleurband achter de tekst op het voorblad, inhoudsopgave (kop 1 en 2) op de markering, paginanummers rechtsonder (niet op het voorblad), opslaan als `.docx` en eventueel PDF. Print het aantal pagina's, en een waarschuwing als een stap niet lukt. |
+| `scripts/pva/maak-voorblad.ps1` | `powershell -NoProfile -ExecutionPolicy Bypass -File <skill>/scripts/pva/maak-voorblad.ps1` | Maakt eenmalig `assets/pva-voorblad.png` (1240 x 700, het verloop van het deck). Alleen opnieuw als de huisstijl verandert. |
 | `scripts/teksten.mjs` | `briefing --dossier <pad> [--presentatie <url>] [--rapport <url>] [--plan <pad>]` | Interne briefing, titel "Projectstart: briefing kick-off". |
 | | `wijzigingen --oud <pad> --nieuw <pad> [--plan <pad>]` | Alleen wat veranderd is, titel "Projectstart: aanvulling <dd-mm-jjjj hh:mm>". Niets veranderd: geen notitie en het plan blijft ongemoeid. |
 | | `mail --dossier <pad> [--zonder-rapport] [--json <pad>] [--plan <pad>]` | Aan, cc, onderwerp en tekst van de korte opvolgmail: bedankje, rapport als PDF-bijlage met het verzoek het zorgvuldig door te nemen, en kort de open besluiten, het aanleveren, de technische vragen en de afspraken (`intern: false`, plus het overlegritme). Nooit een url: `--rapport <url>` wordt genegeerd. `--zonder-rapport`: de tekst zegt dat het rapport later komt. `--json` schrijft `{aan, cc (met "; "), onderwerp, html, tekst}` voor `outlook-concept.ps1`. Als notitie: titel "Projectstart: uitvraag-mail", zonder `**`. Weigert bij een bedrag (`€`, euro, `EUR`, `500,-`), em-dash, BC, M365, MFA zonder "multifactor" of wachtwoordachtige tekst. |
@@ -29,7 +30,7 @@ controlefout, 2 is mislukt (Autotask, Word, bestand). Geen enkel script schrijft
 | `<it>/scripts/dns-lookup.mjs` | `<domein> [<domein>...]` | MX, NS en tenant-ID per domein. |
 | `<it>/scripts/werkbestand.mjs` | `van-dossier <dossierpad>` | Werkbestand van it-inventarisatie uit het dossier. Weigert als het al bestaat. |
 | `<it>/scripts/rapport/word.mjs` | `--rapport <rapport.json> --uit <rapport.html> [--logo <svg>]` | Zet het rapport om in Word-vriendelijke HTML. Exit 2 zonder argumenten, 1 bij een ongeldig rapport. |
-| `<it>/scripts/rapport/naar-word.ps1` | `powershell -NoProfile -ExecutionPolicy Bypass -File <it>/scripts/rapport/naar-word.ps1 -Bron <html> -Doel <docx> [-Pdf <pdf>]` | Word-COM maakt er een A4-`.docx` van met ingebedde afbeeldingen. Zelfde Git Bash- en Word-valkuilen als `afronden.ps1`. |
+| `<it>/scripts/rapport/naar-word.ps1` | `powershell -NoProfile -ExecutionPolicy Bypass -File <it>/scripts/rapport/naar-word.ps1 -Bron <html> -Doel <docx> [-Pdf <pdf>]` | Word-COM maakt er een A4-`.docx` van met ingebedde afbeeldingen. Zelfde Git Bash- en Word-valkuilen als `naar-pva.ps1`. |
 | `<it>/scripts/rapport/bouw.mjs` | `--rapport <pad> --uit <map> --logo-pos <url> --logo-dia <url> [--fit]` | Zie REFERENCE.md van it-inventarisatie. |
 
 **`--plan` en `plan.json`.** `teksten.mjs` voegt de notitie toe aan het plan en maakt het bestand aan als het er nog
@@ -71,21 +72,23 @@ wachtwoordachtige tekst.
 | `schema` | `1` | ja |
 | `projectId`, `companyId` | geheel getal | ja |
 | `klant.autotask`, `klant.weergave` | tekst: naam in Autotask, naam die de klant gebruikt | ja |
+| `projectNaam` | tekst of `null`: naam van het project, voor het voorblad van het PVA | nee |
 | `kickoffDatum` | `jjjj-mm-dd` of `null` | nee |
 | `contacten[]` | `naam`, `rol`, `organisatie` (tekst), `beslisser`, `aanspreekpunt` (boolean), `mail` (e-mailadres of `null`, optioneel) | ja (lijst) |
 | `team[]` | `naam`, `rol` (tekst). De rol "Projectleider" wordt de afzender van de mail | ja (lijst) |
 | `externePartijen[]` | `naam`, `rol` (tekst), `aangestuurdDoor` (tekst of `null`) | nee |
 | `doel` | tekst, één zin | ja |
-| `hardeDatum` | `datum`, `watKlaar`, `watNiet` (tekst) | ja |
+| `doelBron` | tekst of `null`: waar het doel bevestigd is. Zonder bron is het een uitgangspunt | nee |
+| `hardeDatum` | `datum`, `watKlaar`, `watNiet` (tekst); `bron` (tekst of `null`, optioneel, zelfde regel als `doelBron`) | ja |
 | `scope` | `inbegrepen[]`, `buiten[]` (tekst) | ja |
 | `fases[]` | `code`, `naam` (tekst), `route` (`"01"` of `"02"`), `start`, `eind` (`jjjj-mm`, start niet na eind); minimaal 1 | ja |
 | `migratieplan` | `{ datum: tekst of null }` | nee |
 | `vervolgOfferte` | tekst of `null` | nee |
 | `gebruikersimpact` | tekst of `null` | nee |
 | `overgangBeheer` | tekst of `null` | nee |
-| `besluiten[]` | `vraag`, `alsNiet` (tekst), `beslisser`, `uiterlijk` (tekst of `null`), `besluit` (tekst of `null`, optioneel: ingevuld = genomen) | ja (lijst) |
+| `besluiten[]` | `vraag`, `alsNiet` (tekst), `beslisser`, `uiterlijk` (tekst of `null`), `besluit` (tekst of `null`, optioneel: ingevuld = genomen), `bron` (tekst of `null`, optioneel: waar het besluit staat) | ja (lijst) |
 | `aanleveren[]` | `wat` (tekst), `wie`, `datum`, `tijd` (tekst of `null`) | ja (lijst) |
-| `afspraken[]` | `tekst`, `bron` (tekst), `intern` (boolean) | ja (lijst) |
+| `afspraken[]` | `tekst`, `bron` (tekst, altijd), `intern` (boolean); `financieel`, `controleren` (boolean, optioneel; `controleren` alleen met `financieel: true`) | ja (lijst) |
 | `technischeVragen[]` | `vraag`, `aan`, `bron` (tekst) | ja (lijst) |
 | `extraOnderwerpen[]` | `soort` (`"beveiliging"`), `geregeld[]`, `controleren[]`, `later[]`, `optioneel` (boolean, optioneel) | ja (lijst) |
 | `overleg` | `ritme`, `aanspreekpunt`, `escalatie` (tekst); `kanaal`, `volgende`, `verzoekenControle` (tekst of `null`, optioneel) | ja |
@@ -95,6 +98,14 @@ wachtwoordachtige tekst.
 
 - `contacten` bevat alleen wie van de klant bij de kick-off is, plus contacten van externe partijen. Het contact met
   `aanspreekpunt: true` krijgt de uitvraag-mail, beslissers staan in de cc.
+- `financieel: true`: de afspraak komt in het PVA onder Financiële afspraken, met de bron per regel. Alleen wat
+  letterlijk in een bron staat; de offerte is leidend. `controleren: true`: de term staat alleen in een mail of wijkt
+  af van de offerte. Hij komt dan bij Open punten ("controleren tegen de offerte") en niet in de afspraken of de mail.
+- `doelBron`, `hardeDatum.bron` en `besluiten[].bron`: een mail met datum of "kick-off <datum>". Zonder bron zegt
+  het PVA "uitgangspunt, nog te bevestigen" en staat het punt bij Open punten.
+- Open punten in het PVA: alles wat `null` of open is (besluiten zonder uitkomst, aanleveren zonder wie of datum,
+  migratieplan zonder datum, partij zonder aansturing, kanaal, volgend overleg, impact, overgang), plus feiten zonder
+  bron en financiële termen met `controleren: true`.
 - Een beveiligingsonderwerp maakt slide 5. Staat beveiliging in het rapport als keuze, zet dan `optioneel: true`.
 - `werkbestand.mjs van-dossier` zet beveiliging in het werkbestand als `antwoorden.beveiliging.bekend` (uit
   `geregeld`) en `antwoorden.beveiliging.nogControleren` (uit `controleren`). `nogControleren` is een eigen sleutel die
@@ -160,8 +171,8 @@ zone 19). Verwijderen kan niet, ook geen notities en bijlagen.
 - **En-dash en spaties in bestandsnamen.** Bijlagenamen bevatten vaak een en-dash. Geef zulke paden alleen via Node
   door of als los argument aan `-File`, nooit geplakt in een PowerShell-string.
 - **`$` in Git Bash.** In `powershell -Command "..."` maakt Git Bash van `$var` een lege tekst. Gebruik een `.ps1` met
-  `-File` (zoals `afronden.ps1`) of enkele aanhalingstekens. Voor `/_blob/...` in `bouw.mjs`: `MSYS_NO_PATHCONV=1`.
-- **Word houdt een bestand vast.** Na een fout in `afronden.ps1` schrijf je naar een nieuwe doelnaam.
+  `-File` (zoals `naar-pva.ps1`) of enkele aanhalingstekens. Voor `/_blob/...` in `bouw.mjs`: `MSYS_NO_PATHCONV=1`.
+- **Word houdt een bestand vast.** Na een fout in `naar-pva.ps1` schrijf je naar een nieuwe doelnaam.
 - **Tests op Windows.** `node --test <map>` faalt op Windows. Gebruik
   `node --test "plugins/it-inventarisatie/skills/**/*.test.mjs"` vanuit de repo-root. De test "integratie: voorbeeld
   met 60 bijlage-rijen past na --fit" faalt zonder Chrome; dat is de omgeving.

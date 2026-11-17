@@ -30,6 +30,19 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    Central" en "Microsoft 365" voluit, MFA alleen nadat "multifactor" er al staat. Geen "raming" maar "offerte". Geen
    buzzwords (ontzorgen, naadloos, robuust, synergie). Afspraken als afspraak, niet als tekortkoming. Wijs een vorige
    partij nooit aan. Is de `juict-vault` skill er, lees dan ook `10-JUICT/schrijfregels.md`.
+7. **Bron bij elk feit en elke afspraak.** Elke afspraak heeft een `bron`. Financiële afspraken krijgen
+   `financieel: true` en staan in het dossier zoals ze letterlijk in een bron staan. De offerte is leidend: een
+   financiële term die alleen in een mail staat of afwijkt van de offerte krijgt `controleren: true` en komt in het
+   PVA bij Open punten ("controleren tegen de offerte"), niet bij de afspraken. Voeg nooit tarieven, kortingen of
+   voorwaarden toe die niet in de offerte staan. Neem over waarop een korting precies geldt (bijvoorbeeld alleen op de
+   werkelijk bestede uren, niet op een vaste prijs) en hoe de looptijd er staat ("bestaande overeenkomst N maanden
+   verlengd" is iets anders dan "N maanden vanaf de startdatum"). Een feit dat de offerte nog als open vraag had (een
+   nieuwe naam van de rechtspersoon, een overstapdatum) is pas bevestigd met een bron: zet die in `doelBron`,
+   `hardeDatum.bron` of `besluiten[].bron` (mail met datum of "kick-off <datum>"). Zonder bron toont het PVA het
+   als "uitgangspunt, nog te bevestigen" en zet het bij Open punten.
+8. **Geen sjabloontekst en geen lege tabellen.** Geen instructies als "Voer een impactanalyse uit" of "Beschrijf hoe"
+   in een document, en geen tabel zonder rijen. `pva.mjs` weigert zulke uitvoer. Een onbekende datum is "nog te
+   plannen" (nooit "n.t.b.") en staat ook bij Open punten.
 
 ## Starten (nog geen dossier op het project)
 
@@ -63,11 +76,13 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    Publiceer met het Artifact-tool als gewone HTML-pagina: `file_path` = de gemaakte `Kick-off <klant>.html`, `files`
    = de inhoud van `files.json` (server-side kopieën uit Marts deck), `icon: "presentation"`. Geen Design-canvas.
    Zet de url in `artifacts.presentatie`.
-6. **Mini PVA.** `node <skill>/scripts/pva/vul.mjs --dossier <werkmap>/dossier.json --uit <werkmap>/pva-ruw.docx`,
-   daarna voor de inhoudsopgave en een PDF ter controle:
-   `powershell -NoProfile -ExecutionPolicy Bypass -File <skill>/scripts/pva/afronden.ps1 -Bron <werkmap>/pva-ruw.docx -Doel "<werkmap>/Mini PVA <klant> v<N>.docx" -Pdf <werkmap>/pva-controle.pdf`.
-   Bepaal N zo: zoek in `<werkmap>/bronnen.json` (of de bijlagelijst van het project) de bijlagen
-   `Mini PVA <klant> v<N>.docx`, neem de hoogste N en tel er 1 bij op. Staat er nog geen, dan is N 1.
+6. **Mini PVA.** Het plan van aanpak in de stijl en opbouw van de kick-off: voorblad met de kleurband van het deck,
+   inhoudsopgave, hoofdstukken in de volgorde van de presentatie, Financiële afspraken met bron, Open punten en een
+   tabel voor de handtekeningen. Bepaal eerst N: zoek in `<werkmap>/bronnen.json` (of de bijlagelijst van het
+   project) de bijlagen `Mini PVA <klant> v<N>.docx`, neem de hoogste N en tel er 1 bij op. Staat er nog geen, dan is N 1.
+   `node <skill>/scripts/pva/pva.mjs --dossier <werkmap>/dossier.json --uit <werkmap>/pva.html --versie <N>`, daarna
+   `powershell -NoProfile -ExecutionPolicy Bypass -File <skill>/scripts/pva/naar-pva.ps1 -Bron <werkmap>/pva.html -Doel "<werkmap>/Mini PVA <klant> v<N>.docx" -Pdf <werkmap>/pva-controle.pdf`.
+   Lees de PDF en loop de Open punten na: los op wat je uit de bronnen kunt halen en draai opnieuw.
 7. **Briefing en uitvraag-mail.**
    - `node <skill>/scripts/teksten.mjs briefing --dossier <werkmap>/dossier.json --presentatie <url> --rapport <url> --plan <werkmap>/plan.json`
    - Zet het PVA en het Word-rapport als bijlage in `plan.json` (zie REFERENCE.md). Met `--presentatie` en `--rapport` voegt `briefing` zelf
@@ -97,6 +112,10 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
 2. **Niets nieuw** (`aantal` is 0): stop en zeg dat er niets nieuws op het project staat. Geen nieuwe dossierversie,
    geen PVA, geen notitie.
 3. Lees alleen de nieuwe bronnen, zet hun ids in `verwerkt`, werk het dossier bij en draai `controleer`.
+   **Na de kick-off:** zet het verslag of de uitkomsten als notitie op het project en draai de skill opnieuw. Verwerk
+   besluiten (`besluit`, `beslisser`, `bron` "kick-off <datum>"), nieuwe datums (`uiterlijk`, `datum`, start en eind
+   van fases) en bevestigde feiten (`doelBron`, `hardeDatum.bron`) in het dossier, zodat de planning in het PVA
+   klopt en de Open punten kleiner worden.
 4. `node <skill>/scripts/teksten.mjs wijzigingen --oud <werkmap>/dossier.oud.json --nieuw <werkmap>/dossier.json --plan <werkmap>/plan.json`.
    Meldt het "Geen wijzigingen", dan is de inhoud van het dossier gelijk gebleven: geen nieuw rapport en geen nieuwe
    PVA-versie, ga door naar stap 6.
