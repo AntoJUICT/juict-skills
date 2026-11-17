@@ -55,7 +55,7 @@
     {
       "name": "it-inventarisatie",
       "source": "./plugins/it-inventarisatie",
-      "description": "IT-inventarisatie van een klantomgeving: offerte, bronnen en interview naar een rapport in Claude Design, plus een ingevuld Easywork Basic-project in Autotask."
+      "description": "IT-inventarisatie van een klantomgeving: offerte, bronnen en interview naar een rapport in Claude Design, plus een ingevuld Easywork Basic-project in Autotask. De projectstart zet na akkoord op de offerte de kick-off-presentatie, Mini PVA, briefing en uitvraag-mail klaar."
     },
     {
       "name": "datto-rmm-api",

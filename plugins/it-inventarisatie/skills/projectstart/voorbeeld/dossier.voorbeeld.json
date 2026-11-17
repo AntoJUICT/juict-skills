@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "projectId": 9001,
+  "companyId": 8001,
+  "klant": { "autotask": "Voorbeeld Techniek B.V.", "weergave": "Voorbeeld Techniek" },
+  "projectNaam": "Overstap naar een nieuwe cloudomgeving",
+  "kickoffDatum": "2026-11-24",
+  "contacten": [
+    { "naam": "Sanne de Vries", "rol": "Directeur", "organisatie": "Voorbeeld Techniek", "beslisser": true, "aanspreekpunt": false, "mail": "sanne.devries@voorbeeldtechniek.example" },
+    { "naam": "Joost Bakker", "rol": "Office manager", "organisatie": "Voorbeeld Techniek", "beslisser": false, "aanspreekpunt": true, "mail": "joost.bakker@voorbeeldtechniek.example" },
+    { "naam": "Femke Jansen", "rol": "Beheerder applicatie", "organisatie": "Voorbeeld Software", "beslisser": false, "aanspreekpunt": false }
+  ],
+  "team": [
+    { "naam": "Pim Verhoeven", "rol": "Projectleider" },
+    { "naam": "Lotte Smit", "rol": "Engineer" }
+  ],
+  "externePartijen": [
+    { "naam": "Voorbeeld Software", "rol": "Leverancier van de planningssoftware", "aangestuurdDoor": "Pim Verhoeven" },
+    { "naam": "Voorbeeld Telecom", "rol": "Leverancier van de telefooncentrale", "aangestuurdDoor": null }
+  ],
+  "doel": "Alle medewerkers van Voorbeeld Techniek werken veilig en stabiel vanaf een nieuwe cloudomgeving, zonder onderbreking van de productie.",
+  "doelBron": "Offerte 2026-11-02",
+  "hardeDatum": {
+    "datum": "2027-03-01",
+    "watKlaar": "Alle 25 gebruikers werken met hun eigen account op de nieuwe omgeving.",
+    "watNiet": "De koppeling met de oude planningssoftware blijft nog buiten deze oplevering."
+  },
+  "scope": {
+    "inbegrepen": [
+      "Migratie van mailboxen en bestanden naar de nieuwe omgeving",
+      "Inrichting van beveiligde toegang voor alle gebruikers",
+      "Overdracht en documentatie voor beheer"
+    ],
+    "buiten": [
+      "Vervanging van werkplekhardware",
+      "Aanpassingen aan de planningssoftware"
+    ]
+  },
+  "fases": [
+    { "code": "F1", "naam": "Voorbereiding en inrichting", "route": "01", "start": "2026-12", "eind": "2027-01" },
+    { "code": "F2", "naam": "Migratie en oplevering", "route": "02", "start": "2027-01", "eind": "2027-03" }
+  ],
+  "migratieplan": { "datum": "2027-01-15" },
+  "vervolgOfferte": "Na akkoord op het migratieplan volgt een aparte offerte voor de koppeling met de planningssoftware.",
+  "gebruikersimpact": "Geen impact voor medewerkers in deze fase.",
+  "overgangBeheer": "Tot de overstap blijft jullie huidige IT-ondersteuning werken; JUICT neemt het beheer pas over als we volledige toegang hebben.",
+  "besluiten": [
+    { "vraag": "Welke gebruikers krijgen toegang tot de gedeelde planningsmap?", "beslisser": "Sanne de Vries", "uiterlijk": "2026-12-15", "alsNiet": "Alleen het managementteam krijgt toegang tot de map.", "besluit": "Alle medewerkers krijgen leestoegang tot de gedeelde planningsmap.", "bron": "Mail Sanne de Vries 2026-11-12" },
+    { "vraag": "Blijft de oude telefooncentrale in gebruik tot na de migratie?", "beslisser": null, "uiterlijk": null, "alsNiet": "We laten de centrale ongewijzigd en plannen dit later in." }
+  ],
+  "aanleveren": [
+    { "wat": "Lijst met alle gebruikers en hun functie", "wie": "Joost Bakker", "datum": "2026-12-01", "tijd": "2 uur" },
+    { "wat": "Overzicht van gedeelde mailboxen en distributielijsten", "wie": null, "datum": null, "tijd": null }
+  ],
+  "afspraken": [
+    { "tekst": "Het gesprek over de planning vindt plaats op de laatste dinsdag van de maand.", "intern": false, "bron": "Kickoff-notitie 2026-11-10" },
+    { "tekst": "Extra werkzaamheden buiten scope worden berekend tegen € 100 per uur.", "intern": true, "financieel": true, "bron": "Offerte 2026-11-02" },
+    { "tekst": "De bestaande beheerovereenkomst wordt met 12 maanden verlengd.", "intern": true, "financieel": true, "bron": "Offerte 2026-11-02" },
+    { "tekst": "10 procent korting op de werkelijk bestede uren.", "intern": true, "financieel": true, "controleren": true, "bron": "Mail Sanne de Vries 2026-11-12" }
+  ],
+  "technischeVragen": [
+    { "vraag": "Welke versie draait de planningssoftware en is die compatibel met de nieuwe omgeving?", "aan": "Femke Jansen", "bron": "Intake 2026-11-10" }
+  ],
+  "extraOnderwerpen": [
+    {
+      "soort": "beveiliging",
+      "geregeld": ["Multifactor-authenticatie is ingesteld voor beheerders"],
+      "controleren": ["Of alle gebruikers een tweede inlogstap gebruiken"],
+      "later": ["Beveiligingstraining voor medewerkers"]
+    }
+  ],
+  "overleg": {
+    "ritme": "Tweewekelijks een half uur op dinsdag",
+    "aanspreekpunt": "Joost Bakker",
+    "escalatie": "Sanne de Vries",
+    "kanaal": "Microsoft Teams, kanaal Project nieuwe omgeving",
+    "volgende": "2026-12-08",
+    "verzoekenControle": "Nieuwe accounts en rechten zetten we pas door na akkoord van Joost Bakker."
+  },
+  "artifacts": { "presentatie": null, "rapport": null },
+  "verwerkt": { "bijlagen": [], "notities": [] },
+  "versie": 1
+}

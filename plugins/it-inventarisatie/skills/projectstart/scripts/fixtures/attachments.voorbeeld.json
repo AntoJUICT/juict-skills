@@ -1,0 +1,29 @@
+{
+  "_opmerking": "Verzonnen voorbeeld (Voorbeeld Techniek B.V.). Alleen de VORM van de Autotask-antwoorden is gevolgd; ids, namen en inhoud zijn verzonnen.",
+  "project": { "item": { "id": 9001, "companyID": 8001, "projectName": "Voorbeeld Techniek B.V. - Easywork Basic" } },
+  "bedrijf": { "item": { "id": 8001, "companyName": "Voorbeeld Techniek B.V." } },
+  "lijst": {
+    "items": [
+      {
+        "id": 70001, "attachDate": "2026-10-01T08:15:00.000Z", "attachedByContactID": null, "attachedByResourceID": 1,
+        "attachmentType": "FILE_ATTACHMENT", "contentType": "application/pdf", "creatorType": 1, "fileSize": 24,
+        "fullPath": "offerte-voorbeeld.pdf", "impersonatorCreatorResourceID": null, "opportunityID": null,
+        "parentID": 9001, "projectID": 9001, "projectNoteID": null, "publish": 1, "title": "Offerte Voorbeeld – versie 2.pdf", "data": null
+      },
+      {
+        "id": 70002, "attachDate": "2026-10-02T09:30:00.000Z", "attachedByContactID": null, "attachedByResourceID": 1,
+        "attachmentType": "FILE_ATTACHMENT", "contentType": "message/rfc822", "creatorType": 1, "fileSize": 18,
+        "fullPath": "mail-voorbeeld.eml", "impersonatorCreatorResourceID": null, "opportunityID": null,
+        "parentID": 9001, "projectID": 9001, "projectNoteID": null, "publish": 1, "title": "Re_ Voorbeeld _ Vragen over migratie.eml", "data": null
+      }
+    ],
+    "pageDetails": { "count": 2, "requestCount": 500, "prevPageUrl": null, "nextPageUrl": null }
+  },
+  "bijlagen": {
+    "70001": { "items": [ { "id": 70001, "title": "Offerte Voorbeeld – versie 2.pdf", "fullPath": "offerte-voorbeeld.pdf", "contentType": "application/pdf", "attachDate": "2026-10-01T08:15:00.000Z", "fileSize": 24, "data": "JVBERi0xLjQKJVZvb3JiZWVsZAo=" } ], "pageDetails": { "count": 1, "requestCount": 500, "prevPageUrl": null, "nextPageUrl": null } },
+    "70002": { "items": [ { "id": 70002, "title": "Re_ Voorbeeld _ Vragen over migratie.eml", "fullPath": "mail-voorbeeld.eml", "contentType": "message/rfc822", "attachDate": "2026-10-02T09:30:00.000Z", "fileSize": 18, "data": "U3ViamVjdDogVm9vcmJlZWxk" } ], "pageDetails": { "count": 1, "requestCount": 500, "prevPageUrl": null, "nextPageUrl": null } }
+  },
+  "notities": [
+    { "id": 60001, "createDateTime": "2026-10-03T10:00:00.000Z", "createdByContactID": null, "creatorResourceID": 1, "description": "Voorbeeldnotitie: kickoff gepland.", "impersonatorCreatorResourceID": null, "impersonatorUpdaterResourceID": null, "isAnnouncement": false, "lastActivityDate": "2026-10-03T10:00:00.000Z", "noteType": 3, "projectID": 9001, "publish": 1, "title": "Kickoff voorbeeld" }
+  ]
+}

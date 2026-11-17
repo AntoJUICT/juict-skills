@@ -35,6 +35,9 @@ de plugin onder `~/.claude/plugins/cache/...` staat). Hieronder staat die map al
    engineer (Microsoft 365-connector) naar mails sinds `laatsteMailcheck`, werk het werkbestand bij en ga verder bij
    `stap`. De slug is de klantnaam in kleine letters met alleen `[a-z0-9-]` ("Voorbeeld Techniek B.V." wordt
    `voorbeeld-techniek-bv`). Nieuw: `node <skill>/scripts/werkbestand.mjs nieuw "<klantnaam>"`; dat print het pad.
+   Heeft het Autotask-project een projectstart-dossier (bijlage `projectstart-dossier-v<N>.json`), haal dat op en begin
+   daarmee: `node <skill>/scripts/werkbestand.mjs van-dossier <dossierpad>`. Dat zet klant, antwoorden en openstaande
+   vragen alvast klaar; controleer die in plaats van ze opnieuw uit te vragen.
 1. **Offerte lezen en scope bevestigen.** Vraag de offerte. Haal klantnaam, Autotask-bedrijf, onderdelen in scope en
    uren per fase eruit. Neem de klantnaam letterlijk over uit Autotask of het tenantdomein, niet uit een maildomein
    (een bedrijf kan Voorbeeldtech heten en ook voorbeeld-tech.nl hebben), en laat de schrijfwijze bevestigen. Zet de scope per onderdeel op `true` of `false`; wat de offerte niet noemt blijft `null`.
@@ -67,6 +70,7 @@ de plugin onder `~/.claude/plugins/cache/...` staat). Hieronder staat die map al
       en `root: "<werkmap>/rapport"` (volledig pad, geen 8.3-kortpad), daarna de overige `project/*.dc.html` in één call.
       Meldt `bouw.mjs` bij een herbouw bestanden die er niet meer zijn, publiceer die met `"project/<bestand>": null`.
    Details, wijzigingen en problemen: REFERENCE.md.
+   Het rapport kan ook als Word-bestand: `node <skill>/scripts/rapport/word.mjs --rapport <werkmap>/rapport.json --uit <werkmap>/rapport.html --logo <skill>/assets/juict-logo-pos.svg`, daarna `powershell -NoProfile -ExecutionPolicy Bypass -File <skill>/scripts/rapport/naar-word.ps1 -Bron <werkmap>/rapport.html -Doel <werkmap>/rapport.docx`.
 7. **PDF op het project.** De engineer exporteert de PDF in Claude Design (Share, Export, PDF). Zoek het project met
    `node <skill>/scripts/autotask-project.mjs zoek --company <id>` en laat het bevestigen. Geen project: meld het en
    doe niets. Daarna:

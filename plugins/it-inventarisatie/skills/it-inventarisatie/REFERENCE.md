@@ -139,6 +139,8 @@ open vragen.
    zijn (bijvoorbeeld een vervolgpagina). Verwijder elk daarvan in Claude Design met `"project/<bestand>": null`.
 7. Delen doet de engineer zelf via het Share-menu. De PDF komt uit Share, Export, PDF.
 
+**Word-export.** Naast Claude Design kan het rapport als Word-bestand, met dezelfde inhoud als `rapport.json`: `scripts/rapport/word.mjs --rapport <pad> --uit <html> [--logo <svg>]` maakt Word-vriendelijke HTML, `scripts/rapport/naar-word.ps1 -Bron <html> -Doel <docx> [-Pdf <pdf>]` zet die via Word-COM om in een A4-`.docx` met ingebedde afbeeldingen. Draai het `.ps1` met `powershell -NoProfile -ExecutionPolicy Bypass -File` (niet via `-Command` in Git Bash). Houdt Word het bestand vast, kies dan een nieuwe doelnaam.
+
 **Fit-check:** `--fit` meet elke pagina in een headless browser en splitst te lange tabellen over vervolgpagina's,
 maximaal 6 rondes. Past het dan nog niet, dan noemt `bouw.mjs` de pagina. De browser: `IT_INVENTARISATIE_BROWSER`
 als die naar een bestand wijst, anders Chrome, anders Edge. Een beheerde Edge blijft op JUICT-werkplekken headless
