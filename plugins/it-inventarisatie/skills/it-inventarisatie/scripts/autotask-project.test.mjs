@@ -504,3 +504,51 @@ test("voorbeeldwerkbestand: offerte.uren gebruikt Easywork-taaktitels uit de taa
   for (const { fase, uren } of wb.offerte.uren) assert.equal(wijziging(p, fase)?.estimatedHours, uren, fase);
   assert.deepEqual(p.wijzigingen.filter((w) => w.actie === "nvt"), [], "geen scope op false bij gekoppelde taken");
 });
+
+test("maakAt: getProjectPhases, getProjectTasks en postProjectTask op de geneste paden", async () => {
+  const fetch = nepFetch((url, init) => (init.method === "POST" ? { itemId: 77 } : { items: [{ id: url.endsWith("Phases") ? 1 : 2 }], pageDetails: { nextPageUrl: null } }));
+  const at = maakAt({ fetch, creds: CREDS });
+  const fases = await at.getProjectPhases(900001);
+  const taken = await at.getProjectTasks(900001);
+  const r = await at.postProjectTask(900001, { projectID: 900001, title: "t" });
+  const base = "https://webservices19.autotask.net/ATServicesRest/V1.0/";
+  assert.deepEqual(fetch.calls.map((c) => [c.method, c.url]), [
+    ["GET", base + "Projects/900001/Phases"],
+    ["GET", base + "Projects/900001/Tasks"],
+    ["POST", base + "Projects/900001/Tasks"],
+  ]);
+  assert.deepEqual(fases, [{ id: 1 }]);
+  assert.deepEqual(taken, [{ id: 2 }]);
+  assert.deepEqual(r, { itemId: 77 });
+  assert.deepEqual(fetch.calls[2].body, { projectID: 900001, title: "t" });
+});
+
+test("maakAt: getProjectTasks volgt nextPageUrl met GET, niet naar een andere host", async () => {
+  const base = "https://webservices19.autotask.net/ATServicesRest/V1.0/";
+  const fetch = nepFetch((url) => (url.endsWith("/Tasks")
+    ? { items: [{ id: 1 }], pageDetails: { nextPageUrl: `${base}Projects/900001/Tasks?paging=x` } }
+    : { items: [{ id: 2 }], pageDetails: { nextPageUrl: null } }));
+  const items = await maakAt({ fetch, creds: CREDS }).getProjectTasks(900001);
+  assert.deepEqual(items.map((i) => i.id), [1, 2]);
+  assert.equal(fetch.calls[1].method, "GET");
+  const vreemd = nepFetch(() => ({ items: [], pageDetails: { nextPageUrl: "https://elders.example/x" } }));
+  await assert.rejects(maakAt({ fetch: vreemd, creds: CREDS }).getProjectTasks(900001), /andere host/);
+});
+
+test("project zonder technische sjabloontaken: plan meldt per koppeltaak 'geen sjabloontaak, overgeslagen', zonder fout", () => {
+  // Werkwijze met projectstart: de projectleider zet alleen projectmanagement- en administratietaken klaar.
+  const taken = [
+    { id: 1, projectID: 900001, title: "Administratieve opstart project", status: 1 },
+    { id: 2, projectID: 900001, title: "Project opstart", status: 1 },
+    { id: 3, projectID: 900001, title: "Nieuwe cloudomgeving inrichten", status: 1 },
+  ];
+  const p = planTaskUpdates(taken, werkbestand(), OPTIES);
+  assert.deepEqual(p.wijzigingen, []);
+  assert.ok(p.overgeslagen.includes("Setup netwerk"));
+  assert.ok(p.overgeslagen.every((t) => TAAK_KOPPELING[t]), "alleen taken uit de taakkoppeling");
+  assert.ok(!p.overgeslagen.includes("Project afsluitingsgesprek"));
+  const uit = toonPlan(p);
+  assert.match(uit, /Setup netwerk: geen sjabloontaak, overgeslagen\./);
+  assert.match(uit, /projectstart/);
+  assert.ok(!/fout|ontbreken/i.test(uit), uit);
+});

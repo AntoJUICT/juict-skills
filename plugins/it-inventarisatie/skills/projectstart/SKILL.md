@@ -43,6 +43,14 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
 8. **Geen sjabloontekst en geen lege tabellen.** Geen instructies als "Voer een impactanalyse uit" of "Beschrijf hoe"
    in een document, en geen tabel zonder rijen. `pva.mjs` weigert zulke uitvoer. Een onbekende datum is "nog te
    plannen" (nooit "n.t.b.") en staat ook bij Open punten.
+9. **Technische taken alleen uit offerte en mail.** De projectleider maakt het project uit het sjabloon en zet zelf de
+   projectmanagement-, administratie- en salestaken klaar; de skill maakt alleen de technische taken, als concrete
+   stappen voor een engineer met het werkwoord voorop. Elke taak heeft een `bron` (de offerte of een mail met datum).
+   Uren komen alleen uit de offerte, nooit verzonnen, en per fase nooit meer dan de offerte noemt. Geen uren bekend:
+   `uren: null` (de taak krijgt 0 uur en staat bij Open punten). Wat buiten de scope valt wordt nooit een taak. Een
+   afspraak in een mail die werk toevoegt dat niet in de offerte staat, is geen taak maar meerwerk (`meerwerk[]`, Open
+   punt "meerwerk, afstemmen"). Taken worden niet aan engineers toegewezen: dat doet de planner via het planbord. Een
+   bestaande taak wordt nooit overschreven.
 
 ## Starten (nog geen dossier op het project)
 
@@ -59,7 +67,17 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
      partijen) en wie het dagelijkse aanspreekpunt is;
    - wie van JUICT in het projectteam zit (`team`). Neem de accountmanager niet vanzelf op.
 3. **Controleren.** `node <skill>/scripts/dossier.mjs controleer <werkmap>/dossier.json`, net zo lang tot het geldig is.
-4. **Rapport.** `node <it>/scripts/dns-lookup.mjs <domein>...` op de domeinen uit de bronnen. Dan
+4. **Technische taken.** Zet in het dossier `taken[]`: per stap uit de offerte en de mails een concrete stap voor een
+   engineer, met het werkwoord voorop ("Testwerkplekken voor Business Central inrichten"), de fase zoals die in het
+   Autotask-project heet (`fase`, bijvoorbeeld "Realisatie- en uitvoeringsfase"), wat er daarna is (`resultaat`) en de
+   `bron`. Zet de uren per fase uit de offerte in `fases[].uren` en koppel elke taak met `projectFase` aan zijn fase:
+   `controleer` weigert dan een som boven de offerte. Werk uit een mail dat niet in de offerte staat gaat naar
+   `meerwerk[]`, niet naar `taken`. Laat de lijst bevestigen en draai `controleer` opnieuw. Daarna
+   `node <skill>/scripts/taken.mjs --dossier <werkmap>/dossier.json --plan <werkmap>/plan.json`: de taken komen in het
+   plan en gaan in stap 8 met de rest naar Autotask. De voorvertoning toont per taak "nieuw", "staat er al;
+   overgeslagen", "fase niet gevonden; niet aangemaakt" (pas dan de fasenaam aan, nooit gokken) of "notitie bij
+   bestaande taak" (het dossier wijkt af van een taak die er al staat: de taak blijft zoals hij is).
+5. **Rapport.** `node <it>/scripts/dns-lookup.mjs <domein>...` op de domeinen uit de bronnen. Dan
    `node <it>/scripts/werkbestand.mjs van-dossier <werkmap>/dossier.json` en verder volgens it-inventarisatie stap 5
    en 6 (`rapport.json`, `bouw.mjs`, publiceren in Claude Design), met `--uit <scratch>/rapport`. Controleer daarna
    `node <skill>/scripts/samenhang.mjs --dossier <werkmap>/dossier.json --rapport <pad naar rapport.json>`. Het rapport
@@ -69,21 +87,21 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    `<werkmap>/bronnen.json` of de bijlagelijst, plus 1; anders 1) en draai:
    `node <it>/scripts/rapport/word.mjs --rapport <pad naar rapport.json> --uit <scratch>/rapport.html --logo <it>/assets/juict-logo-pos.svg`, daarna
    `powershell -NoProfile -ExecutionPolicy Bypass -File <it>/scripts/rapport/naar-word.ps1 -Bron <scratch>/rapport.html -Doel "<werkmap>/IT-inventarisatie <klant.autotask> v<N>.docx" -Pdf "<werkmap>/IT-inventarisatie <klant.autotask> v<N>.pdf"`.
-   De PDF blijft lokaal in de werkmap (niet naar Autotask): hij gaat als bijlage mee met de opvolgmail (stap 7).
-   Zet het .docx-bestand als bijlage in `plan.json` (zelfde vorm als het PVA, stap 7).
-5. **Presentatie** (alleen als `artifacts.presentatie` nog leeg is).
+   De PDF blijft lokaal in de werkmap (niet naar Autotask): hij gaat als bijlage mee met de opvolgmail (stap 8).
+   Zet het .docx-bestand als bijlage in `plan.json` (zelfde vorm als het PVA, stap 8).
+6. **Presentatie** (alleen als `artifacts.presentatie` nog leeg is).
    `node <skill>/scripts/presentatie/bouw.mjs --dossier <werkmap>/dossier.json --uit <scratch>/kickoff [--datum jjjj-mm-dd]`.
    Publiceer met het Artifact-tool als gewone HTML-pagina: `file_path` = de gemaakte `Kick-off <klant>.html`, `files`
    = de inhoud van `files.json` (server-side kopieën uit Marts deck), `icon: "presentation"`. Geen Design-canvas.
    Zet de url in `artifacts.presentatie`.
-6. **Mini PVA.** Het plan van aanpak in de stijl en opbouw van de kick-off: voorblad met de kleurband van het deck,
+7. **Mini PVA.** Het plan van aanpak in de stijl en opbouw van de kick-off: voorblad met de kleurband van het deck,
    inhoudsopgave, hoofdstukken in de volgorde van de presentatie, Financiële afspraken met bron, Open punten en een
    tabel voor de handtekeningen. Bepaal eerst N: zoek in `<werkmap>/bronnen.json` (of de bijlagelijst van het
    project) de bijlagen `Mini PVA <klant> v<N>.docx`, neem de hoogste N en tel er 1 bij op. Staat er nog geen, dan is N 1.
    `node <skill>/scripts/pva/pva.mjs --dossier <werkmap>/dossier.json --uit <werkmap>/pva.html --versie <N>`, daarna
    `powershell -NoProfile -ExecutionPolicy Bypass -File <skill>/scripts/pva/naar-pva.ps1 -Bron <werkmap>/pva.html -Doel "<werkmap>/Mini PVA <klant> v<N>.docx" -Pdf <werkmap>/pva-controle.pdf`.
    Lees de PDF en loop de Open punten na: los op wat je uit de bronnen kunt halen en draai opnieuw.
-7. **Briefing en uitvraag-mail.**
+8. **Briefing en uitvraag-mail.**
    - `node <skill>/scripts/teksten.mjs briefing --dossier <werkmap>/dossier.json --presentatie <url> --rapport <url> --plan <werkmap>/plan.json`
    - Zet het PVA en het Word-rapport als bijlage in `plan.json` (zie REFERENCE.md). Met `--presentatie` en `--rapport` voegt `briefing` zelf
      link-bijlagen toe aan het plan (`Kick-off presentatie <klant>` en `IT-inventarisatie <klant>`), zodat de twee
@@ -100,7 +118,7 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
      Nooit versturen.
    - `node <skill>/scripts/autotask-schrijf.mjs --project <id> --plan <werkmap>/plan.json`: toon de voorvertoning, en
      na akkoord hetzelfde commando met `--toepassen`.
-8. **Stand bewaren.** `node <skill>/scripts/dossier.mjs bewaar --project <id> --dossier <werkmap>/dossier.json`, na
+9. **Stand bewaren.** `node <skill>/scripts/dossier.mjs bewaar --project <id> --dossier <werkmap>/dossier.json`, na
    akkoord met `--toepassen`.
 
 ## Aanvullen (er staat al een dossier op het project)
@@ -115,12 +133,14 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    **Na de kick-off:** zet het verslag of de uitkomsten als notitie op het project en draai de skill opnieuw. Verwerk
    besluiten (`besluit`, `beslisser`, `bron` "kick-off <datum>"), nieuwe datums (`uiterlijk`, `datum`, start en eind
    van fases) en bevestigde feiten (`doelBron`, `hardeDatum.bron`) in het dossier, zodat de planning in het PVA
-   klopt en de Open punten kleiner worden.
+   klopt en de Open punten kleiner worden. Nieuwe of gewijzigde technische taken en meerwerk volgen de regels van
+   stap 4 van Starten (harde regel 9).
 4. `node <skill>/scripts/teksten.mjs wijzigingen --oud <werkmap>/dossier.oud.json --nieuw <werkmap>/dossier.json --plan <werkmap>/plan.json`.
    Meldt het "Geen wijzigingen", dan is de inhoud van het dossier gelijk gebleven: geen nieuw rapport en geen nieuwe
    PVA-versie, ga door naar stap 6.
 5. Wel wijzigingen: bouw het rapport opnieuw en publiceer het naar dezelfde url, draai `samenhang.mjs`, maak een
-   nieuw Word-rapport (Word-bijlage in stap 4 van Starten, nieuwe versie, met ook de nieuwe PDF via `-Pdf`) en een nieuwe PVA-versie (stap 6 van Starten) en zet beide in het plan. Daarna `autotask-schrijf.mjs` met voorvertoning en
+   nieuw Word-rapport (Word-bijlage in stap 5 van Starten, nieuwe versie, met ook de nieuwe PDF via `-Pdf`) en een nieuwe PVA-versie (stap 7 van Starten) en zet beide in het plan. Zijn de taken veranderd, draai dan ook `taken.mjs --plan`:
+   alleen nieuwe taken worden aangemaakt, een afwijking bij een bestaande taak wordt een notitie bij die taak. Daarna `autotask-schrijf.mjs` met voorvertoning en
    `--toepassen`. **De presentatie nooit opnieuw:** die maakt alleen de eerste run, daarna past de projectleider hem
    met de hand aan.
 6. `dossier.mjs bewaar`, voorvertoning en daarna `--toepassen`. De nieuwe ids in `verwerkt` maken een nieuwe versie.

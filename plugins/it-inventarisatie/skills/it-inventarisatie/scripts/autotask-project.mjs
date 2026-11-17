@@ -193,7 +193,10 @@ export function planTaskUpdates(taken, werkbestand, { datum, engineer } = {}) {
 
   const projectId = (taken ?? []).find((t) => t.projectID != null)?.projectID ?? werkbestand?.autotask?.projectId ?? null;
   const ontbrekend = SJABLOON_TAKEN.filter((t) => !aanwezig.has(normaliseerTitel(t)));
-  return { projectId, wijzigingen, ontbrekend, onbekend };
+  // Projecten die met projectstart beginnen hebben geen technische sjabloontaken: die komen uit de offerte.
+  // Een koppeltaak die er niet is, is dus geen fout; hij wordt gemeld als overgeslagen.
+  const overgeslagen = ontbrekend.filter((t) => TAAK_KOPPELING[t]);
+  return { projectId, wijzigingen, ontbrekend, overgeslagen, onbekend };
 }
 
 function inspring(tekst, maxRegels = 40) {
@@ -213,7 +216,11 @@ export function toonPlan(plan) {
     if (w.notitie) uit.push(`  notitie "${w.notitie.titel}":`, inspring(w.notitie.tekst));
     uit.push("");
   }
-  if (plan.ontbrekend.length) uit.push(`Sjabloontaken die op dit project ontbreken (${plan.ontbrekend.length}): ${plan.ontbrekend.join("; ")}`);
+  const overgeslagen = plan.overgeslagen ?? (plan.ontbrekend ?? []).filter((t) => TAAK_KOPPELING[t]);
+  for (const t of overgeslagen) uit.push(`${t}: geen sjabloontaak, overgeslagen.`);
+  if (overgeslagen.length) uit.push("Technische taken uit de offerte zet projectstart op het project (scripts/taken.mjs).");
+  const overig = (plan.ontbrekend ?? []).filter((t) => !overgeslagen.includes(t));
+  if (overig.length) uit.push(`Andere sjabloontaken niet op dit project (${overig.length}), niet aangeraakt: ${overig.join("; ")}`);
   if (plan.onbekend.length) uit.push(`Eigen taken, niet aangeraakt (${plan.onbekend.length}): ${plan.onbekend.join("; ")}`);
   return uit.join("\n").trimEnd() + "\n";
 }
@@ -326,6 +333,18 @@ export function maakAt({ fetch: doFetch = globalThis.fetch, creds, maxGelijktijd
     });
   }
 
+  // Geneste lijst met GET; volgt nextPageUrl (alleen op dezelfde host, zie verzoek).
+  async function lijst(pad) {
+    const items = [];
+    let volgende = pad;
+    for (let pagina = 0; volgende && pagina < 50; pagina++) {
+      const data = await verzoek("GET", volgende);
+      items.push(...(data.items ?? []));
+      volgende = data.pageDetails?.nextPageUrl ?? null;
+    }
+    return items;
+  }
+
   return {
     get: (pad) => verzoek("GET", pad),
     async query(entity, filter) {
@@ -347,6 +366,11 @@ export function maakAt({ fetch: doFetch = globalThis.fetch, creds, maxGelijktijd
     },
     // De drie schrijf-endpoints hieronder: geverifieerd in zone 19 op 4-11-2026 (zie REFERENCE.md).
     patchTask: (projectId, body) => verzoek("PATCH", `Projects/${projectId}/Tasks`, body),
+    // Voor projectstart (technische taken). GET Projects/{id}/Phases en /Tasks zijn geverifieerd (autotask-api
+    // REFERENCE.md); POST Projects/{id}/Tasks ook, maar phaseID en status 1 bij aanmaken nog niet (zie projectstart).
+    getProjectPhases: (projectId) => lijst(`Projects/${projectId}/Phases`),
+    getProjectTasks: (projectId) => lijst(`Projects/${projectId}/Tasks`),
+    postProjectTask: (projectId, body) => verzoek("POST", `Projects/${projectId}/Tasks`, body),
     postTaskNote: (body) => verzoek("POST", "TaskNotes", body),
     postProjectAttachment: (projectId, body) => verzoek("POST", `Projects/${projectId}/Attachments`, body),
     // Geverifieerd in zone 19 op 17-11-2026: isAnnouncement is verplicht (zie projectstart/REFERENCE.md).

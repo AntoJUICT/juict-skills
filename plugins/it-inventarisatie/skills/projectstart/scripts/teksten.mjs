@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { isBedrag } from "./dossier.mjs";
+import { urenTekst } from "./taken.mjs";
 import { findSecretText } from "../../it-inventarisatie/scripts/geheimen.mjs";
 
 const p2 = (n) => String(n).padStart(2, "0");
@@ -40,6 +41,8 @@ function aanleverRegel(a) {
   return delen.length ? `${a.wat} (${delen.join(", ")})` : `${a.wat} (nog open: wie en wanneer)`;
 }
 
+const taakRegel = (t) => `${t.titel} (${t.fase}, ${urenTekst(t.uren)})`;
+
 // --- Briefing (intern) ---
 
 export function briefing(d, { presentatie, rapport } = {}) {
@@ -72,6 +75,14 @@ export function briefing(d, { presentatie, rapport } = {}) {
   for (const s of d.scope.inbegrepen) l.push(`- ${s}`);
   l.push("Scope, buiten:");
   for (const s of d.scope.buiten) l.push(`- ${s}`);
+  if (d.taken?.length) {
+    l.push("", "Technische taken in Autotask:");
+    for (const t of d.taken) l.push(`- ${taakRegel(t)}`);
+  }
+  if (d.meerwerk?.length) {
+    l.push("", "Meerwerk, nog afstemmen (geen taak):");
+    for (const m of d.meerwerk) l.push(`- ${m.wat} (${m.bron})`);
+  }
   if (d.externePartijen?.length) {
     l.push("", "Externe partijen:");
     for (const e of d.externePartijen) l.push(`- ${e.naam}, ${e.rol}${e.aangestuurdDoor ? `, aangestuurd door ${e.aangestuurdDoor}` : ""}`);
@@ -107,6 +118,8 @@ const LIJSTEN = [
   ["Scope buiten", (d) => d.scope?.buiten, (s) => s],
   ["Extra onderwerpen", (d) => d.extraOnderwerpen, (o) => `${o.soort}: geregeld ${o.geregeld.join("; ") || "-"}; controleren ${o.controleren.join("; ") || "-"}; later ${o.later.join("; ") || "-"}`],
   ["Externe partijen", (d) => d.externePartijen, (e) => `${e.naam}, ${e.rol}${e.aangestuurdDoor ? `, aangestuurd door ${e.aangestuurdDoor}` : ""}`],
+  ["Technische taken", (d) => d.taken, (t) => `${taakRegel(t)}, bron ${t.bron}`],
+  ["Meerwerk", (d) => d.meerwerk, (m) => `${m.wat} (${m.bron})`],
 ];
 
 const ENKEL = [
@@ -123,7 +136,7 @@ const ENKEL = [
   ["Overleg kanaal", (d) => d.overleg?.kanaal],
   ["Volgend overleg", (d) => d.overleg?.volgende && nlDatum(d.overleg.volgende)],
   ["Verzoeken en controle", (d) => d.overleg?.verzoekenControle],
-  ["Fases", (d) => d.fases?.map((f) => `${f.code} ${f.naam} (${f.start} tot ${f.eind})`).join("; ")],
+  ["Fases", (d) => d.fases?.map((f) => `${f.code} ${f.naam} (${f.start} tot ${f.eind}${typeof f.uren === "number" ? `, ${f.uren} uur in de offerte` : ""})`).join("; ")],
 ];
 
 export function wijzigingen(oud, nieuw, { datum = new Date() } = {}) {
@@ -235,7 +248,8 @@ function optie(argv, naam) {
 // Voegt een notitie toe aan een plan; een notitie met dezelfde titel wordt vervangen.
 export function voegToeAanPlan(plan, notitie) {
   const notities = (plan.notities ?? []).filter((n) => n.titel !== notitie.titel);
-  return { notities: [...notities, notitie], bijlagen: plan.bijlagen ?? [] };
+  // De rest van het plan (bijvoorbeeld de taken van taken.mjs) blijft staan.
+  return { ...plan, notities: [...notities, notitie], bijlagen: plan.bijlagen ?? [] };
 }
 
 // Voegt link-bijlagen toe; een bijlage met dezelfde url staat er al en wordt niet verdubbeld.

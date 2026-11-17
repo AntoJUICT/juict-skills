@@ -192,7 +192,7 @@ Gebruik de regels uit de `juict-vault` skill als die er is. Anders deze korte ve
 ## Taakkoppeling (Easywork Basic)
 
 `plan` raakt alleen deze taken aan. Afgeronde taken (status 5) en taken die niet in het sjabloon staan, blijven
-ongemoeid; ontbrekende sjabloontaken worden gemeld. Staat de scope in de offerte op `false`, dan is de taak niet van
+ongemoeid; een taak uit deze koppeling die niet op het project staat, meldt `plan` als "geen sjabloontaak, overgeslagen" (projecten die met projectstart starten hebben geen technische sjabloontaken; die komen uit projectstart). Staat de scope in de offerte op `false`, dan is de taak niet van
 toepassing. `null` (onbekend) of `true` maakt een taak nooit niet van toepassing.
 
 | Taak | Onderdelen uit `antwoorden` | Scope |
