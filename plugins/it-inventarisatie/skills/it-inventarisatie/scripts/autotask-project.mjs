@@ -349,7 +349,7 @@ export function maakAt({ fetch: doFetch = globalThis.fetch, creds, maxGelijktijd
     patchTask: (projectId, body) => verzoek("PATCH", `Projects/${projectId}/Tasks`, body),
     postTaskNote: (body) => verzoek("POST", "TaskNotes", body),
     postProjectAttachment: (projectId, body) => verzoek("POST", `Projects/${projectId}/Attachments`, body),
-    // Nog niet live geverifieerd (REST-conventie voor child-entities); eerste echte POST volgt in de proefrun.
+    // Geverifieerd in zone 19 op 17-11-2026: isAnnouncement is verplicht (zie projectstart/REFERENCE.md).
     postProjectNote: (projectId, body) => verzoek("POST", `Projects/${projectId}/Notes`, body),
   };
 }

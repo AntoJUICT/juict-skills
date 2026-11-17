@@ -37,7 +37,7 @@ export async function voerUit(at, plan, { toepassen = false, lees = (pad) => rea
     if (findSecretText(`${n.titel}\n${n.tekst}`).length) { res.fouten++; regels.push(`Notitie "${n.titel}" overgeslagen: de tekst lijkt een wachtwoord te bevatten.`); continue; }
     if (!toepassen) { regels.push(`Notitie "${n.titel}" (${n.tekst.length} tekens) wordt geplaatst, volledige tekst:`, n.tekst.replace(/\n+$/, ""), ""); continue; }
     try {
-      await at.postProjectNote(plan.projectId, { projectID: plan.projectId, title: n.titel, description: n.tekst, noteType: NOTE_TYPE, publish: 2 });
+      await at.postProjectNote(plan.projectId, { projectID: plan.projectId, title: n.titel, description: n.tekst, noteType: NOTE_TYPE, publish: 2, isAnnouncement: false });
       res.notities++;
       regels.push(`Notitie "${n.titel}" geplaatst.`);
     } catch (e) { res.fouten++; regels.push(`Notitie "${n.titel}" mislukt: ${e.message}`); }

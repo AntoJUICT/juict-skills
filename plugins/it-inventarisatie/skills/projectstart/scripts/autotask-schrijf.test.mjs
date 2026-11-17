@@ -45,7 +45,7 @@ test("met toepassen: notitie publish 2 noteType 5, bijlage met base64", async ()
   assert.equal(at.calls.length, 4);
   const [, p, b] = at.calls[0];
   assert.equal(p, 9001);
-  assert.deepEqual(b, { projectID: 9001, title: "Projectstart: briefing kick-off", description: "Inhoud", noteType: 5, publish: 2 });
+  assert.deepEqual(b, { projectID: 9001, title: "Projectstart: briefing kick-off", description: "Inhoud", noteType: 5, publish: 2, isAnnouncement: false });
   const bijlage = at.calls.find((c) => c[0] === "bijlage")[2];
   assert.equal(bijlage.fullPath, "Mini PVA Voorbeeld v1.docx");
   assert.equal(bijlage.parentID, 9001);

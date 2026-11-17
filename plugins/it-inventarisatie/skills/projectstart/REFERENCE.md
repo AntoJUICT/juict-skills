@@ -124,9 +124,9 @@ zone 19). Verwijderen kan niet, ook geen notities en bijlagen.
   geverifieerd op 4 november 2026 (it-inventarisatie, met `publish: 1`). `fullPath` komt exact terug, dus de
   dubbelcontrole werkt. Dossier en PVA zijn intern en gaan met `publish: 2` (intern projectteam): **bevestig in de
   proefrun** dat de bijlage daarmee geplaatst wordt en zichtbaar is voor het projectteam.
-- `POST /Projects/{id}/Notes` met `{ projectID, title, description, noteType: 5, publish: 2 }`: **nog niet live
-  geverifieerd.** Controleer bij de eerste echte `--toepassen` dat de notitie verschijnt en via `ProjectNotes/query`
-  terugkomt met dezelfde titel. Meld een afwijking in plaats van opnieuw te proberen.
+- `POST /Projects/{id}/Notes` met `{ projectID, title, description, noteType: 5, publish: 2, isAnnouncement: false }`:
+  geverifieerd in zone 19 op 17 november 2026. `isAnnouncement` is verplicht (zonder dit veld faalt de POST met
+  `Missing Required Field: isAnnouncement.`). De notitie komt terug via `ProjectNotes/query` met dezelfde titel.
 
 ## Bekende valkuilen
 
