@@ -30,28 +30,79 @@ test("uitvraag-mail bevat geen € en geen wachtwoordvraag, wel slotzin", () => 
   assert.ok(!/stuur.*wachtwoord/i.test(m.tekst.replace(/Wachtwoorden hoef je niet te sturen[^\n]*/, "")));
 });
 
-test("uitvraag-mail: ontvanger, cc, volgorde van onderdelen", () => {
+test("uitvraag-mail: ontvanger, cc, volgorde van onderdelen, nooit een url", () => {
   const m = uitvraagMail(vers(), { rapport: LINKS.rapport });
   assert.equal(m.aan, "joost.bakker@voorbeeldtechniek.example");
   assert.deepEqual(m.cc, ["sanne.devries@voorbeeldtechniek.example"]);
   assert.match(m.tekst, /^Hoi Joost,/);
-  const pos = ["Bedankt", "**Besluiten", "**Wat we van jullie nodig hebben", "**Technische vragen", "levend document", "Wachtwoorden hoef"]
+  const pos = ["Bedankt voor jullie tijd", "In de bijlage vind je het inventarisatierapport", "**We vragen je het rapport zorgvuldig door te nemen.**", "levend document", "Kort de belangrijkste punten:", "- **Besluiten:**", "- **Aanleveren:**", "- **Technische vragen:**", "- **Afspraken:**", "Wachtwoorden hoef"]
     .map((s) => m.tekst.indexOf(s));
   assert.ok(pos.every((p) => p >= 0), pos.join());
   assert.deepEqual(pos, [...pos].sort((a, b) => a - b));
-  assert.ok(m.tekst.includes(LINKS.rapport));
-  assert.match(m.tekst, /Lijst met alle gebruikers en hun functie.*Joost Bakker.*01-12-2026/);
+  assert.ok(!/claude\.ai|https?:/.test(m.tekst), "geen url in de mail");
+  assert.match(m.tekst, /Lijst met alle gebruikers en hun functie \(Joost Bakker.*01-12-2026/);
   assert.match(m.tekst, /Overzicht van gedeelde mailboxen.*nog open/);
   assert.match(m.tekst, /Welke versie draait de planningssoftware/);
+  assert.match(m.tekst, /Voortgangsoverleg: Tweewekelijks een half uur op dinsdag\./);
+  assert.match(m.tekst, /Blijft de oude telefooncentrale/);
+  assert.ok(!m.tekst.includes("Zonder besluit geldt"));
 });
 
-test("uitvraag-mail: besloten als afspraak, open als nog open; rapport volgt zonder link", () => {
+test("uitvraag-mail: genomen besluiten staan er niet bij, open besluiten wel", () => {
   const d = vers();
   d.besluiten[0].besluit = "Alle medewerkers krijgen toegang.";
   const m = uitvraagMail(d, {});
-  assert.match(m.tekst, /Afgesproken: Alle medewerkers krijgen toegang\./);
-  assert.match(m.tekst, /Nog open: Blijft de oude telefooncentrale/);
-  assert.match(m.tekst, /rapport volgt/i);
+  assert.ok(!m.tekst.includes("Alle medewerkers krijgen toegang"));
+  assert.ok(!m.tekst.includes(d.besluiten[0].vraag));
+  assert.match(m.tekst, /Blijft de oude telefooncentrale/);
+});
+
+test("uitvraag-mail: lege lijsten laten hun punt weg, zonder punten ook de inleiding", () => {
+  const d = vers();
+  d.technischeVragen = [];
+  d.afspraken = [];
+  delete d.overleg.ritme;
+  let m = uitvraagMail(d, {});
+  assert.ok(!m.tekst.includes("**Technische vragen"));
+  assert.ok(!m.tekst.includes("**Afspraken"));
+  assert.match(m.tekst, /\*\*Besluiten:\*\*/);
+  d.besluiten = d.besluiten.map((b) => ({ ...b, besluit: "Besloten." }));
+  d.aanleveren = [];
+  m = uitvraagMail(d, {});
+  assert.ok(!m.tekst.includes("Kort de belangrijkste punten"));
+  assert.match(m.tekst, /Wachtwoorden hoef je niet te sturen[^\n]*\n\nGroet,/);
+});
+
+test("uitvraag-mail: zonder rapport een toezegging in plaats van de bijlage", () => {
+  const m = uitvraagMail(vers(), { bijlage: false });
+  assert.ok(m.tekst.includes("Het inventarisatierapport sturen we je zo snel mogelijk toe. We vragen je het rapport dan zorgvuldig door te nemen: daarin staat vooral wat we nog van jullie nodig hebben."));
+  assert.ok(!m.tekst.includes("In de bijlage"));
+});
+
+test("mailHtml: Calibri-wrapper, alinea's, lijst, vet en escaping", async () => {
+  const { mailHtml } = await import("./teksten.mjs");
+  const h = mailHtml('Hoi A & B,\n\nLet op <script>"x"</script> **vet** tekst.\n\nKort:\n- **Punt:** a < b.\n- Twee\n\nGroet,\nMike');
+  assert.match(h, /^<div style="font-family:Calibri,sans-serif;font-size:11pt">/);
+  assert.ok(h.includes("<p>Hoi A &amp; B,</p>"));
+  assert.ok(h.includes("&lt;script&gt;&quot;x&quot;&lt;/script&gt; <b>vet</b> tekst."));
+  assert.ok(!h.includes("<script>"));
+  assert.ok(h.includes("<p>Kort:</p><ul><li><b>Punt:</b> a &lt; b.</li><li>Twee</li></ul>"));
+  assert.ok(h.includes("<p>Groet,<br>Mike</p>"));
+});
+
+test("hoofd: mail --json schrijft aan, cc met puntkomma, html en tekst; --rapport komt niet in de mail", async () => {
+  const { hoofd } = await import("./teksten.mjs");
+  const bestanden = { "d.json": JSON.stringify(vers()) };
+  const deps = { lees: (p) => bestanden[p], bestaat: (p) => p in bestanden, schrijf: (p, t) => { bestanden[p] = t; } };
+  const r = hoofd(["mail", "--dossier", "d.json", "--rapport", LINKS.rapport, "--json", "mail.json"], deps);
+  assert.equal(r.code, 0);
+  const j = JSON.parse(bestanden["mail.json"]);
+  assert.deepEqual(Object.keys(j), ["aan", "cc", "onderwerp", "html", "tekst"]);
+  assert.equal(j.cc, "sanne.devries@voorbeeldtechniek.example");
+  assert.ok(j.html.includes("<b>We vragen je het rapport zorgvuldig door te nemen.</b>"));
+  for (const x of [r.uitvoer, j.tekst, j.html]) assert.ok(!/claude\.ai/.test(x));
+  const z = hoofd(["mail", "--dossier", "d.json", "--zonder-rapport"], deps);
+  assert.match(z.uitvoer, /sturen we je zo snel mogelijk toe/);
 });
 
 test("wijzigingen zonder verschil geeft null", () => {
@@ -85,7 +136,7 @@ test("uitvraag-mail zonder mailadressen valt terug op namen", () => {
 
 test("uitvraag-mail gooit bij een bedrag in het dossier", () => {
   const d = vers();
-  d.besluiten[1].alsNiet = "Dan rekenen we € 50 extra.";
+  d.besluiten[1].vraag = "Gaan we akkoord met € 50 extra?";
   assert.throws(() => uitvraagMail(d, {}), /bedrag/);
 });
 
@@ -129,13 +180,11 @@ test("wijzigingen: titel met tijd, zodat een tweede aanvulling op dezelfde dag n
 
 test("uitvraag-mail noemt de klantgerichte afspraken, niet de interne", () => {
   const m = uitvraagMail(vers(), {});
-  assert.match(m.tekst, /\*\*Afspraken\.\*\*/);
-  assert.match(m.tekst, /- Het gesprek over de planning vindt plaats op de laatste dinsdag van de maand\./);
+  assert.match(m.tekst, /- \*\*Afspraken:\*\* Voortgangsoverleg: .* Het gesprek over de planning vindt plaats op de laatste dinsdag van de maand\./);
   assert.ok(!m.tekst.includes("Extra werkzaamheden buiten scope"));
-  assert.match(m.tekst, /\*\*Technische vragen/);
   const zonder = vers();
   zonder.afspraken = zonder.afspraken.filter((a) => a.intern);
-  assert.ok(!uitvraagMail(zonder, {}).tekst.includes("**Afspraken"));
+  assert.ok(!uitvraagMail(zonder, {}).tekst.includes("Het gesprek over de planning"));
 });
 
 test("uitvraag-mail vangnet: euro, ',-', MFA zonder multifactor en wachtwoordtekst", () => {
@@ -152,10 +201,10 @@ test("mail als notitie: zonder ** in de tekst; in de chat blijft de opmaak", asy
   const bestanden = { "d.json": JSON.stringify(vers()) };
   const deps = { lees: (p) => bestanden[p], bestaat: (p) => p in bestanden, schrijf: (p, t) => { bestanden[p] = t; } };
   const r = hoofd(["mail", "--dossier", "d.json", "--plan", "plan.json"], deps);
-  assert.match(r.uitvoer, /\*\*Besluiten\.\*\*/);
+  assert.match(r.uitvoer, /\*\*Besluiten:\*\*/);
   const notitie = JSON.parse(bestanden["plan.json"]).notities.find((n) => n.titel === MAIL_NOTITIE);
   assert.ok(!notitie.tekst.includes("**"), notitie.tekst);
-  assert.match(notitie.tekst, /^Besluiten\. Dit is de stand van zaken\./m);
+  assert.match(notitie.tekst, /^- Besluiten: /m);
 });
 
 test("hoofd: briefing met url's zet link-bijlagen in het plan, zonder dubbelen", async () => {

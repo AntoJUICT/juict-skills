@@ -55,8 +55,9 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    bijlage op het project staat. Bepaal N zoals bij het PVA (hoogste N van `IT-inventarisatie <klant.autotask> v<N>.docx` in
    `<werkmap>/bronnen.json` of de bijlagelijst, plus 1; anders 1) en draai:
    `node <it>/scripts/rapport/word.mjs --rapport <pad naar rapport.json> --uit <scratch>/rapport.html --logo <it>/assets/juict-logo-pos.svg`, daarna
-   `powershell -NoProfile -ExecutionPolicy Bypass -File <it>/scripts/rapport/naar-word.ps1 -Bron <scratch>/rapport.html -Doel "<werkmap>/IT-inventarisatie <klant.autotask> v<N>.docx"`.
-   Zet het bestand als bijlage in `plan.json` (zelfde vorm als het PVA, stap 7).
+   `powershell -NoProfile -ExecutionPolicy Bypass -File <it>/scripts/rapport/naar-word.ps1 -Bron <scratch>/rapport.html -Doel "<werkmap>/IT-inventarisatie <klant.autotask> v<N>.docx" -Pdf "<werkmap>/IT-inventarisatie <klant.autotask> v<N>.pdf"`.
+   De PDF blijft lokaal in de werkmap (niet naar Autotask): hij gaat als bijlage mee met de opvolgmail (stap 7).
+   Zet het .docx-bestand als bijlage in `plan.json` (zelfde vorm als het PVA, stap 7).
 5. **Presentatie** (alleen als `artifacts.presentatie` nog leeg is).
    `node <skill>/scripts/presentatie/bouw.mjs --dossier <werkmap>/dossier.json --uit <scratch>/kickoff [--datum jjjj-mm-dd]`.
    Publiceer met het Artifact-tool als gewone HTML-pagina: `file_path` = de gemaakte `Kick-off <klant>.html`, `files`
@@ -72,11 +73,16 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    - Zet het PVA en het Word-rapport als bijlage in `plan.json` (zie REFERENCE.md). Met `--presentatie` en `--rapport` voegt `briefing` zelf
      link-bijlagen toe aan het plan (`Kick-off presentatie <klant>` en `IT-inventarisatie <klant>`), zodat de twee
      artifacts op het project staan naast het PVA. Zonder url voor het rapport of de presentatie komt er geen link.
-   - `node <skill>/scripts/teksten.mjs mail --dossier <werkmap>/dossier.json --rapport <url>` en toon de volledige tekst.
-     De mail is de opvolgmail na de kick-off: besluiten, de afspraken met de klant (`intern: false`), wat de klant
-     aanlevert, de technische vragen en het rapport als levend document. Als notitie verdwijnen de `**`.
-     Na akkoord als concept via de Microsoft 365-connector (`outlook_create_draft`). Geen connector: de tekst blijft
-     in de chat en komt als notitie op het project (zelfde commando met `--plan <werkmap>/plan.json`).
+   - `node <skill>/scripts/teksten.mjs mail --dossier <werkmap>/dossier.json --json <werkmap>/mail.json [--plan <werkmap>/plan.json]`
+     en toon de volledige tekst. De mail is kort: bedankt, het rapport als PDF-bijlage met het verzoek het zorgvuldig door te
+     nemen, en in een paar punten de open besluiten, wat de klant aanlevert, de technische vragen en de afspraken met
+     de klant (`intern: false`). De mail bevat nooit een rapport-url (de klant kan claude.ai niet openen); `--rapport` wordt
+     bij `mail` genegeerd. Is er geen rapport, gebruik dan `--zonder-rapport`. Als notitie verdwijnen de `**`.
+   - Na akkoord op de tekst maak je het concept met Outlook desktop:
+     `powershell -NoProfile -ExecutionPolicy Bypass -File <skill>/scripts/outlook-concept.ps1 -Json <werkmap>/mail.json -Bijlage "<werkmap>/IT-inventarisatie <klant.autotask> v<N>.pdf"`.
+     Controleer in de uitvoer map Concepten en de bijlage. Is Outlook desktop er niet: Microsoft 365-connector
+     (`outlook_create_draft`) zonder bijlage en zeg erbij dat de PDF zelf bijgevoegd moet worden, of laat de tekst in de chat.
+     Nooit versturen.
    - `node <skill>/scripts/autotask-schrijf.mjs --project <id> --plan <werkmap>/plan.json`: toon de voorvertoning, en
      na akkoord hetzelfde commando met `--toepassen`.
 8. **Stand bewaren.** `node <skill>/scripts/dossier.mjs bewaar --project <id> --dossier <werkmap>/dossier.json`, na
@@ -95,7 +101,7 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    Meldt het "Geen wijzigingen", dan is de inhoud van het dossier gelijk gebleven: geen nieuw rapport en geen nieuwe
    PVA-versie, ga door naar stap 6.
 5. Wel wijzigingen: bouw het rapport opnieuw en publiceer het naar dezelfde url, draai `samenhang.mjs`, maak een
-   nieuw Word-rapport (Word-bijlage in stap 4 van Starten, nieuwe versie) en een nieuwe PVA-versie (stap 6 van Starten) en zet beide in het plan. Daarna `autotask-schrijf.mjs` met voorvertoning en
+   nieuw Word-rapport (Word-bijlage in stap 4 van Starten, nieuwe versie, met ook de nieuwe PDF via `-Pdf`) en een nieuwe PVA-versie (stap 6 van Starten) en zet beide in het plan. Daarna `autotask-schrijf.mjs` met voorvertoning en
    `--toepassen`. **De presentatie nooit opnieuw:** die maakt alleen de eerste run, daarna past de projectleider hem
    met de hand aan.
 6. `dossier.mjs bewaar`, voorvertoning en daarna `--toepassen`. De nieuwe ids in `verwerkt` maken een nieuwe versie.

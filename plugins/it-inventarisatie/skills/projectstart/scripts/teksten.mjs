@@ -152,7 +152,9 @@ export function wijzigingen(oud, nieuw, { datum = new Date() } = {}) {
 
 // --- Uitvraag-mail (naar de klant) ---
 
-export function uitvraagMail(d, { rapport } = {}) {
+// Opties: `bijlage` (standaard true) zegt of het rapport als PDF meegaat. Een rapport-url komt NOOIT in de mail:
+// de klant kan geen claude.ai-links openen. `rapport` wordt daarom genegeerd (alleen nog geaccepteerd voor oudere aanroepen).
+export function uitvraagMail(d, { bijlage = true } = {}) {
   const aanspreek = d.contacten.find((c) => c.aanspreekpunt);
   if (!aanspreek) throw new Error("Geen contact met aanspreekpunt: true in het dossier; de mail heeft een ontvanger nodig.");
   const adres = (c) => (typeof c.mail === "string" && c.mail.trim() ? c.mail.trim() : c.naam);
@@ -160,34 +162,25 @@ export function uitvraagMail(d, { rapport } = {}) {
   const afzender = projectleider(d) ?? "JUICT";
   const l = [`Hoi ${voornaam(aanspreek.naam)},`, ""];
 
-  l.push(`Bedankt voor de kick-off van het project met ${d.klant.weergave}. In deze mail staat wat we hebben afgesproken en wat we van jullie nodig hebben om door te gaan.`, "");
+  l.push(`Bedankt voor jullie tijd en de prettige kick-off van het project met ${d.klant.weergave}.`, "");
+  l.push(bijlage
+    ? "In de bijlage vind je het inventarisatierapport. **We vragen je het rapport zorgvuldig door te nemen.** Daarin staat wat we tot nu toe hebben gezien, wat we adviseren en vooral wat we nog van jullie nodig hebben om verder te kunnen. Het is een levend document: we werken het bij zodra we jullie antwoorden hebben."
+    : "Het inventarisatierapport sturen we je zo snel mogelijk toe. We vragen je het rapport dan zorgvuldig door te nemen: daarin staat vooral wat we nog van jullie nodig hebben.", "");
 
-  l.push("**Besluiten.** Dit is de stand van zaken.");
-  for (const b of d.besluiten) l.push(`- ${besluitRegel(b)}`);
-  l.push("");
+  const open = d.besluiten.filter((b) => !isBesloten(b)).map((b) => eindig(String(b.vraag).trim()));
+  const aanleveren = d.aanleveren.map(aanleverRegel);
+  const vragen = d.technischeVragen.map((v) => eindig(String(v.vraag).trim()));
+  const afspraken = [];
+  if (d.overleg?.ritme) afspraken.push(eindig(`Voortgangsoverleg: ${d.overleg.ritme}`));
+  for (const a of d.afspraken.filter((x) => x.intern === false)) afspraken.push(eindig(a.tekst));
+  const punten = [];
+  if (open.length) punten.push(`- **Besluiten:** ${open.join(" ")}`);
+  if (aanleveren.length) punten.push(`- **Aanleveren:** ${eindig(aanleveren.join("; "))}`);
+  if (vragen.length) punten.push(`- **Technische vragen:** ${vragen.join(" ")}`);
+  if (afspraken.length) punten.push(`- **Afspraken:** ${afspraken.join(" ")}`);
+  if (punten.length) l.push("Kort de belangrijkste punten:", ...punten, "");
 
-  const afspraken = d.afspraken.filter((a) => a.intern === false);
-  if (afspraken.length) {
-    l.push("**Afspraken.** Dit hebben we met elkaar afgesproken.");
-    for (const a of afspraken) l.push(`- ${eindig(a.tekst)}`);
-    l.push("");
-  }
-
-  l.push("**Wat we van jullie nodig hebben.** Zo houden we de planning haalbaar.");
-  for (const a of d.aanleveren) l.push(`- ${aanleverRegel(a)}`);
-  l.push("");
-
-  if (d.technischeVragen.length) {
-    l.push("**Technische vragen.** Hierop willen we graag een antwoord.");
-    for (const v of d.technischeVragen) l.push(`- ${v.vraag} (${v.aan})`);
-    l.push("");
-  }
-
-  l.push(rapport
-    ? `Het inventarisatierapport is een levend document: je ziet er steeds in wat we nog nodig hebben. Je vindt het hier: ${rapport}`
-    : "Het inventarisatierapport volgt en is een levend document: je ziet er steeds in wat we nog nodig hebben.", "");
-
-  l.push("Wachtwoorden hoef je niet te sturen, het gaat nu alleen om het overzicht.", "", "Groet,", afzender);
+  l.push("Wachtwoorden hoef je niet te sturen, het gaat nu alleen om het overzicht. Heb je vragen bij het rapport, laat het gerust weten.", "", "Groet,", afzender);
   const uit = { aan: adres(aanspreek), cc, onderwerp: `Opvolging kick-off ${d.klant.weergave}`, tekst: l.join("\n") + "\n" };
   // Vangnet: de mail gaat naar de klant, dus nooit bedragen, em-dash, verboden afkortingen of wachtwoorden.
   const alles = `${uit.onderwerp}\n${uit.tekst}`;
@@ -200,13 +193,30 @@ export function uitvraagMail(d, { rapport } = {}) {
   return uit;
 }
 
+// Eenvoudige HTML van de mailtekst voor Outlook: alles geescaped, ** wordt <b>, "- " regels worden een lijst.
+const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const vet = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+
+export function mailHtml(tekst) {
+  const delen = [];
+  for (const blok of String(tekst).trim().split(/\n{2,}/)) {
+    const regels = blok.split("\n");
+    const eerste = regels.findIndex((r) => r.startsWith("- "));
+    const kop = eerste < 0 ? regels : regels.slice(0, eerste);
+    if (kop.length) delen.push(`<p>${kop.map(vet).join("<br>")}</p>`);
+    if (eerste >= 0) delen.push(`<ul>${regels.slice(eerste).map((r) => `<li>${vet(r.replace(/^- /, ""))}</li>`).join("")}</ul>`);
+  }
+  return `<div style="font-family:Calibri,sans-serif;font-size:11pt">${delen.join("")}</div>`;
+}
+
 // --- CLI ---
 
 const GEBRUIK = [
   "Gebruik:",
   "  teksten.mjs briefing --dossier <pad> [--presentatie <url>] [--rapport <url>] [--plan <pad>]",
   "  teksten.mjs wijzigingen --oud <pad> --nieuw <pad> [--plan <pad>]",
-  "  teksten.mjs mail --dossier <pad> [--rapport <url>] [--plan <pad>]",
+  "  teksten.mjs mail --dossier <pad> [--zonder-rapport] [--json <pad>] [--plan <pad>]",
+  "    (--rapport <url> wordt bij mail genegeerd: de mail bevat nooit een link; het rapport gaat als PDF-bijlage mee)",
   "Zonder --plan alleen tonen. Met --plan komt de tekst als notitie in dat plan voor autotask-schrijf.mjs",
   "(het bestand wordt aangemaakt als het er nog niet is). Er wordt nooit iets verstuurd of in Autotask geschreven.",
   "",
@@ -254,10 +264,15 @@ export function hoofd(argv, deps = {}) {
       if (!notitie) return { code: 0, uitvoer: "Geen wijzigingen; er komt geen notitie.\n" };
       tonen = `${notitie.titel}\n\n${notitie.tekst}`;
     } else if (cmd === "mail" && optie(rest, "--dossier")) {
-      const m = uitvraagMail(json(optie(rest, "--dossier")), { rapport: optie(rest, "--rapport") });
+      const m = uitvraagMail(json(optie(rest, "--dossier")), { bijlage: !rest.includes("--zonder-rapport") });
       tonen = [`Aan: ${m.aan}`, `Cc: ${m.cc.join(", ") || "-"}`, `Onderwerp: ${m.onderwerp}`, "", m.tekst].join("\n");
       // In Autotask is ** geen opmaak: de notitie krijgt de kopjes zonder sterretjes.
       notitie = { titel: MAIL_NOTITIE, tekst: tonen.replace(/\*\*/g, "") };
+      const jsonPad = optie(rest, "--json");
+      if (jsonPad) {
+        schrijf(jsonPad, JSON.stringify({ aan: m.aan, cc: m.cc.join("; "), onderwerp: m.onderwerp, html: mailHtml(m.tekst), tekst: m.tekst }, null, 2) + "\n");
+        tonen += `\nMail-json geschreven naar ${jsonPad}.\n`;
+      }
     } else {
       return { code: 1, uitvoer: GEBRUIK };
     }

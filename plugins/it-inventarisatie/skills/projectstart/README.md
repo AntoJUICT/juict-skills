@@ -25,10 +25,10 @@ Alles staat op het Autotask-project, zichtbaar voor het interne projectteam.
 | Wat | Vorm | Voor wie | Waarvoor |
 |---|---|---|---|
 | Kick-off-presentatie | Link naar een webpagina (Claude) | Klant | De kick-off zelf: doel, scope, fases, team, besluiten, wat de klant aanlevert, afspraken over overleg en support. Maximaal 10 slides, hoofdlijnen, geen bedragen. |
-| IT-inventarisatierapport | Link naar de online versie, plus een Word-bestand | Klant, na de kick-off | Wat we zagen, wat we adviseren, stappenplan, uren, open vragen en een bijlage om aan te kruisen. Een levend document: het groeit mee met de antwoorden van de klant. |
+| IT-inventarisatierapport | Link naar de online versie, plus een Word-bestand en een PDF (de PDF gaat met de opvolgmail mee) | Klant, na de kick-off | Wat we zagen, wat we adviseren, stappenplan, uren, open vragen en een bijlage om aan te kruisen. Een levend document: het groeit mee met de antwoorden van de klant. |
 | Mini PVA | Word-bestand, met versienummer | Intern | Het plan van aanpak, inclusief financiële afspraken. |
 | Interne briefing | Notitie op het project | Projectteam en techniek | Afspraken, technische vragen, externe partijen en de links naar presentatie en rapport. |
-| Opvolgmail na de kick-off | Concept in Outlook, of tekst in de chat en als notitie op het project | Klant | Besluiten, afspraken, wat de klant aanlevert, technische vragen, met het rapport als levend document. De skill verstuurt nooit zelf. |
+| Opvolgmail na de kick-off | Concept in Outlook met het rapport als PDF-bijlage (zonder Outlook: tekst in de chat) | Klant | Kort bedankje, het verzoek het rapport zorgvuldig door te nemen en de belangrijkste punten kort genoemd. Geen link naar het rapport. De skill verstuurt nooit zelf. |
 | Dossier | `projectstart-dossier-v<N>.json` als bijlage | De skill zelf | De stand van alle feiten. Hiermee vult een volgende run aan zonder iets dubbel te doen. |
 
 ## Aanvullen tijdens het project
