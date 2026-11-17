@@ -222,7 +222,8 @@ function uitvoering(d) {
 
 function openPuntenHoofdstuk(d) {
   const p = openPunten(d);
-  return tabel(["Wat", "Waarom open", "Wie"], p.map((x) => [esc(x.wat), esc(x.waarom), esc(x.wie)]), { breedtes: [34, 46, 20] });
+  // "Wie pakt het op": wie het punt regelt, niet per se wie iets aanlevert (dat kan juist het open punt zijn).
+  return tabel(["Wat", "Waarom open", "Wie pakt het op"], p.map((x) => [esc(x.wat), esc(x.waarom), esc(x.wie)]), { breedtes: [34, 46, 20] });
 }
 
 function goedkeuring(d) {

@@ -188,3 +188,9 @@ test("CLI: schrijft HTML, foutcodes bij gebruik en ongeldig dossier", () => {
     rmSync(map, { recursive: true, force: true });
   }
 });
+
+test("open punten: kolom heet 'Wie pakt het op', zodat een open aanleverder niet botst met de naam in de kolom", () => {
+  const d = JSON.parse(readFileSync(new URL("../../voorbeeld/dossier.voorbeeld.json", import.meta.url), "utf8"));
+  const html = pvaHtml(d, {});
+  assert.ok(html.includes("Wie pakt het op"));
+});
