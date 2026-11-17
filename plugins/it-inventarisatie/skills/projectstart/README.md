@@ -13,8 +13,7 @@ De presentatie sluit in stijl en route aan op de verkooppresentatie, zodat de kl
 ## Wanneer gebruik je het
 
 1. De offerte is getekend.
-2. De projectleider maakt het project aan in Autotask vanuit het sjabloon en zet de projectmanagement-,
-   administratie- en salestaken klaar. De technische taken laat hij leeg: die maakt de skill.
+2. Iemand maakt het project aan in Autotask.
 3. Alle communicatie met de klant tot nu toe staat als bijlage of notitie op dat project (offerte, mails,
    verslagen van gesprekken).
 4. Je start Claude Code en typt `/projectstart` met het projectnummer.
@@ -28,7 +27,6 @@ Alles staat op het Autotask-project, zichtbaar voor het interne projectteam.
 | Kick-off-presentatie | Link naar een webpagina (Claude) | Klant | De kick-off zelf: doel, scope, fases, team, besluiten, wat de klant aanlevert, afspraken over overleg en support. Maximaal 10 slides, hoofdlijnen, geen bedragen. |
 | IT-inventarisatierapport | Link naar de online versie, plus een Word-bestand en een PDF (de PDF gaat met de opvolgmail mee) | Klant, na de kick-off | Wat we zagen, wat we adviseren, stappenplan, uren, open vragen en een bijlage om aan te kruisen. Een levend document: het groeit mee met de antwoorden van de klant. |
 | Mini PVA | Word-bestand, met versienummer | Intern | Het plan van aanpak in de stijl en volgorde van de kick-off: planning, besluiten, team, afspraken, financiële afspraken met bron, open punten en goedkeuring. |
-| Technische taken | Taken in Autotask, in de fases van het project | Engineers en planner | Per stap uit de offerte en de mails een taak, met de uren uit de offerte en de bron in de omschrijving. Jij voegt de projectmanagement-, administratie- en salestaken zelf toe; de planner wijst de taken toe via het planbord. Een taak die er al staat, wordt nooit overschreven. |
 | Interne briefing | Notitie op het project | Projectteam en techniek | Afspraken, technische vragen, externe partijen en de links naar presentatie en rapport. |
 | Opvolgmail na de kick-off | Concept in Outlook met het rapport als PDF-bijlage (zonder Outlook: tekst in de chat) | Klant | Kort bedankje, het verzoek het rapport zorgvuldig door te nemen en de belangrijkste punten kort genoemd. Geen link naar het rapport. De skill verstuurt nooit zelf. |
 | Dossier | `projectstart-dossier-v<N>.json` als bijlage | De skill zelf | De stand van alle feiten. Hiermee vult een volgende run aan zonder iets dubbel te doen. |

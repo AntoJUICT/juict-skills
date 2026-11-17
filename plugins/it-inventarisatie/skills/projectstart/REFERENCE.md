@@ -25,8 +25,7 @@ controlefout, 2 is mislukt (Autotask, Word, bestand). Geen enkel script schrijft
 | | `wijzigingen --oud <pad> --nieuw <pad> [--plan <pad>]` | Alleen wat veranderd is, titel "Projectstart: aanvulling <dd-mm-jjjj hh:mm>". Niets veranderd: geen notitie en het plan blijft ongemoeid. |
 | | `mail --dossier <pad> [--zonder-rapport] [--json <pad>] [--plan <pad>]` | Aan, cc, onderwerp en tekst van de korte opvolgmail: bedankje, rapport als PDF-bijlage met het verzoek het zorgvuldig door te nemen, en kort de open besluiten, het aanleveren, de technische vragen en de afspraken (`intern: false`, plus het overlegritme). Nooit een url: `--rapport <url>` wordt genegeerd. `--zonder-rapport`: de tekst zegt dat het rapport later komt. `--json` schrijft `{aan, cc (met "; "), onderwerp, html, tekst}` voor `outlook-concept.ps1`. Als notitie: titel "Projectstart: uitvraag-mail", zonder `**`. Weigert bij een bedrag (`€`, euro, `EUR`, `500,-`), em-dash, BC, M365, MFA zonder "multifactor" of wachtwoordachtige tekst. |
 | `scripts/outlook-concept.ps1` | `powershell -NoProfile -ExecutionPolicy Bypass -File <skill>/scripts/outlook-concept.ps1 -Json <mail.json> [-Bijlage <pdf>]` | Maakt via Outlook desktop (COM) een concept uit de json van `teksten.mjs mail --json`, met de PDF als bijlage, en slaat het op in Concepten. Print de mapnaam en de bijlagen. Verstuurt nooit. |
-| `scripts/autotask-schrijf.mjs` | `--project <id> --plan <pad> [--toepassen]` | Voorvertoning of plaatsing van notities, bestandsbijlagen, link-bijlagen en technische taken. De voorvertoning toont de volledige notitietekst, per bijlage het lokale pad en de grootte in bytes, en per taak `Taak "<titel>" in <fase>, <uren> uur:` met `nieuw` (plus de omschrijving), `staat er al; overgeslagen`, `fase "<x>" niet gevonden; niet aangemaakt` of `notitie bij bestaande taak` (plus de tekst). Wat er al staat wordt overgeslagen. Exit 2 als iets mislukt, ook bij een onbekende fase. |
-| `scripts/taken.mjs` | `--dossier <pad> [--plan <pad>]` | Zet `dossier.taken` als `taken` in het plan (vervangt de taken die er al stonden, notities en bijlagen blijven). Omschrijving in Autotask = `omschrijving`, een witregel, `Resultaat: ...` (als het er is) en `Bron: ...`, maximaal 8000 tekens (de omschrijving wordt ingekort, resultaat en bron blijven). Zonder `--plan` alleen tonen. Exit 1 bij een ongeldig dossier. Schrijft niet naar Autotask. |
+| `scripts/autotask-schrijf.mjs` | `--project <id> --plan <pad> [--toepassen]` | Voorvertoning of plaatsing van notities, bestandsbijlagen en link-bijlagen. De voorvertoning toont de volledige notitietekst en per bijlage het lokale pad en de grootte in bytes. Wat er al staat wordt overgeslagen. Exit 2 als iets mislukt. |
 | `scripts/samenhang.mjs` | `--dossier <pad> --rapport <rapport.json>` | "Dossier en rapport passen bij elkaar." of de afwijkingen (exit 1). |
 | `<it>/scripts/dns-lookup.mjs` | `<domein> [<domein>...]` | MX, NS en tenant-ID per domein. |
 | `<it>/scripts/werkbestand.mjs` | `van-dossier <dossierpad>` | Werkbestand van it-inventarisatie uit het dossier. Weigert als het al bestaat. |
@@ -43,8 +42,7 @@ niet is; een notitie met dezelfde titel wordt vervangen. De vorm:
   "bijlagen": [{ "titel": "Mini PVA Voorbeeld Techniek v1", "bestandsnaam": "Mini PVA Voorbeeld Techniek v1.docx", "pad": "C:\\...\\Mini PVA Voorbeeld Techniek v1.docx" },
     { "titel": "IT-inventarisatie Voorbeeld Techniek v1", "bestandsnaam": "IT-inventarisatie Voorbeeld Techniek v1.docx", "pad": "C:\...\IT-inventarisatie Voorbeeld Techniek v1.docx" },
     { "titel": "Kick-off presentatie Voorbeeld Techniek", "url": "https://claude.ai/artifact/..." }
-  ],
-  "taken": [{ "titel": "Mailboxen en bestanden migreren", "fase": "Realisatie- en uitvoeringsfase", "uren": 28, "omschrijving": "...\n\nResultaat: ...\nBron: Offerte 2026-11-02" }]
+  ]
 }
 ```
 
@@ -53,8 +51,8 @@ beginnen, anders weigert `autotask-schrijf.mjs` hem. `teksten.mjs briefing --pre
 zet de links zelf in het plan, met de titels `Kick-off presentatie <klant.weergave>` en `IT-inventarisatie <klant.autotask>`;
 een url die al in het plan staat wordt niet verdubbeld.
 
-`taken` zet `taken.mjs` in het plan; `uren` is een getal of `null` (de taak krijgt dan 0 uur). De bijlage zet je zelf in het plan. Dubbelcontrole: notities op titel, bijlagen op bestandsnaam (`fullPath`),
-hoofdletters en spaties genegeerd. Taken op titel binnen het project (hoofdletters, spaties en accenten genegeerd); de fase op titel, net zo. Links op `fullPath` = de url, exact (na trim, hoofdlettergevoelig). De aanvullingsnotitie heeft de tijd in de titel, dus een tweede aanvulling op
+De bijlage zet je zelf in het plan. Dubbelcontrole: notities op titel, bijlagen op bestandsnaam (`fullPath`),
+hoofdletters en spaties genegeerd. Links op `fullPath` = de url, exact (na trim, hoofdlettergevoelig). De aanvullingsnotitie heeft de tijd in de titel, dus een tweede aanvulling op
 dezelfde dag wordt niet overgeslagen.
 
 **Bestandsnamen op het project.** `projectstart-dossier-v<N>.json`, `Mini PVA <klant> v<N>.docx` (`klant.weergave`) en
@@ -83,7 +81,7 @@ wachtwoordachtige tekst.
 | `doelBron` | tekst of `null`: waar het doel bevestigd is. Zonder bron is het een uitgangspunt | nee |
 | `hardeDatum` | `datum`, `watKlaar`, `watNiet` (tekst); `bron` (tekst of `null`, optioneel, zelfde regel als `doelBron`) | ja |
 | `scope` | `inbegrepen[]`, `buiten[]` (tekst) | ja |
-| `fases[]` | `code`, `naam` (tekst), `route` (`"01"` of `"02"`), `start`, `eind` (`jjjj-mm`, start niet na eind); `uren` (getal vanaf 0 of `null`, optioneel: uren uit de offerte voor deze fase); minimaal 1 | ja |
+| `fases[]` | `code`, `naam` (tekst), `route` (`"01"` of `"02"`), `start`, `eind` (`jjjj-mm`, start niet na eind); minimaal 1 | ja |
 | `migratieplan` | `{ datum: tekst of null }` | nee |
 | `vervolgOfferte` | tekst of `null` | nee |
 | `gebruikersimpact` | tekst of `null` | nee |
@@ -91,8 +89,6 @@ wachtwoordachtige tekst.
 | `besluiten[]` | `vraag`, `alsNiet` (tekst), `beslisser`, `uiterlijk` (tekst of `null`), `besluit` (tekst of `null`, optioneel: ingevuld = genomen), `bron` (tekst of `null`, optioneel: waar het besluit staat) | ja (lijst) |
 | `aanleveren[]` | `wat` (tekst), `wie`, `datum`, `tijd` (tekst of `null`) | ja (lijst) |
 | `afspraken[]` | `tekst`, `bron` (tekst, altijd), `intern` (boolean); `financieel`, `controleren` (boolean, optioneel; `controleren` alleen met `financieel: true`) | ja (lijst) |
-| `taken[]` | `titel`, `fase` (titel van de fase in het Autotask-project), `omschrijving`, `bron` (tekst); `uren` (getal vanaf 0 of `null`); `resultaat` (tekst of `null`, optioneel); `projectFase` (een `fases[].code`, optioneel). Geen dubbele titels (hoofdletters, spaties en accenten genegeerd) | nee |
-| `meerwerk[]` | `wat`, `bron` (tekst): werk uit een mail dat niet in de offerte staat | nee |
 | `technischeVragen[]` | `vraag`, `aan`, `bron` (tekst) | ja (lijst) |
 | `extraOnderwerpen[]` | `soort` (`"beveiliging"`), `geregeld[]`, `controleren[]`, `later[]`, `optioneel` (boolean, optioneel) | ja (lijst) |
 | `overleg` | `ritme`, `aanspreekpunt`, `escalatie` (tekst); `kanaal`, `volgende`, `verzoekenControle` (tekst of `null`, optioneel) | ja |
@@ -110,12 +106,6 @@ wachtwoordachtige tekst.
 - Open punten in het PVA: alles wat `null` of open is (besluiten zonder uitkomst, aanleveren zonder wie of datum,
   migratieplan zonder datum, partij zonder aansturing, kanaal, volgend overleg, impact, overgang), plus feiten zonder
   bron en financiële termen met `controleren: true`.
-- `taken`: alleen technische taken (geen projectmanagement, administratie of sales; die zet de projectleider zelf
-  klaar), elk met een `bron` (offerte of mail met datum). Uren alleen uit de offerte; zonder uren `null`, dan
-  staat de taak in het PVA bij Open punten ("uren nog te bepalen"). Heeft een fase `uren`, dan mag de som van de
-  taken met die `projectFase` daar niet boven komen (`controleer` weigert). Het PVA toont de taken in Technische
-  uitvoering (Taak, Fase, Uren, Bron) met het totaal; de briefing noemt ze kort.
-- `meerwerk`: komt in het PVA bij Open punten ("meerwerk, afstemmen") en in de briefing, nooit als taak.
 - Een beveiligingsonderwerp maakt slide 5. Staat beveiliging in het rapport als keuze, zet dan `optioneel: true`.
 - `werkbestand.mjs van-dossier` zet beveiliging in het werkbestand als `antwoorden.beveiliging.bekend` (uit
   `geregeld`) en `antwoorden.beveiliging.nogControleren` (uit `controleren`). `nogControleren` is een eigen sleutel die
@@ -151,10 +141,6 @@ zone 19). Verwijderen kan niet, ook geen notities en bijlagen.
   `description`, `impersonatorCreatorResourceID`, `impersonatorUpdaterResourceID`, `isAnnouncement`,
   `lastActivityDate`, `noteType`, `projectID`, `publish`, `title`. Bestaande notities: `noteType` 5, `publish` 2.
 
-- `GET /Projects/{id}/Phases` en `GET /Projects/{id}/Tasks` (geverifieerd volgens de autotask-api skill). Gebruikt
-  voor de fase-id op titel en de dubbelcontrole van taken. `POST /TaskNotes/query` op `taskID` voor bestaande
-  taaknotities.
-
 **Schrijven:**
 
 - `POST /Projects/{id}/Attachments` met `{ parentID, attachmentType: "FILE_ATTACHMENT", publish, title, fullPath, data }`:
@@ -168,17 +154,6 @@ zone 19). Verwijderen kan niet, ook geen notities en bijlagen.
 - `POST /Projects/{id}/Notes` met `{ projectID, title, description, noteType: 5, publish: 2, isAnnouncement: false }`:
   geverifieerd in zone 19 op 17 november 2026. `isAnnouncement` is verplicht (zonder dit veld faalt de POST met
   `Missing Required Field: isAnnouncement.`). De notitie komt terug via `ProjectNotes/query` met dezelfde titel.
-
-- **Technische taken.** `POST /Projects/{id}/Tasks` met `{ projectID, phaseID, title, description, taskType: 1, status: 1, estimatedHours }`,
-  zonder resource (dan zijn `departmentID` en `billingCodeID` niet nodig; de planner wijst toe via het planbord).
-  Het endpoint en de verplichte velden `projectID`, `title`, `taskType` (1 FixedWork) en `status` zijn
-  geverifieerd (autotask-api). **Nog niet live geverifieerd:** `phaseID` bij het aanmaken en `status: 1` (New).
-  Doe de eerste run op een project met de voorvertoning, plaats met `--toepassen` en lees het resultaat terug met
-  `GET /Projects/{id}/Tasks` (fase, status en uren). Een taak kan niet worden verwijderd; een fout sluit je af met
-  status 5 en 0 uur, of laat de projectleider hem in de webinterface verwijderen.
-- **Aanvulling bij een bestaande taak.** `POST /TaskNotes` met `{ taskID, title: "Projectstart: aanvulling",
-  description, noteType: 3, publish: 2 }` (zelfde vorm als it-inventarisatie, geverifieerd op 4 november 2026). Een
-  bestaande taak wordt nooit gepatcht; een notitie met dezelfde titel en tekst op die taak wordt niet opnieuw geplaatst.
 
 ## Bekende valkuilen
 

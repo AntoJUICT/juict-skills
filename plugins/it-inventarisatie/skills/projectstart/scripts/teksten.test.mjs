@@ -246,37 +246,3 @@ test("uitvraag-mail laat een afspraak weg die nog tegen de offerte gecontroleerd
   assert.match(m.tekst, /elke maand ingepland/);
   assert.doesNotMatch(m.tekst, /Korting/);
 });
-
-// --- Technische taken in de briefing en het plan ---
-
-test("briefing: korte lijst van de technische taken met fase en uren, en het meerwerk", () => {
-  const t = briefing(vers(), LINKS).tekst;
-  assert.match(t, /Technische taken in Autotask:\n- Beheertoegang en uitgangssituatie vastleggen \(Voorbereidings- en planningsfase, 4 uur\)/);
-  assert.match(t, /- Proefmigratie met twee gebruikers uitvoeren \(Realisatie- en uitvoeringsfase, uren nog te bepalen\)/);
-  assert.match(t, /Meerwerk, nog afstemmen \(geen taak\):\n- Gedeelde agenda voor de werkplaats inrichten \(Mail Joost Bakker 2026-11-14\)/);
-});
-
-test("briefing: zonder taken en meerwerk geen kopjes", () => {
-  const d = vers();
-  delete d.taken;
-  delete d.meerwerk;
-  const t = briefing(d, LINKS).tekst;
-  assert.doesNotMatch(t, /Technische taken|Meerwerk/);
-});
-
-test("voegToeAanPlan en voegLinksToe laten de taken in het plan staan", async () => {
-  const { voegToeAanPlan, voegLinksToe } = await import("./teksten.mjs");
-  const plan = { notities: [], bijlagen: [], taken: [{ titel: "x", fase: "y", uren: 1, omschrijving: "z" }] };
-  const uit = voegLinksToe(voegToeAanPlan(plan, { titel: "n", tekst: "t" }), [{ titel: "l", url: "https://a" }]);
-  assert.deepEqual(uit.taken, plan.taken);
-});
-
-test("wijzigingen: nieuwe technische taak en meerwerk komen in de aanvulling", () => {
-  const oud = vers();
-  const nieuw = vers();
-  nieuw.taken.push({ titel: "Printers koppelen", fase: "Realisatie- en uitvoeringsfase", uren: null, omschrijving: "Printers koppelen.", resultaat: null, bron: "Mail Joost Bakker 2026-11-20" });
-  nieuw.meerwerk.push({ wat: "Tweede locatie aansluiten", bron: "Mail Joost Bakker 2026-11-20" });
-  const w = wijzigingen(oud, nieuw, { datum: new Date(2026, 10, 20, 9, 0) });
-  assert.match(w.tekst, /Technische taken:\n- Nieuw of gewijzigd: Printers koppelen \(Realisatie- en uitvoeringsfase, uren nog te bepalen\)/);
-  assert.match(w.tekst, /Meerwerk:\n- Nieuw of gewijzigd: Tweede locatie aansluiten/);
-});

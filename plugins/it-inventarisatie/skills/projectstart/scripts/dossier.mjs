@@ -4,7 +4,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
-import { haalCredentials, maakAt, normaliseerTitel } from "../../it-inventarisatie/scripts/autotask-project.mjs";
+import { haalCredentials, maakAt } from "../../it-inventarisatie/scripts/autotask-project.mjs";
 import { scrubSecrets, findSecretText, isSecretKey } from "../../it-inventarisatie/scripts/geheimen.mjs";
 
 const GEBRUIK = [
@@ -61,8 +61,6 @@ function controleerVorm(d, f) {
       ["route", (v) => v === "01" || v === "02", 'moet "01" of "02" zijn'],
       ["start", (v) => typeof v === "string" && JJJJ_MM.test(v), "formaat jjjj-mm verplicht"],
       ["eind", (v) => typeof v === "string" && JJJJ_MM.test(v), "formaat jjjj-mm verplicht"],
-      // Uren uit de offerte voor deze fase (optioneel). Alleen als ze er staan, telt de som van de taken.
-      ["uren", (v) => v === undefined || v === null || isUren(v), "getal vanaf 0 of null verplicht"],
     ]);
     d.fases.forEach((fase, i) => {
       if (JJJJ_MM.test(fase?.start ?? "") && JJJJ_MM.test(fase?.eind ?? "") && fase.start > fase.eind) {
@@ -84,8 +82,6 @@ function controleerVorm(d, f) {
     ["geregeld", isLijst, "lijst verplicht"], ["controleren", isLijst, "lijst verplicht"], ["later", isLijst, "lijst verplicht"],
     ["optioneel", (v) => v === undefined || typeof v === "boolean", "true of false verplicht"],
   ]);
-  if (d.taken !== undefined) controleerTaken(d, f, rij);
-  if (d.meerwerk !== undefined) rij("meerwerk", d.meerwerk, [t("wat"), t("bron")]);
   eis("overleg.ritme", isTekst(d.overleg?.ritme), "verplicht");
   eis("overleg.aanspreekpunt", isTekst(d.overleg?.aanspreekpunt), "verplicht");
   eis("overleg.escalatie", isTekst(d.overleg?.escalatie), "verplicht");
@@ -113,33 +109,6 @@ function controleerVorm(d, f) {
   eis("verwerkt.bijlagen", isLijst(d.verwerkt?.bijlagen), "lijst verplicht");
   eis("verwerkt.notities", isLijst(d.verwerkt?.notities), "lijst verplicht");
   eis("versie", Number.isInteger(d.versie) && d.versie >= 1, "geheel getal verplicht");
-}
-
-const isUren = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0;
-
-// Technische taken voor de engineers: elk met een bron, uren alleen uit de offerte en per fase nooit meer dan daar staat.
-function controleerTaken(d, f, rij) {
-  const codes = new Set((isLijst(d.fases) ? d.fases : []).map((x) => x?.code));
-  rij("taken", d.taken, [
-    ["titel", isTekst, "verplicht"], ["fase", isTekst, "verplicht (titel van de fase in Autotask)"],
-    ["omschrijving", isTekst, "verplicht"], ["bron", isTekst, "verplicht (offerte of mail met datum)"],
-    ["uren", (v) => v === null || isUren(v), "getal vanaf 0 of null verplicht"],
-    ["resultaat", (v) => v === undefined || isTekstOfNull(v), "tekst of null verplicht"],
-    ["projectFase", (v) => v === undefined || v === null || codes.has(v), "moet een code uit fases zijn"],
-  ]);
-  if (!isLijst(d.taken)) return;
-  const gezien = new Map();
-  d.taken.forEach((t, i) => {
-    if (!isTekst(t?.titel)) return;
-    const sleutel = normaliseerTitel(t.titel);
-    if (gezien.has(sleutel)) f.push(`taken[${i}].titel: dubbel, zelfde titel als taken[${gezien.get(sleutel)}]`);
-    else gezien.set(sleutel, i);
-  });
-  for (const fase of isLijst(d.fases) ? d.fases : []) {
-    if (!isUren(fase?.uren)) continue;
-    const som = d.taken.filter((t) => t?.projectFase === fase.code && isUren(t.uren)).reduce((s, t) => s + t.uren, 0);
-    if (som > fase.uren + 1e-9) f.push(`taken: de uren voor fase ${fase.code} (${som}) zijn meer dan in de offerte (${fase.uren})`);
-  }
 }
 
 // Alle tekstvelden met hun pad, bv. "afspraken[0].tekst".

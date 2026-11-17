@@ -37,8 +37,8 @@
     ]
   },
   "fases": [
-    { "code": "F1", "naam": "Voorbereiding en inrichting", "route": "01", "start": "2026-12", "eind": "2027-01", "uren": 24 },
-    { "code": "F2", "naam": "Migratie en oplevering", "route": "02", "start": "2027-01", "eind": "2027-03", "uren": 40 }
+    { "code": "F1", "naam": "Voorbereiding en inrichting", "route": "01", "start": "2026-12", "eind": "2027-01" },
+    { "code": "F2", "naam": "Migratie en oplevering", "route": "02", "start": "2027-01", "eind": "2027-03" }
   ],
   "migratieplan": { "datum": "2027-01-15" },
   "vervolgOfferte": "Na akkoord op het migratieplan volgt een aparte offerte voor de koppeling met de planningssoftware.",
@@ -68,16 +68,6 @@
       "controleren": ["Of alle gebruikers een tweede inlogstap gebruiken"],
       "later": ["Beveiligingstraining voor medewerkers"]
     }
-  ],
-  "taken": [
-    { "titel": "Beheertoegang en uitgangssituatie vastleggen", "fase": "Voorbereidings- en planningsfase", "projectFase": "F1", "uren": 4, "omschrijving": "Beheertoegang tot de huidige omgeving regelen en de uitgangssituatie vastleggen: gebruikers, mailboxen, gedeelde mappen en apparaten.", "resultaat": "Een overzicht van de huidige omgeving en werkende beheertoegang.", "bron": "Offerte 2026-11-02" },
-    { "titel": "Nieuwe cloudomgeving en beveiligde toegang inrichten", "fase": "Realisatie- en uitvoeringsfase", "projectFase": "F1", "uren": 16, "omschrijving": "De nieuwe omgeving inrichten met accounts voor alle 25 gebruikers, multifactor-authenticatie en voorwaardelijke toegang.", "resultaat": "Een ingerichte omgeving waarin elke gebruiker veilig kan inloggen.", "bron": "Offerte 2026-11-02" },
-    { "titel": "Proefmigratie met twee gebruikers uitvoeren", "fase": "Realisatie- en uitvoeringsfase", "projectFase": "F1", "uren": null, "omschrijving": "Mailbox en bestanden van twee gebruikers uit het managementteam als eerste overzetten en met hen testen voordat de rest volgt.", "resultaat": "Twee gebruikers werken op de nieuwe omgeving; de aanpak voor de rest is getest.", "bron": "Mail Sanne de Vries 2026-11-12" },
-    { "titel": "Mailboxen en bestanden migreren", "fase": "Realisatie- en uitvoeringsfase", "projectFase": "F2", "uren": 28, "omschrijving": "Alle mailboxen, gedeelde mailboxen en bestanden volgens het migratieplan overzetten naar de nieuwe omgeving.", "resultaat": "Alle mail en bestanden staan in de nieuwe omgeving.", "bron": "Offerte 2026-11-02" },
-    { "titel": "Beheer overdragen en documentatie in IT Glue bijwerken", "fase": "Opleveringsfase", "projectFase": "F2", "uren": 8, "omschrijving": "De nieuwe situatie documenteren in IT Glue en het beheer overdragen aan de servicedesk.", "resultaat": "Actuele documentatie in IT Glue en een overdracht aan de servicedesk.", "bron": "Offerte 2026-11-02" }
-  ],
-  "meerwerk": [
-    { "wat": "Gedeelde agenda voor de werkplaats inrichten", "bron": "Mail Joost Bakker 2026-11-14" }
   ],
   "overleg": {
     "ritme": "Tweewekelijks een half uur op dinsdag",

@@ -194,33 +194,3 @@ test("open punten: kolom heet 'Wie pakt het op', zodat een open aanleverder niet
   const html = pvaHtml(d, {});
   assert.ok(html.includes("Wie pakt het op"));
 });
-
-test("technische uitvoering: tabel met taak, fase, uren en bron, plus het totaal", () => {
-  const h = hoofdstuk(html(), "Technische uitvoering en afronding");
-  assert.match(h, /<h2>Technische taken<\/h2>/);
-  assert.match(h, /<th[^>]*>Taak<\/th><th[^>]*>Fase<\/th><th[^>]*>Uren<\/th><th[^>]*>Bron<\/th>/);
-  const t = tekst(h);
-  assert.ok(t.includes("Mailboxen en bestanden migreren Realisatie- en uitvoeringsfase 28 Offerte 2026-11-02"), t);
-  assert.ok(t.includes("Proefmigratie met twee gebruikers uitvoeren Realisatie- en uitvoeringsfase nog te bepalen Mail Sanne de Vries 2026-11-12"), t);
-  assert.match(t, /Totaal: 56 uur, zonder 1 taak waarvan de uren nog te bepalen zijn\./);
-});
-
-test("technische uitvoering: zonder taken geen tabel en geen totaal", () => {
-  const d = voorbeeld();
-  delete d.taken;
-  const h = hoofdstuk(html(d), "Technische uitvoering en afronding");
-  assert.ok(!h.includes("Technische taken"));
-  assert.ok(!h.includes("Totaal"));
-});
-
-test("open punten: taak zonder uren en meerwerk uit een mail", () => {
-  const p = openPunten(voorbeeld());
-  const uren = p.find((x) => x.wat === "Taak: Proefmigratie met twee gebruikers uitvoeren");
-  assert.ok(uren, JSON.stringify(p));
-  assert.match(uren.waarom, /uren nog te bepalen/i);
-  const meer = p.find((x) => x.wat === "Meerwerk: Gedeelde agenda voor de werkplaats inrichten");
-  assert.ok(meer);
-  assert.match(meer.waarom, /Mail Joost Bakker 2026-11-14/);
-  assert.match(meer.waarom, /meerwerk, afstemmen/i);
-  assert.ok(!p.some((x) => x.wat === "Taak: Mailboxen en bestanden migreren"));
-});

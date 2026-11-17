@@ -79,12 +79,6 @@ export function openPunten(d) {
   for (const a of d.afspraken.filter((x) => x.financieel === true && x.controleren === true)) {
     punt(zin(a.tekst), `Staat alleen in ${a.bron}. Controleren tegen de offerte; tot dan geen afspraak.`);
   }
-  for (const t of d.taken ?? []) {
-    if (t.uren === null) punt(`Taak: ${t.titel}`, "Uren nog te bepalen: de offerte noemt geen uren voor deze taak. In Autotask staat hij op 0 uur.");
-  }
-  for (const m of d.meerwerk ?? []) {
-    punt(`Meerwerk: ${m.wat}`, `Staat in ${m.bron}, niet in de offerte. Meerwerk, afstemmen met de klant voordat het een taak wordt.`);
-  }
   for (const e of d.externePartijen ?? []) if (!isTekst(e.aangestuurdDoor)) punt(`Aansturing ${e.naam}`, `Wie deze partij aanstuurt is ${OPEN}.`);
   if (!isTekst(d.gebruikersimpact)) punt("Impact voor gebruikers", `Nog niet vastgelegd.`);
   if (!isTekst(d.overgangBeheer)) punt("Overgang van het beheer", `Nog niet vastgelegd.`);
@@ -217,27 +211,9 @@ function afspraken(d) {
   ].filter(Boolean).join("\n");
 }
 
-const uren = (u) => String(u).replace(".", ",");
-
-// De technische taken zoals ze in Autotask komen, met de bron per taak en het totaal aan uren uit de offerte.
-function technischeTaken(d) {
-  const taken = d.taken ?? [];
-  const t = tabel(["Taak", "Fase", "Uren", "Bron"],
-    taken.map((x) => [`<b>${esc(x.titel)}</b>`, esc(x.fase), esc(x.uren === null ? OPEN : uren(x.uren)), klein(x.bron)]), { breedtes: [40, 24, 12, 24] });
-  if (!t) return "";
-  const totaal = taken.filter((x) => x.uren !== null).reduce((s, x) => s + x.uren, 0);
-  const open = taken.filter((x) => x.uren === null).length;
-  const rest = open ? `, zonder ${open} ${open === 1 ? "taak waarvan de uren" : "taken waarvan de uren"} nog te bepalen zijn` : "";
-  return `<h2>Technische taken</h2>
-<p>Deze taken staan in Autotask voor de engineers. Elke taak komt uit de offerte of een mail; de uren komen uit de offerte. Het inplannen gebeurt via het planbord.</p>
-${t}
-<p><b>Totaal: ${esc(uren(totaal))} uur${esc(rest)}.</b></p>`;
-}
-
 function uitvoering(d) {
   const vragen = tabel(["Vraag", "Aan", "Bron"], d.technischeVragen.map((v) => [esc(v.vraag), esc(v.aan), klein(v.bron)]), { breedtes: [60, 20, 20] });
   return [
-    technischeTaken(d),
     vragen && `<h2>Technische vragen</h2>\n${vragen}`,
     isTekst(d.vervolgOfferte) && `<h2>Vervolg</h2>\n<p>${esc(zin(d.vervolgOfferte))}</p>`,
     `<h2>Documentatie</h2>\n<p>De technische documentatie van de nieuwe situatie staat in IT Glue.</p>`,
