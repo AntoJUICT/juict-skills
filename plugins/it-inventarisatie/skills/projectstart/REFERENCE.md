@@ -23,7 +23,7 @@ controlefout, 2 is mislukt (Autotask, Word, bestand). Geen enkel script schrijft
 | `scripts/teksten.mjs` | `briefing --dossier <pad> [--presentatie <url>] [--rapport <url>] [--plan <pad>]` | Interne briefing, titel "Projectstart: briefing kick-off". |
 | | `wijzigingen --oud <pad> --nieuw <pad> [--plan <pad>]` | Alleen wat veranderd is, titel "Projectstart: aanvulling <dd-mm-jjjj hh:mm>". Niets veranderd: geen notitie en het plan blijft ongemoeid. |
 | | `mail --dossier <pad> [--rapport <url>] [--plan <pad>]` | Aan, cc, onderwerp en tekst van de uitvraag-mail. Bevat de afspraken met `intern: false` en de technische vragen. Als notitie: titel "Projectstart: uitvraag-mail", zonder `**`. Weigert bij een bedrag (`€`, euro, `EUR`, `500,-`), em-dash, BC, M365, MFA zonder "multifactor" of wachtwoordachtige tekst. |
-| `scripts/autotask-schrijf.mjs` | `--project <id> --plan <pad> [--toepassen]` | Voorvertoning of plaatsing van notities en bijlagen. De voorvertoning toont de volledige notitietekst en per bijlage het lokale pad en de grootte in bytes. Wat er al staat wordt overgeslagen. Exit 2 als iets mislukt. |
+| `scripts/autotask-schrijf.mjs` | `--project <id> --plan <pad> [--toepassen]` | Voorvertoning of plaatsing van notities, bestandsbijlagen en link-bijlagen. De voorvertoning toont de volledige notitietekst en per bijlage het lokale pad en de grootte in bytes. Wat er al staat wordt overgeslagen. Exit 2 als iets mislukt. |
 | `scripts/samenhang.mjs` | `--dossier <pad> --rapport <rapport.json>` | "Dossier en rapport passen bij elkaar." of de afwijkingen (exit 1). |
 | `<it>/scripts/dns-lookup.mjs` | `<domein> [<domein>...]` | MX, NS en tenant-ID per domein. |
 | `<it>/scripts/werkbestand.mjs` | `van-dossier <dossierpad>` | Werkbestand van it-inventarisatie uit het dossier. Weigert als het al bestaat. |
@@ -35,12 +35,19 @@ niet is; een notitie met dezelfde titel wordt vervangen. De vorm:
 ```json
 {
   "notities": [{ "titel": "Projectstart: briefing kick-off", "tekst": "..." }],
-  "bijlagen": [{ "titel": "Mini PVA Voorbeeld Techniek v1", "bestandsnaam": "Mini PVA Voorbeeld Techniek v1.docx", "pad": "C:\\...\\Mini PVA Voorbeeld Techniek v1.docx" }]
+  "bijlagen": [{ "titel": "Mini PVA Voorbeeld Techniek v1", "bestandsnaam": "Mini PVA Voorbeeld Techniek v1.docx", "pad": "C:\\...\\Mini PVA Voorbeeld Techniek v1.docx" },
+    { "titel": "Kick-off presentatie Voorbeeld Techniek", "url": "https://claude.ai/artifact/..." }
+  ]
 }
 ```
 
+Een bijlage is een bestand (`titel`, `bestandsnaam`, `pad`) of een link (`titel`, `url`). Een link moet met `https://`
+beginnen, anders weigert `autotask-schrijf.mjs` hem. `teksten.mjs briefing --presentatie <url> --rapport <url> --plan <pad>`
+zet de links zelf in het plan, met de titels `Kick-off presentatie <klant.weergave>` en `IT-inventarisatie <klant.autotask>`;
+een url die al in het plan staat wordt niet verdubbeld.
+
 De bijlage zet je zelf in het plan. Dubbelcontrole: notities op titel, bijlagen op bestandsnaam (`fullPath`),
-hoofdletters en spaties genegeerd. De aanvullingsnotitie heeft de tijd in de titel, dus een tweede aanvulling op
+hoofdletters en spaties genegeerd. Links op `fullPath` = de url, exact (na trim, hoofdlettergevoelig). De aanvullingsnotitie heeft de tijd in de titel, dus een tweede aanvulling op
 dezelfde dag wordt niet overgeslagen.
 
 **Bestandsnamen op het project.** `projectstart-dossier-v<N>.json`, `Mini PVA <klant> v<N>.docx` (`klant.weergave`) en
@@ -124,6 +131,10 @@ zone 19). Verwijderen kan niet, ook geen notities en bijlagen.
   geverifieerd op 4 november 2026 (it-inventarisatie, met `publish: 1`). `fullPath` komt exact terug, dus de
   dubbelcontrole werkt. Dossier en PVA zijn intern en gaan met `publish: 2` (intern projectteam): **bevestig in de
   proefrun** dat de bijlage daarmee geplaatst wordt en zichtbaar is voor het projectteam.
+- `POST /Projects/{id}/Attachments` voor een link met `{ parentID, attachmentType: "URL", publish: 2, title, fullPath: <url> }`:
+  geverifieerd in zone 19 op 17 november 2026. De bijlagenlijst geeft `attachmentType: "URL"` en `fullPath` precies
+  als de url terug, dus de dubbelcontrole werkt. Er is geen `data`. `bronnen.mjs` slaat zulke bijlagen over
+  (`overgeslagen`, reden "geen bestandsbijlage") en `dossier.mjs nieuw` telt ze dus nooit als nieuwe bron.
 - `POST /Projects/{id}/Notes` met `{ projectID, title, description, noteType: 5, publish: 2, isAnnouncement: false }`:
   geverifieerd in zone 19 op 17 november 2026. `isAnnouncement` is verplicht (zonder dit veld faalt de POST met
   `Missing Required Field: isAnnouncement.`). De notitie komt terug via `ProjectNotes/query` met dezelfde titel.

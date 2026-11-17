@@ -225,6 +225,13 @@ export function voegToeAanPlan(plan, notitie) {
   return { notities: [...notities, notitie], bijlagen: plan.bijlagen ?? [] };
 }
 
+// Voegt link-bijlagen toe; een bijlage met dezelfde url staat er al en wordt niet verdubbeld.
+export function voegLinksToe(plan, links) {
+  const bijlagen = [...(plan.bijlagen ?? [])];
+  for (const l of links) if (!bijlagen.some((b) => b.url != null && String(b.url).trim() === l.url)) bijlagen.push(l);
+  return { ...plan, bijlagen };
+}
+
 export function hoofd(argv, deps = {}) {
   const lees = deps.lees ?? ((pad) => readFileSync(pad, "utf8"));
   const bestaat = deps.bestaat ?? existsSync;
@@ -234,9 +241,14 @@ export function hoofd(argv, deps = {}) {
   try {
     let notitie;
     let tonen;
+    const links = [];
     if (cmd === "briefing" && optie(rest, "--dossier")) {
       notitie = briefing(json(optie(rest, "--dossier")), { presentatie: optie(rest, "--presentatie"), rapport: optie(rest, "--rapport") });
       tonen = `${notitie.titel}\n\n${notitie.tekst}`;
+      const d = json(optie(rest, "--dossier"));
+      const pres = optie(rest, "--presentatie"), rap = optie(rest, "--rapport");
+      if (pres) links.push({ titel: `Kick-off presentatie ${d.klant.weergave}`, url: pres.trim() });
+      if (rap) links.push({ titel: `IT-inventarisatie ${d.klant.autotask}`, url: rap.trim() });
     } else if (cmd === "wijzigingen" && optie(rest, "--oud") && optie(rest, "--nieuw")) {
       notitie = wijzigingen(json(optie(rest, "--oud")), json(optie(rest, "--nieuw")));
       if (!notitie) return { code: 0, uitvoer: "Geen wijzigingen; er komt geen notitie.\n" };
@@ -251,9 +263,10 @@ export function hoofd(argv, deps = {}) {
     }
     const planPad = optie(rest, "--plan");
     if (planPad) {
-      const plan = voegToeAanPlan(bestaat(planPad) ? json(planPad) : {}, notitie);
+      const plan = voegLinksToe(voegToeAanPlan(bestaat(planPad) ? json(planPad) : {}, notitie), links);
       schrijf(planPad, JSON.stringify(plan, null, 2) + "\n");
       tonen += `\nToegevoegd aan ${planPad} als notitie "${notitie.titel}".\n`;
+      for (const l of links) tonen += `Link-bijlage "${l.titel}" in het plan.\n`;
     }
     return { code: 0, uitvoer: tonen };
   } catch (e) {

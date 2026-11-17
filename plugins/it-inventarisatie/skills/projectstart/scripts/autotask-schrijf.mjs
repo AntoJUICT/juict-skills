@@ -10,22 +10,25 @@ import { findSecretText } from "../../it-inventarisatie/scripts/geheimen.mjs";
 const GEBRUIK = [
   "Gebruik:",
   "  autotask-schrijf.mjs --project <id> --plan <pad> [--toepassen]",
-  "Het plan is JSON: { notities: [{titel, tekst}], bijlagen: [{titel, bestandsnaam, pad}] }.",
+  "Het plan is JSON: { notities: [{titel, tekst}], bijlagen: [{titel, bestandsnaam, pad} of {titel, url}] }.",
   "Zonder --toepassen schrijft niets naar Autotask; je krijgt alleen een voorvertoning.",
   "",
 ].join("\n");
 
 const NOTE_TYPE = 5; // zoals bestaande projectnotities in zone 19 (waargenomen op 12-11-2026)
+const isLink = (b) => b.url != null;
+const normUrl = (u) => String(u ?? "").trim(); // exact: hoofdlettergevoelig
 const norm = (s) => String(s ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 
 export function planSchrijfacties(projectId, { notities = [], bijlagen = [] } = {}, bestaand = {}) {
   const titels = new Set((bestaand.notities ?? []).map((n) => norm(n.title)));
   const paden = new Set((bestaand.bijlagen ?? []).map((b) => norm(b.fullPath)));
+  const urls = new Set((bestaand.bijlagen ?? []).map((b) => normUrl(b.fullPath)));
   const gezien = (set, sleutel) => (set.has(sleutel) ? true : (set.add(sleutel), false));
   return {
     projectId,
     notities: notities.map((n) => ({ ...n, actie: gezien(titels, norm(n.titel)) ? "overslaan" : "nieuw" })),
-    bijlagen: bijlagen.map((b) => ({ ...b, actie: gezien(paden, norm(b.bestandsnaam)) ? "overslaan" : "nieuw" })),
+    bijlagen: bijlagen.map((b) => ({ ...b, actie: (isLink(b) ? gezien(urls, normUrl(b.url)) : gezien(paden, norm(b.bestandsnaam))) ? "overslaan" : "nieuw" })),
   };
 }
 
@@ -43,6 +46,17 @@ export async function voerUit(at, plan, { toepassen = false, lees = (pad) => rea
     } catch (e) { res.fouten++; regels.push(`Notitie "${n.titel}" mislukt: ${e.message}`); }
   }
   for (const b of plan.bijlagen) {
+    if (isLink(b)) {
+      if (!/^https:[/][/]/.test(normUrl(b.url))) { res.fouten++; regels.push(`Link-bijlage "${b.titel}" overgeslagen: de url moet met https:// beginnen.`); continue; }
+      if (b.actie === "overslaan") { regels.push(`Link-bijlage "${b.titel}" staat er al; overgeslagen.`); continue; }
+      if (!toepassen) { regels.push(`Link-bijlage "${b.titel}" wordt geplaatst: ${normUrl(b.url)}`); continue; }
+      try {
+        await at.postProjectAttachment(plan.projectId, { parentID: plan.projectId, attachmentType: "URL", publish: 2, title: b.titel, fullPath: normUrl(b.url) });
+        res.bijlagen++;
+        regels.push(`Link-bijlage "${b.titel}" geplaatst.`);
+      } catch (e) { res.fouten++; regels.push(`Link-bijlage "${b.titel}" mislukt: ${e.message}`); }
+      continue;
+    }
     if (b.actie === "overslaan") { regels.push(`Bijlage "${b.bestandsnaam}" staat er al; overgeslagen.`); continue; }
     if (!toepassen) {
       // Alleen lezen voor de grootte: zo zie je in de voorvertoning welk lokaal bestand er echt meegaat.

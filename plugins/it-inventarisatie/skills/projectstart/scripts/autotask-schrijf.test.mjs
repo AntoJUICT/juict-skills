@@ -123,3 +123,47 @@ test("voorvertoning: ontbrekend bestand is een fout, geen crash", async () => {
   assert.equal(r.fouten, 1);
   assert.match(r.uitvoer, /C:\/weg\.docx/);
 });
+
+const LINK = { titel: "Kick-off presentatie Voorbeeld Techniek", url: "https://claude.ai/artifact/pres" };
+
+test("link-bijlage: POST met attachmentType URL, publish 2, fullPath = url, zonder bestand te lezen", async () => {
+  const at = nepAt();
+  const plan = planSchrijfacties(9001, { notities: [], bijlagen: [LINK] }, {});
+  await voerUit(at, plan, { toepassen: true, lees: () => { throw new Error("mag niet lezen"); } });
+  assert.equal(at.calls.length, 1);
+  assert.deepEqual(at.calls[0][2], { parentID: 9001, attachmentType: "URL", publish: 2, title: LINK.titel, fullPath: LINK.url });
+});
+
+test("link-bijlage: voorvertoning noemt titel en url, geen POST", async () => {
+  const at = nepAt();
+  const r = await voerUit(at, planSchrijfacties(9001, { bijlagen: [LINK] }, {}), { toepassen: false, lees: () => { throw new Error("nee"); } });
+  assert.equal(at.calls.length, 0);
+  assert.equal(r.fouten, 0);
+  assert.match(r.uitvoer, /Link-bijlage "Kick-off presentatie Voorbeeld Techniek" wordt geplaatst: https:\/\/claude\.ai\/artifact\/pres/);
+});
+
+test("link-bijlage: bestaande fullPath (exact na trim) en dubbele url in plan worden overgeslagen", async () => {
+  const plan = planSchrijfacties(9001, { bijlagen: [LINK, { titel: "nog eens", url: ` ${LINK.url} ` }, { titel: "ander", url: "https://claude.ai/artifact/rap" }] },
+    { bijlagen: [{ fullPath: `${LINK.url} ` }] });
+  assert.deepEqual(plan.bijlagen.map((b) => b.actie), ["overslaan", "overslaan", "nieuw"]);
+  const at = nepAt();
+  const r = await voerUit(at, plan, { toepassen: true, lees });
+  assert.equal(at.calls.length, 1);
+  assert.match(r.uitvoer, /Link-bijlage "Kick-off presentatie Voorbeeld Techniek" staat er al; overgeslagen/);
+});
+
+test("link-bijlage: url vergelijken is hoofdlettergevoelig", () => {
+  const plan = planSchrijfacties(9001, { bijlagen: [{ titel: "a", url: "https://x.example/A" }] }, { bijlagen: [{ fullPath: "https://x.example/a" }] });
+  assert.equal(plan.bijlagen[0].actie, "nieuw");
+});
+
+test("link-bijlage: url zonder https:// is een fout en wordt niet geplaatst", async () => {
+  const at = nepAt();
+  const plan = planSchrijfacties(9001, { bijlagen: [{ titel: "x", url: "http://claude.ai/a" }, { titel: "y", url: "javascript:alert(1)" }] }, {});
+  for (const toepassen of [false, true]) {
+    const r = await voerUit(at, plan, { toepassen, lees });
+    assert.equal(r.fouten, 2);
+    assert.match(r.uitvoer, /https:\/\//);
+  }
+  assert.equal(at.calls.length, 0);
+});

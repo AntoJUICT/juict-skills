@@ -365,3 +365,10 @@ test("fase met start na eind faalt", () => {
   d.fases[1].start = "2027-03";
   assert.deepEqual(valideerDossier(d), []);
 });
+
+test("nieuweBronnen: een URL-bijlage komt nooit als nieuwe bron voor (bronnen.mjs laat ze in overgeslagen)", () => {
+  const d = vers();
+  d.verwerkt = { bijlagen: [], notities: [] };
+  const m = { bijlagen: [{ id: 2, titel: "Offerte.pdf" }], overgeslagen: [{ id: 3, titel: "Kick-off presentatie X", reden: "geen bestandsbijlage" }], notities: [] };
+  assert.deepEqual(nieuweBronnen(d, m).bijlagen.map((x) => x.id), [2]);
+});

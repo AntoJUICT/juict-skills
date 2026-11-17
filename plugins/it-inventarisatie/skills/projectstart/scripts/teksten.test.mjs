@@ -100,7 +100,8 @@ test("hoofd: briefing, mail en wijzigingen tonen; met --plan komt de notitie in 
   let plan = JSON.parse(bestanden["plan.json"]);
   assert.equal(plan.notities.length, 1, "zelfde titel wordt vervangen, niet verdubbeld");
   assert.match(plan.notities[0].tekst, /Voor de techniek/);
-  assert.equal(plan.bijlagen.length, 1, "bestaande bijlagen blijven staan");
+  assert.equal(plan.bijlagen.length, 3, "bestaande bijlage blijft staan, plus link-bijlagen voor presentatie en rapport");
+  assert.equal(plan.bijlagen[0].bestandsnaam, "Mini PVA Voorbeeld Techniek v1.docx");
 
   const m = hoofd(["mail", "--dossier", "d.json", "--rapport", LINKS.rapport, "--plan", "plan.json"], deps);
   assert.equal(m.code, 0);
@@ -155,4 +156,27 @@ test("mail als notitie: zonder ** in de tekst; in de chat blijft de opmaak", asy
   const notitie = JSON.parse(bestanden["plan.json"]).notities.find((n) => n.titel === MAIL_NOTITIE);
   assert.ok(!notitie.tekst.includes("**"), notitie.tekst);
   assert.match(notitie.tekst, /^Besluiten\. Dit is de stand van zaken\./m);
+});
+
+test("hoofd: briefing met url's zet link-bijlagen in het plan, zonder dubbelen", async () => {
+  const { hoofd } = await import("./teksten.mjs");
+  const bestanden = { "d.json": JSON.stringify(vers()), "plan.json": JSON.stringify({ notities: [], bijlagen: [{ titel: "Bestaand", url: LINKS.rapport }] }) };
+  const deps = { lees: (p) => bestanden[p], bestaat: (p) => p in bestanden, schrijf: (p, t) => { bestanden[p] = t; } };
+  const args = ["briefing", "--dossier", "d.json", "--presentatie", LINKS.presentatie, "--rapport", LINKS.rapport, "--plan", "plan.json"];
+  for (let i = 0; i < 2; i++) assert.equal(hoofd(args, deps).code, 0);
+  const plan = JSON.parse(bestanden["plan.json"]);
+  assert.deepEqual(plan.bijlagen, [
+    { titel: "Bestaand", url: LINKS.rapport },
+    { titel: "Kick-off presentatie Voorbeeld Techniek", url: LINKS.presentatie },
+  ]);
+});
+
+test("hoofd: briefing zonder url's laat bijlagen ongemoeid; rapport krijgt titel met autotask-naam", async () => {
+  const { hoofd } = await import("./teksten.mjs");
+  const bestanden = { "d.json": JSON.stringify(vers()) };
+  const deps = { lees: (p) => bestanden[p], bestaat: (p) => p in bestanden, schrijf: (p, t) => { bestanden[p] = t; } };
+  hoofd(["briefing", "--dossier", "d.json", "--plan", "p.json"], deps);
+  assert.deepEqual(JSON.parse(bestanden["p.json"]).bijlagen, []);
+  hoofd(["briefing", "--dossier", "d.json", "--rapport", LINKS.rapport, "--plan", "p.json"], deps);
+  assert.deepEqual(JSON.parse(bestanden["p.json"]).bijlagen, [{ titel: "IT-inventarisatie Voorbeeld Techniek B.V.", url: LINKS.rapport }]);
 });

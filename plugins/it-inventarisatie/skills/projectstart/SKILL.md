@@ -63,7 +63,9 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    `Mini PVA <klant> v<N>.docx`, neem de hoogste N en tel er 1 bij op. Staat er nog geen, dan is N 1.
 7. **Briefing en uitvraag-mail.**
    - `node <skill>/scripts/teksten.mjs briefing --dossier <werkmap>/dossier.json --presentatie <url> --rapport <url> --plan <werkmap>/plan.json`
-   - Zet het PVA als bijlage in `plan.json` (zie REFERENCE.md).
+   - Zet het PVA als bijlage in `plan.json` (zie REFERENCE.md). Met `--presentatie` en `--rapport` voegt `briefing` zelf
+     link-bijlagen toe aan het plan (`Kick-off presentatie <klant>` en `IT-inventarisatie <klant>`), zodat de twee
+     artifacts op het project staan naast het PVA. Zonder url voor het rapport of de presentatie komt er geen link.
    - `node <skill>/scripts/teksten.mjs mail --dossier <werkmap>/dossier.json --rapport <url>` en toon de volledige tekst.
      De mail is de opvolgmail na de kick-off: besluiten, de afspraken met de klant (`intern: false`), wat de klant
      aanlevert, de technische vragen en het rapport als levend document. Als notitie verdwijnen de `**`.
