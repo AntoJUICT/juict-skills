@@ -51,6 +51,12 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    en 6 (`rapport.json`, `bouw.mjs`, publiceren in Claude Design), met `--uit <scratch>/rapport`. Controleer daarna
    `node <skill>/scripts/samenhang.mjs --dossier <werkmap>/dossier.json --rapport <pad naar rapport.json>`. Het rapport
    is leidend: pas het dossier aan tot er geen afwijkingen meer zijn. Zet de url in `artifacts.rapport`.
+   **Word-bijlage.** Maak van hetzelfde `rapport.json` ook een Word-bestand, zodat het rapport naast de link ook als
+   bijlage op het project staat. Bepaal N zoals bij het PVA (hoogste N van `IT-inventarisatie <klant.autotask> v<N>.docx` in
+   `<werkmap>/bronnen.json` of de bijlagelijst, plus 1; anders 1) en draai:
+   `node <it>/scripts/rapport/word.mjs --rapport <pad naar rapport.json> --uit <scratch>/rapport.html --logo <it>/assets/juict-logo-pos.svg`, daarna
+   `powershell -NoProfile -ExecutionPolicy Bypass -File <it>/scripts/rapport/naar-word.ps1 -Bron <scratch>/rapport.html -Doel "<werkmap>/IT-inventarisatie <klant.autotask> v<N>.docx"`.
+   Zet het bestand als bijlage in `plan.json` (zelfde vorm als het PVA, stap 7).
 5. **Presentatie** (alleen als `artifacts.presentatie` nog leeg is).
    `node <skill>/scripts/presentatie/bouw.mjs --dossier <werkmap>/dossier.json --uit <scratch>/kickoff [--datum jjjj-mm-dd]`.
    Publiceer met het Artifact-tool als gewone HTML-pagina: `file_path` = de gemaakte `Kick-off <klant>.html`, `files`
@@ -63,7 +69,7 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    `Mini PVA <klant> v<N>.docx`, neem de hoogste N en tel er 1 bij op. Staat er nog geen, dan is N 1.
 7. **Briefing en uitvraag-mail.**
    - `node <skill>/scripts/teksten.mjs briefing --dossier <werkmap>/dossier.json --presentatie <url> --rapport <url> --plan <werkmap>/plan.json`
-   - Zet het PVA als bijlage in `plan.json` (zie REFERENCE.md). Met `--presentatie` en `--rapport` voegt `briefing` zelf
+   - Zet het PVA en het Word-rapport als bijlage in `plan.json` (zie REFERENCE.md). Met `--presentatie` en `--rapport` voegt `briefing` zelf
      link-bijlagen toe aan het plan (`Kick-off presentatie <klant>` en `IT-inventarisatie <klant>`), zodat de twee
      artifacts op het project staan naast het PVA. Zonder url voor het rapport of de presentatie komt er geen link.
    - `node <skill>/scripts/teksten.mjs mail --dossier <werkmap>/dossier.json --rapport <url>` en toon de volledige tekst.
@@ -80,8 +86,8 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
 
 1. `dossier.mjs laad` (zie stap 1), kopieer het naar `<werkmap>/dossier.oud.json`, draai `bronnen.mjs` en `tekst.mjs`
    opnieuw en daarna `node <skill>/scripts/dossier.mjs nieuw --dossier <werkmap>/dossier.json --bronnen <werkmap>/bronnen.json`.
-   `nieuw` laat de eigen uitvoer van de skill al weg: dossierbijlagen, `Mini PVA <klant> v<N>.docx` en notities die
-   met "Projectstart:" beginnen.
+   `nieuw` laat de eigen uitvoer van de skill al weg: dossierbijlagen, `Mini PVA <klant> v<N>.docx`,
+   `IT-inventarisatie <klant> v<N>.docx` en notities die met "Projectstart:" beginnen.
 2. **Niets nieuw** (`aantal` is 0): stop en zeg dat er niets nieuws op het project staat. Geen nieuwe dossierversie,
    geen PVA, geen notitie.
 3. Lees alleen de nieuwe bronnen, zet hun ids in `verwerkt`, werk het dossier bij en draai `controleer`.
@@ -89,7 +95,7 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    Meldt het "Geen wijzigingen", dan is de inhoud van het dossier gelijk gebleven: geen nieuw rapport en geen nieuwe
    PVA-versie, ga door naar stap 6.
 5. Wel wijzigingen: bouw het rapport opnieuw en publiceer het naar dezelfde url, draai `samenhang.mjs`, maak een
-   nieuwe PVA-versie (stap 6 van Starten) en zet die in het plan. Daarna `autotask-schrijf.mjs` met voorvertoning en
+   nieuw Word-rapport (Word-bijlage in stap 4 van Starten, nieuwe versie) en een nieuwe PVA-versie (stap 6 van Starten) en zet beide in het plan. Daarna `autotask-schrijf.mjs` met voorvertoning en
    `--toepassen`. **De presentatie nooit opnieuw:** die maakt alleen de eerste run, daarna past de projectleider hem
    met de hand aan.
 6. `dossier.mjs bewaar`, voorvertoning en daarna `--toepassen`. De nieuwe ids in `verwerkt` maken een nieuwe versie.

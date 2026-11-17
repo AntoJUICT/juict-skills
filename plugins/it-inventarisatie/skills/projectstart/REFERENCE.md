@@ -16,7 +16,7 @@ controlefout, 2 is mislukt (Autotask, Word, bestand). Geen enkel script schrijft
 | `scripts/dossier.mjs` | `controleer <pad>` | "Dossier is geldig." of de fouten per veld (exit 1). |
 | | `laad --project <id> --uit <pad>` | Hoogste versie van `projectstart-dossier-v<N>.json` naar `<pad>`, of "Nog geen dossier op project <id>." |
 | | `bewaar --project <id> --dossier <pad> [--toepassen]` | Valideert, filtert geheimen en zet `projectstart-dossier-v<N+1>.json` op het project. Geen wijziging: er wordt niets geschreven. |
-| | `nieuw --dossier <pad> --bronnen <bronnen.json>` | JSON met `aantal` en de bijlagen en notities die nog niet in `verwerkt` staan (zonder inhoud). De eigen uitvoer van de skill telt niet mee: `projectstart-dossier-v<N>.json`, `Mini PVA <klant> v<N>.docx` en notities die met "Projectstart:" beginnen. |
+| | `nieuw --dossier <pad> --bronnen <bronnen.json>` | JSON met `aantal` en de bijlagen en notities die nog niet in `verwerkt` staan (zonder inhoud). De eigen uitvoer van de skill telt niet mee: `projectstart-dossier-v<N>.json`, `Mini PVA <klant> v<N>.docx`, `IT-inventarisatie <klant> v<N>.docx` en notities die met "Projectstart:" beginnen. |
 | `scripts/presentatie/bouw.mjs` | `--dossier <pad> --uit <map> [--datum jjjj-mm-dd]` | `<map>/Kick-off <klant>.html` en `<map>/files.json`. `--datum` gaat voor `kickoffDatum`. |
 | `scripts/pva/vul.mjs` | `--dossier <pad> --uit <docx>` | Mini PVA uit `assets/mini-pva-template.docx`. Exit 2 als er een plaatshouder overblijft. |
 | `scripts/pva/afronden.ps1` | `powershell -NoProfile -ExecutionPolicy Bypass -File <skill>/scripts/pva/afronden.ps1 -Bron <docx> -Doel <docx> [-Pdf <pdf>]` | Werkt via Word-COM de inhoudsopgave bij, slaat op en maakt eventueel een PDF. Print het aantal pagina's. |
@@ -27,6 +27,8 @@ controlefout, 2 is mislukt (Autotask, Word, bestand). Geen enkel script schrijft
 | `scripts/samenhang.mjs` | `--dossier <pad> --rapport <rapport.json>` | "Dossier en rapport passen bij elkaar." of de afwijkingen (exit 1). |
 | `<it>/scripts/dns-lookup.mjs` | `<domein> [<domein>...]` | MX, NS en tenant-ID per domein. |
 | `<it>/scripts/werkbestand.mjs` | `van-dossier <dossierpad>` | Werkbestand van it-inventarisatie uit het dossier. Weigert als het al bestaat. |
+| `<it>/scripts/rapport/word.mjs` | `--rapport <rapport.json> --uit <rapport.html> [--logo <svg>]` | Zet het rapport om in Word-vriendelijke HTML. Exit 2 zonder argumenten, 1 bij een ongeldig rapport. |
+| `<it>/scripts/rapport/naar-word.ps1` | `powershell -NoProfile -ExecutionPolicy Bypass -File <it>/scripts/rapport/naar-word.ps1 -Bron <html> -Doel <docx> [-Pdf <pdf>]` | Word-COM maakt er een A4-`.docx` van met ingebedde afbeeldingen. Zelfde Git Bash- en Word-valkuilen als `afronden.ps1`. |
 | `<it>/scripts/rapport/bouw.mjs` | `--rapport <pad> --uit <map> --logo-pos <url> --logo-dia <url> [--fit]` | Zie REFERENCE.md van it-inventarisatie. |
 
 **`--plan` en `plan.json`.** `teksten.mjs` voegt de notitie toe aan het plan en maakt het bestand aan als het er nog
@@ -36,6 +38,7 @@ niet is; een notitie met dezelfde titel wordt vervangen. De vorm:
 {
   "notities": [{ "titel": "Projectstart: briefing kick-off", "tekst": "..." }],
   "bijlagen": [{ "titel": "Mini PVA Voorbeeld Techniek v1", "bestandsnaam": "Mini PVA Voorbeeld Techniek v1.docx", "pad": "C:\\...\\Mini PVA Voorbeeld Techniek v1.docx" },
+    { "titel": "IT-inventarisatie Voorbeeld Techniek v1", "bestandsnaam": "IT-inventarisatie Voorbeeld Techniek v1.docx", "pad": "C:\...\IT-inventarisatie Voorbeeld Techniek v1.docx" },
     { "titel": "Kick-off presentatie Voorbeeld Techniek", "url": "https://claude.ai/artifact/..." }
   ]
 }
@@ -51,8 +54,9 @@ hoofdletters en spaties genegeerd. Links op `fullPath` = de url, exact (na trim,
 dezelfde dag wordt niet overgeslagen.
 
 **Bestandsnamen op het project.** `projectstart-dossier-v<N>.json`, `Mini PVA <klant> v<N>.docx` (`klant.weergave`) en
+`IT-inventarisatie <klant.autotask> v<N>.docx` (Word-versie van het rapport, bestandsbijlage naast de link) en
 `Kick-off <klant>.pdf` alleen als de projectleider zelf een PDF aanlevert. Volgende PVA-versie: de hoogste N van de
-bijlagen `Mini PVA <klant> v<N>.docx` op het project plus 1, of 1 als er nog geen staat.
+bijlagen `Mini PVA <klant> v<N>.docx` op het project plus 1, of 1 als er nog geen staat; voor het Word-rapport geldt hetzelfde met `IT-inventarisatie <klant.autotask> v<N>.docx`.
 
 ## Dossierschema (`dossier.json`, schema 1)
 

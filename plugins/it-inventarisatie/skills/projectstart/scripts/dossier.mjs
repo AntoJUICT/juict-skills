@@ -149,8 +149,8 @@ export function valideerDossier(d) {
 
 // --- Bronnen ---
 
-// De eigen uitvoer van de skill (dossierbijlagen, Mini PVA, notities "Projectstart: ...") is geen bron.
-const PVA_BESTAND = /^Mini PVA .* v\d+\.docx$/;
+// De eigen uitvoer van de skill (dossierbijlagen, Mini PVA, Word-rapport, notities "Projectstart: ...") is geen bron.
+const PVA_BESTAND = /^(Mini PVA|IT-inventarisatie) .* v\d+\.docx$/;
 const isEigenBijlage = (b) => [b.titel, String(b.bestand ?? "").split("/").pop().replace(/^\d+-/, "")]
   .some((naam) => BESTAND.test(String(naam ?? "")) || PVA_BESTAND.test(String(naam ?? "")));
 const isEigenNotitie = (n) => /^Projectstart:/.test(String(n.titel ?? "").trim());

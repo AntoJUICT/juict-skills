@@ -282,6 +282,8 @@ test("nieuweBronnen negeert de eigen uitvoer van de skill", () => {
       { id: 3, titel: "Mini PVA Voorbeeld Techniek v1", bestand: "bronnen/3-Mini PVA Voorbeeld Techniek v1.docx" },
       { id: 4, titel: "Mini PVA Voorbeeld Techniek v2.docx", bestand: "bronnen/4-Mini PVA Voorbeeld Techniek v2.docx" },
       { id: 9, titel: "x", bestand: "bronnen/9-projectstart-dossier-v2.json" },
+      { id: 11, titel: "IT-inventarisatie Voorbeeld Techniek v1.docx", bestand: "bronnen/11-IT-inventarisatie Voorbeeld Techniek v1.docx" },
+      { id: 12, titel: "IT-inventarisatie Voorbeeld Techniek v2", bestand: "bronnen/12-IT-inventarisatie Voorbeeld Techniek v2.docx" },
       { id: 10, titel: "Antwoord klant.eml", bestand: "bronnen/10-Antwoord klant.eml" },
     ],
     notities: [
