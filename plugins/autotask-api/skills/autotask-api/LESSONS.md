@@ -39,6 +39,8 @@ Bekende valkuilen, fouten en hard-geleerde lessen bij werken met de Autotask RES
 **Tijd boeken op een task kan alleen voor een resource die aan die task hangt.** Een `POST /TimeEntries` met `taskID` voor een collega die er niet op staat geeft 500 "This roleID is not valid for this Task and Resource", ook als de resource+rol-combinatie op zich geldig is. Bij tickets speelt dit niet, daar mag iedereen boeken.
 - How to apply: zet eerst `POST /Tasks/{id}/SecondaryResources` met dezelfde `resourceID` en `roleID` als de tijdregistratie, en pas daarna de entry.
 
+**Een tasknummer heeft hetzelfde formaat als een ticketnummer.** `T20261023.0025` was een projecttaak, geen ticket: `Tickets/query` op `ticketNumber` gaf niets, en in de ticketreeks van die dag ontbrak het nummer gewoon. Zoek bij een onvindbaar ticketnummer daarom ook via `Tasks/query` op `taskNumber`.
+
 **`PATCH /Tickets` met `projectID` koppelt een ticket aan een project.** Werkt gewoon, ondanks dat het veld zeldzaam gevuld is (16 van de ruim 20.000 tickets in zone 19). Handig om de historie van een ticket vindbaar te houden onder het project waar het werk verderging.
 
 ---
@@ -167,7 +169,8 @@ Why: Eerste poging gaf 500 "does not have adequate permissions" omdat de API sec
 
 **Op Tasks wordt de impersonatie-header stil genegeerd.** Geen foutmelding, gewoon 200, en toch blijft het API-account als `creatorResourceID` staan (geverifieerd met drie verschillende resources). Het verschil met een rechtenprobleem is het geluid: ontbreekt het "Add"-recht, dan krijg je een harde 500; ondersteunt de entity het niet, dan gebeurt er niets. Voor tasks valt hier dus niets in te stellen.
 
-**Impersoneren van een API-user resource of van een resource met een beperkt security level wordt geweigerd.** Resources als "Rewst API" en "Claude API" (licenseType 7) geven 500 "does not have the adequate permissions to create this entity type", en dat gold in zone 19 ook voor één gewone collega. Bouw daarom altijd een fallback naar het API-account in plaats van de call te laten klappen, en log wie is teruggevallen.
+**Impersonatie moet óók aanstaan in het security level van de geïmpersoneerde resource.** Het recht van de API-user is niet genoeg: in het security level van de medewerker zelf moet onder Web Services API → Resource Impersonation "Allow impersonation of resources with this security level" aangevinkt zijn. Bij Administrator-levels staat dat aan, bij Professional-levels standaard uit; dan geeft elke create met die `ImpersonationResourceId` 500 "does not have the adequate permissions to create this entity type", terwijl dezelfde API-user collega's met Administrator-licentie wel kan impersoneren (opgelost zone 19, 09-11-2026, Mike en Jeroen). API-user resources zelf (licenseType 7) zijn niet te impersoneren.
+- How to apply: krijgt één medewerker deze 500 en de rest niet, kijk dan eerst naar het vinkje in diens security level. Bouw daarnaast altijd een fallback naar het API-account en log wie is teruggevallen.
 
 **Een met impersonatie aangemaakte TimeEntry kan het API-account niet meer verwijderen.** Eerst "You do not have permission to delete time entries that you did not create", en met dezelfde impersonatie erbij "does not have the adequate permissions to delete this entity timeEntryType". Aanpassen mag nog wel. Wil je een migratie terugdraaibaar houden, zet dan naast Add ook het Delete-recht voor Time Entries aan.
 
@@ -203,6 +206,9 @@ AUTOTASK_SECRET='abc#def'    # # binnen single quotes = literal hekje
 3. Endpoint pad correct / bestaat het?
 4. Vereiste scopes/permissies aanwezig?
 
+**Er zijn twee Autotask API-accounts in Key Vault, met verschillende rechten.** Het account in `juict-shared-kv` mag Projects en Tasks lezen, dat in `ju-hermes-emmanuel` niet (zone 19, 06-11-2026). Het verschil hoor je niet altijd: `Projects/query` geeft 500 "The logged in Resource does not have the adequate permissions to query this entity projectType", maar `Tasks/query` geeft stil 200 met nul items, ook zonder filter.
+- How to apply: krijg je een lege lijst op Tasks of een rechtenfout op Projects, probeer dan eerst het account uit `juict-shared-kv` voordat je aan filters of endpoints gaat twijfelen.
+
 **Plotselinge 401/S2S17001 bij het ophalen van Key Vault-secrets via `az`: check `az account show`.** Een andere sessie kan de default subscription naar een klanttenant hebben gezet, waardoor de JUICT-vault onbereikbaar is en de Autotask-headers leeg blijven. Fix: `az account set --subscription JUICTAzure`.
 
 ---
@@ -235,6 +241,9 @@ AUTOTASK_SECRET='abc#def'    # # binnen single quotes = literal hekje
 **Phase `phaseNumber` is een string** (bijv. `"T20260120.0026"`), geen number.
 
 **Query-responses bevatten soms minder velden dan `GET /{id}`-responses.** Controleer altijd of een veld ook aanwezig is bij query-gebruik.
+
+**Mojibake in een response hoeft niet in Autotask te staan.** Op Windows leest `json.load(sys.stdin)` in Python de UTF-8-response van curl als cp1252, waardoor "financiële" als "financiÃ«le" verschijnt terwijl de note in Autotask goed is (16-11-2026). Een PATCH om het te "herstellen" verandert dan niets.
+- How to apply: lees met `sys.stdin.buffer.read().decode('utf-8')` voordat je concludeert dat de data kapot is, en stuur bodies met `json.dump(..., ensure_ascii=True)` zodat de shell-codepage er nooit tussen kan zitten.
 
 ---
 
