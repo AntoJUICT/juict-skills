@@ -35,6 +35,9 @@ de plugin onder `~/.claude/plugins/cache/...` staat). Hieronder staat die map al
    engineer (Microsoft 365-connector) naar mails sinds `laatsteMailcheck`, werk het werkbestand bij en ga verder bij
    `stap`. De slug is de klantnaam in kleine letters met alleen `[a-z0-9-]` ("Voorbeeld Techniek B.V." wordt
    `voorbeeld-techniek-bv`). Nieuw: `node <skill>/scripts/werkbestand.mjs nieuw "<klantnaam>"`; dat print het pad.
+   Heeft het Autotask-project een projectstart-dossier (bijlage `projectstart-dossier-v<N>.json`), haal dat op en begin
+   daarmee: `node <skill>/scripts/werkbestand.mjs van-dossier <dossierpad>`. Dat zet klant, antwoorden en openstaande
+   vragen alvast klaar; controleer die in plaats van ze opnieuw uit te vragen.
 1. **Offerte lezen en scope bevestigen.** Vraag de offerte. Haal klantnaam, Autotask-bedrijf, onderdelen in scope en
    uren per fase eruit. Neem de klantnaam letterlijk over uit Autotask of het tenantdomein, niet uit een maildomein
    (een bedrijf kan Voorbeeldtech heten en ook voorbeeld-tech.nl hebben), en laat de schrijfwijze bevestigen. Zet de scope per onderdeel op `true` of `false`; wat de offerte niet noemt blijft `null`.

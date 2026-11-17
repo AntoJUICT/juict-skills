@@ -65,6 +65,28 @@ export function nieuw(klant) {
   };
 }
 
+// Begin vanuit een projectstart-dossier. Scope blijft null tenzij het dossier iets expliciet maakt; nooit raden.
+export function werkbestandUitDossier(d) {
+  const w = nieuw(d.klant.autotask);
+  const beveiliging = (d.extraOnderwerpen ?? []).filter((x) => x.soort === "beveiliging");
+  if (beveiliging.some((x) => x.optioneel !== true)) w.offerte.scope.beveiliging = true;
+  w.stap = "bronnen";
+  const bekend = (regels) => regels.filter(Boolean).join("; ");
+  const geregeld = beveiliging.flatMap((x) => x.geregeld ?? []);
+  const controleren = beveiliging.flatMap((x) => x.controleren ?? []);
+  if (geregeld.length) w.antwoorden.beveiliging = { bekend: bekend(geregeld), nogControleren: bekend(controleren) };
+  else if (controleren.length) w.antwoorden.beveiliging = { nogControleren: bekend(controleren) };
+  const appVragen = (d.technischeVragen ?? []).filter((v) => /applicatie|software/i.test(v.vraag));
+  if (appVragen.length) w.antwoorden.applicaties = { bekend: bekend(appVragen.map((v) => v.vraag)) };
+  w.openVragen = [
+    ...(d.aanleveren ?? []).map((a) => ({ aan: a.wie ?? "nog te bepalen", vraag: a.wat })),
+    ...(d.technischeVragen ?? []).map((v) => ({ aan: v.aan, vraag: v.vraag })),
+  ];
+  w.rapport.artifactUrl = d.artifacts?.rapport ?? null;
+  w.autotask = { companyId: d.companyId ?? null, projectId: d.projectId ?? null, toegepast: false };
+  return w;
+}
+
 function cli(args) {
   const [cmd, a, b] = args;
   if (cmd === "nieuw" && a) {
@@ -99,7 +121,27 @@ function cli(args) {
     console.log(bewaar(a, w));
     return 0;
   }
-  console.error("Gebruik: werkbestand.mjs nieuw <klant> | toon <slug> | stap <slug> <stap>");
+  if (cmd === "van-dossier" && a) {
+    let d;
+    try {
+      d = JSON.parse(readFileSync(a, "utf8"));
+    } catch (e) {
+      console.error(`Dossier lezen mislukt: ${e.message}`);
+      return 1;
+    }
+    if (!d?.klant?.autotask) {
+      console.error("Dossier mist klant.autotask.");
+      return 1;
+    }
+    const w = werkbestandUitDossier(d);
+    if (laad(w.slug)) {
+      console.error(`Werkbestand voor ${w.slug} bestaat al.`);
+      return 1;
+    }
+    console.log(bewaar(w.slug, w));
+    return 0;
+  }
+  console.error("Gebruik: werkbestand.mjs nieuw <klant> | toon <slug> | stap <slug> <stap> | van-dossier <dossierpad>");
   return 1;
 }
 

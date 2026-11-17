@@ -339,10 +339,18 @@ export function maakAt({ fetch: doFetch = globalThis.fetch, creds, maxGelijktijd
       }
       return items;
     },
+    // Leesmethodes voor projectstart, geverifieerd in zone 19 op 12-11-2026: de lijst geeft data:null,
+    // de enkele bijlage geeft de inhoud als base64 in items[0].data.
+    getProjectAttachment: (projectId, attachmentId) => verzoek("GET", `Projects/${projectId}/Attachments/${attachmentId}`),
+    queryProjectNotes(projectId) {
+      return this.query("ProjectNotes", [{ field: "projectID", op: "eq", value: projectId }]);
+    },
     // De drie schrijf-endpoints hieronder: geverifieerd in zone 19 op 4-11-2026 (zie REFERENCE.md).
     patchTask: (projectId, body) => verzoek("PATCH", `Projects/${projectId}/Tasks`, body),
     postTaskNote: (body) => verzoek("POST", "TaskNotes", body),
     postProjectAttachment: (projectId, body) => verzoek("POST", `Projects/${projectId}/Attachments`, body),
+    // Nog niet live geverifieerd (REST-conventie voor child-entities); eerste echte POST volgt in de proefrun.
+    postProjectNote: (projectId, body) => verzoek("POST", `Projects/${projectId}/Notes`, body),
   };
 }
 

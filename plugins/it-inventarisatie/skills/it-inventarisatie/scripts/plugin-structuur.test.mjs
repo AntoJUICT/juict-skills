@@ -66,3 +66,51 @@ test("CLI's zetten process.exitCode in plaats van process.exit(), zodat stdout v
     }
   }
 });
+
+test("projectstart-skill bestaat met geldige frontmatter", () => {
+  const skill = readFileSync(resolve(repoRoot, "plugins/it-inventarisatie/skills/projectstart/SKILL.md"), "utf-8");
+  assert.match(skill, /^---\r?\nname: projectstart\r?\ndescription: .{40,}\r?\n---/);
+});
+
+test("plugin-versie is minstens 0.3.0", () => {
+  const plugin = JSON.parse(readFileSync(resolve(repoRoot, "plugins/it-inventarisatie/.claude-plugin/plugin.json"), "utf-8"));
+  const [maj, min] = plugin.version.split(".").map(Number);
+  assert.ok(maj > 0 || min >= 3);
+});
+
+// Een YAML-waarde is veilig als hij gequote is, of geen ': ' of '#' bevat.
+const isYamlVeilig = (regel) => {
+  const gequote = /^"[^"]*"$/.test(regel) || /^'[^']*'$/.test(regel);
+  return gequote || !/: |#/.test(regel);
+};
+
+test("isYamlVeilig herkent gequote en kale waarden", () => {
+  assert.equal(isYamlVeilig('"abc: def"'), true);
+  assert.equal(isYamlVeilig("'abc: def'"), true);
+  assert.equal(isYamlVeilig("abc def"), true);
+  assert.equal(isYamlVeilig("abc: def"), false);
+  assert.equal(isYamlVeilig('"abc" en "def: x"'), false);
+});
+
+test("projectstart: description in de frontmatter is YAML-veilig en REFERENCE.md bestaat", () => {
+  const map = resolve(repoRoot, "plugins/it-inventarisatie/skills/projectstart");
+  const skill = readFileSync(resolve(map, "SKILL.md"), "utf-8");
+  const regel = /\ndescription: (.*)\r?\n/.exec(skill)[1];
+  assert.ok(isYamlVeilig(regel), "description bevat ': ' of '#' zonder aanhalingstekens");
+  assert.ok(existsSync(resolve(map, "REFERENCE.md")), "REFERENCE.md ontbreekt");
+  const plugin = JSON.parse(readFileSync(resolve(repoRoot, "plugins/it-inventarisatie/.claude-plugin/plugin.json"), "utf-8"));
+  assert.ok(plugin.keywords.includes("projectstart"), "keyword projectstart ontbreekt in plugin.json");
+});
+
+test("projectstart: elk script dat SKILL.md en REFERENCE.md noemen bestaat", () => {
+  const map = resolve(repoRoot, "plugins/it-inventarisatie/skills/projectstart");
+  const tekst = ["SKILL.md", "REFERENCE.md"].map((n) => readFileSync(resolve(map, n), "utf-8")).join("\n");
+  const paden = new Set([...tekst.matchAll(/<(skill|it)>\/(scripts\/[\w/.-]+\.(?:mjs|ps1))/g)].map((m) => `${m[1]}|${m[2]}`));
+  for (const m of tekst.matchAll(/`(scripts\/[\w/.-]+\.(?:mjs|ps1))`/g)) paden.add(`skill|${m[1]}`);
+  assert.ok(paden.size >= 8, "te weinig scriptverwijzingen gevonden");
+  for (const p of paden) {
+    const [basis, rel] = p.split("|");
+    const pad = basis === "it" ? resolve(map, "../it-inventarisatie", rel) : resolve(map, rel);
+    assert.ok(existsSync(pad), `${basis}/${rel} bestaat niet`);
+  }
+});
