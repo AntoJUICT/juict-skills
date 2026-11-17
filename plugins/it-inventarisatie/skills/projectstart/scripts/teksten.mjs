@@ -171,8 +171,10 @@ export function uitvraagMail(d, { bijlage = true } = {}) {
   const aanleveren = d.aanleveren.map(aanleverRegel);
   const vragen = d.technischeVragen.map((v) => eindig(String(v.vraag).trim()));
   const afspraken = [];
-  if (d.overleg?.ritme) afspraken.push(eindig(`Voortgangsoverleg: ${d.overleg.ritme}`));
-  for (const a of d.afspraken.filter((x) => x.intern === false)) afspraken.push(eindig(a.tekst));
+  const klantAfspraken = d.afspraken.filter((x) => x.intern === false);
+  // Het ritme alleen noemen als geen afspraak het overleg al beschrijft, anders staat het er twee keer.
+  if (d.overleg?.ritme && !klantAfspraken.some((a) => /overleg/i.test(a.tekst))) afspraken.push(eindig(`Voortgangsoverleg: ${d.overleg.ritme}`));
+  for (const a of klantAfspraken) afspraken.push(eindig(a.tekst));
   const punten = [];
   if (open.length) punten.push(`- **Besluiten:** ${open.join(" ")}`);
   if (aanleveren.length) punten.push(`- **Aanleveren:** ${eindig(aanleveren.join("; "))}`);

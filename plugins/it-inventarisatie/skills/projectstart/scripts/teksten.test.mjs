@@ -229,3 +229,11 @@ test("hoofd: briefing zonder url's laat bijlagen ongemoeid; rapport krijgt titel
   hoofd(["briefing", "--dossier", "d.json", "--rapport", LINKS.rapport, "--plan", "p.json"], deps);
   assert.deepEqual(JSON.parse(bestanden["p.json"]).bijlagen, [{ titel: "IT-inventarisatie Voorbeeld Techniek B.V.", url: LINKS.rapport }]);
 });
+
+test("uitvraagMail noemt het overlegritme niet dubbel als een afspraak het overleg al beschrijft", () => {
+  const d = JSON.parse(readFileSync(new URL("../voorbeeld/dossier.voorbeeld.json", import.meta.url), "utf8"));
+  d.overleg = { ...d.overleg, ritme: "Eens per drie weken" };
+  d.afspraken = [{ tekst: "Voortgangsoverleg eens per drie weken.", intern: false, bron: "test" }];
+  const { tekst } = uitvraagMail(d, {});
+  assert.equal(tekst.split(/overleg/i).length - 1, 1);
+});
