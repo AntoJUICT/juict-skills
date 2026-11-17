@@ -100,6 +100,8 @@ Veldlengtes (zone 19, geverifieerd 05-08-2026): `Ticket.title` 255 (verplicht), 
 ### Service Calls
 - `POST /ServiceCallTickets/query` — filter op `ticketID`, geeft per koppeling een `serviceCallID` (een herpland ticket heeft er meerdere)
 - `GET /ServiceCalls/{id}` — `startDateTime`, `endDateTime`, `duration`, `status`, `isComplete`
+- `POST /ServiceCallTasks/query` — filter op `taskID`; geeft `serviceCallID` voor een service call op een projecttask. De ingeplande medewerker vind je met `POST /ServiceCallTaskResources/query` op `serviceCallTaskID` (= de `id` uit ServiceCallTasks).
+- `PATCH /ServiceCalls` — afsluiten met `{ id, status: 2, isComplete: 1 }`, respons `{ itemId }`; teruggelezen klopten beide velden (geverifieerd 16-11-2026).
 - Status-picklist (zone 19): `1 = New`, `2 = Complete`, `101 = Canceled`, `102 = Canceled by Company`, `103 = Missed`
 
 ### Companies
@@ -110,6 +112,7 @@ Veldlengtes (zone 19, geverifieerd 05-08-2026): `Ticket.title` 255 (verplicht), 
 - `POST /Companies/{companyID}/ToDos` — CRM to-do aanmaken (top-level `/CompanyToDos` en `/ToDos` geven 404)
 - `GET /Companies/{companyID}/ToDos` en `GET /Companies/{companyID}/ToDos/{id}` — ophalen
 - `PATCH /Companies/{companyID}/ToDos` — bijwerken; body met `id` + de te wijzigen velden (bijv. `activityDescription`). Geneste PATCH net als Ticket Notes; een top-level PATCH-pad bestaat niet. Response `{ itemId }` (geverifieerd 17-08-2026, zone 19).
+- `POST /CompanyToDos/query` — zoeken werkt wél top-level (bijv. op `id` als je de company niet weet). Een to-do zonder klant heeft `companyID: 0`; bijwerken gaat dan via `PATCH /Companies/0/ToDos`. Afronden = `completedDate` zetten (geverifieerd 09-11-2026, zone 19).
 - Verplichte velden: `companyID`, `assignedToResourceID`, `actionType`, `startDateTime`, `endDateTime`. Optioneel o.a. `activityDescription`, `ticketID` (koppelt de to-do aan een ticket), `creatorResourceID`.
 - `actionType` is een picklist; zone 19 heeft o.a. `29682841 = Administratie` (handig voor facturatie-to-do's), naast standaardwaarden als `3 = Algemeen` en `1 = Telefoongesprek`.
 
@@ -150,8 +153,10 @@ Creates zijn genest onder het project, queries zijn top-level. Geverifieerd zone
 - `GET /Projects/{id}/Phases` en `POST /Phases/query` — beide werken voor lezen (filter op `projectID`).
 - `POST /Projects/{id}/Tasks` en `PATCH /Projects/{id}/Tasks` — top-level `POST /Tasks` geeft 404. Verplicht: `projectID`, `title`, `taskType` (1 FixedWork, 2 FixedDuration), `status`. Met een toegewezen resource komen `departmentID` en `billingCodeID` er verplicht bij. PATCH-body is `{ id, ...velden }` en geeft `{ itemId }`; geverifieerd voor `status`, `estimatedHours` en `description` (zone 19, 04-11-2026). `Task.description` is maximaal 8000 tekens.
 - `POST /Tasks/query` — lezen, top-level.
-- `POST /Tasks/{id}/SecondaryResources` — resource+rol aan een task hangen (verplicht: `taskID`, `resourceID`, `roleID`). Top-level `/TaskSecondaryResources` geeft 404.
-- `POST /TaskNotes` en `POST /TaskNotes/query` — werken top-level. Verplicht: `taskID`, `description`, `noteType`, `publish`. `noteType` kent hier maar drie waarden: 1 Task Summary, 2 Task Detail, 3 Task Notes. Aanmaken lukt ook op een task met status 5 (Complete). De query op `taskID` geeft `taskID` en `title` terug, bruikbaar om dubbele notities te voorkomen.
+- `POST /Tasks/{id}/SecondaryResources` — resource+rol aan een task hangen (verplicht: `taskID`, `resourceID`, `roleID`). Aanmaken via top-level `/TaskSecondaryResources` geeft 404, maar `POST /TaskSecondaryResources/query` op `taskID` werkt wél (geverifieerd 16-11-2026): zo check je vóór het tijdschrijven of iemand al aan de task hangt.
+- `POST /TaskNotes`, `POST /Tasks/{id}/Notes` en `POST /TaskNotes/query` — aanmaken werkt zowel top-level als genest (genest geverifieerd 06-11-2026, respons `{ itemId }`). Verplicht: `taskID`, `description`, `noteType`, `publish`. `noteType` kent hier maar drie waarden: 1 Task Summary, 2 Task Detail, 3 Task Notes. Aanmaken lukt ook op een task met status 5 (Complete). De query op `taskID` geeft `taskID` en `title` terug, bruikbaar om dubbele notities te voorkomen.
+- `PATCH /Tasks/{id}/Notes` — bestaande task note bijwerken met `{ id, description }` (of `title`), respons `{ itemId }` (geverifieerd 16-11-2026).
+- `POST /Tasks/{id}/Attachments` — bijlage op een task, zelfde body als een ticketbijlage (`parentID` = task id, `attachmentType: "FILE_ATTACHMENT"`, `publish`, `title`, `fullPath`, `data` base64), respons `{ itemId }`. `GET /Tasks/{id}/Attachments` geeft de metadata, `GET /Tasks/{id}/Attachments/{attachmentId}` de `data` (in `items[0]`). Geverifieerd 16-11-2026.
 - `POST /Projects/{id}/Attachments` — bijlage op een project: `parentID` (= project-id), `attachmentType: "FILE_ATTACHMENT"`, `publish`, `title`, `fullPath`, `data` (base64); geeft `{ itemId }`. `GET /Projects/{id}/Attachments` geeft o.a. `id`, `fullPath` (exact zoals gepost), `title`, `attachDate`, `fileSize`; een vaste `fullPath` voorkomt een dubbele upload. Geverifieerd zone 19 op 04-11-2026.
 - Sjablonen: `POST /Projects/query` op `projectType` eq 3. Zone 19: 12 Azure Virtual Desktop, 14 Easywork Basic (29 taken, omschrijvingen leeg), 23 Azure Landing Zone template.
 - Interne projecten: `companyID` 0 (JUICT zelf) met `projectType` 4.
@@ -159,7 +164,7 @@ Creates zijn genest onder het project, queries zijn top-level. Geverifieerd zone
 `projectType` (zone 19): 2 Proposal, 3 Template, 4 Internal, 5 Client, 8 Baseline.
 `Project.status`: 0 Inactive, 1 New, 2 In Behandeling, 3 On Hold, 4 Change Order, 5 Complete, 6 Wacht op Leverancier, 7 Wacht op Klant. `Task.status` gebruikt dezelfde picklist als tickets.
 
-Bestaat niet als entity: `ProjectResources`, `ProjectTeamMembers`, `ProjectTeam`, `ProjectPhases`, `TaskSecondaryResources`, `SecurityLevels`. Tasks, Projects, Phases, TaskNotes en ProjectNotes kun je via de API niet verwijderen (`canDelete: false`); afsluiten kan alleen met een status. ProjectAttachments en TaskAttachments kun je wel verwijderen, maar niet bijwerken.
+Bestaat niet als entity: `ProjectResources`, `ProjectTeamMembers`, `ProjectTeam`, `ProjectPhases`, `SecurityLevels`. Tasks, Projects, Phases, TaskNotes en ProjectNotes kun je via de API niet verwijderen (`canDelete: false`); afsluiten kan alleen met een status. ProjectAttachments en TaskAttachments kun je wel verwijderen, maar niet bijwerken.
 
 ### Metadata / picklists
 - `GET /Tickets/entityInformation/fields` — picklist-waarden voor status, priority, issueType, subIssueType, etc.
