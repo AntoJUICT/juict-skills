@@ -89,6 +89,20 @@ direct op het site-object. Je hebt dus geen eigen mappingtabel nodig om een Datt
 Autotask-klant te koppelen. Niet elke site heeft ze ingevuld, dus val terug op naam-matching en
 niet andersom.
 
+## Quick jobs
+
+**Het commando blijft in klare tekst op de machine staan.** De component *Run Ad Hoc Command
+(PowerShell 2-5) [WIN]* schrijft alles wat je in `usrInput` meegeeft weg naar
+`C:\ProgramData\CentraStage\Temp\AdHocPSCmd-<timestamp>.ps1`, en dat bestand blijft na afloop
+staan. Stuur je er een token, wachtwoord of connectiestring doorheen, dan ligt die op de schijf van
+de klant, ook nadat de job is afgerond. Overschrijf de bestanden aan het eind van dezelfde job en
+controleer dat daarna in een losse job. Let op bij die controle: zoek je op `eyJ` om een JWT te
+vinden, dan matcht het controlecommando zichzelf, want ook dat wordt gearchiveerd.
+
+**De jobvariabele is ruimer dan je zou gokken.** 16.195 tekens in `usrInput` kwamen ongeschonden
+aan, gemeten door de machine de lengte terug te laten rapporteren. Een ARM-access-token van ruim
+16 kB past er dus in; afkapping is niet de eerste verdachte als een lang commando misgaat.
+
 ## Netwerk
 
 **De API laat af en toe een losse call stranden op "fetch failed".** Geen HTTP-status, maar een
