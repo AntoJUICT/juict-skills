@@ -201,8 +201,9 @@ zone 19). Verwijderen kan niet, ook geen notities en bijlagen.
 - **Eigen taken (buiten het sjabloon).** `POST /Projects/{id}/Tasks` met `{ projectID, phaseID, title, description, taskType: 1, status: 1, estimatedHours }`,
   zonder resource (dan zijn `departmentID` en `billingCodeID` niet nodig; de planner wijst toe via het planbord).
   Het endpoint en de verplichte velden `projectID`, `title`, `taskType` (1 FixedWork) en `status` zijn
-  geverifieerd (autotask-api). **Nog niet live geverifieerd:** `phaseID` bij het aanmaken en `status: 1` (New).
-  Doe de eerste run op een project met de voorvertoning, plaats met `--toepassen` en lees het resultaat terug met
+  geverifieerd (autotask-api). **Live geverifieerd op 18-11-2026 (zone 19, testproject):** `phaseID` en
+  `status: 1` (New) bij het aanmaken (taak kwam in de juiste fase), `PATCH` van `description` op 28 sjabloontaken,
+  en het sluiten van een n.v.t.-taak met status 5, 0 uur en een notitie. Lees na een run het resultaat terug met
   `GET /Projects/{id}/Tasks` (fase, status en uren). Een taak kan niet worden verwijderd; een fout sluit je af met
   status 5, 0 uur en een notitie met de reden, of laat de projectleider hem in de webinterface verwijderen.
 - **Lezen voor de punten.** De taken van het project (`GET /Projects/{id}/Tasks`), hun notities
