@@ -168,105 +168,167 @@ test("link-bijlage: url zonder https:// is een fout en wordt niet geplaatst", as
   assert.equal(at.calls.length, 0);
 });
 
-// --- Technische taken ---
+// --- Technische taken (Easywork Basic) ---
 
 const FASES = [{ id: 501, title: "Voorbereidings- en planningsfase" }, { id: 502, title: "Realisatie- en uitvoeringsfase" }, { id: 503, title: "Opleveringsfase" }];
-const TAKEN = [
-  { titel: "Testwerkplek inrichten", fase: "realisatie-  en uitvoeringsfase", uren: 4, omschrijving: "Werkplek inrichten.\n\nBron: Offerte 2026-11-02" },
-  { titel: "Proefmigratie uitvoeren", fase: "Realisatie- en uitvoeringsfase", uren: null, omschrijving: "Twee gebruikers.\n\nBron: Mail Sanne de Vries 2026-11-12" },
-];
+const TEKST = "Stap 10 van 28. Wacht op: Licentie plan maken\nSubtaken volgens het Easywork-draaiboek.\n\nEngineer\n1. [ ] Setup Conditional Access";
+const SJ = (titel, extra = {}) => ({ titel, sjabloon: true, fase: "Realisatie- en uitvoeringsfase", status: "nodig", uren: null, stap: 10, punten: 8, open: 7, omschrijving: TEKST, ...extra });
+const EIGEN = { titel: "Proefmigratie uitvoeren", sjabloon: false, fase: "realisatie-  en uitvoeringsfase", status: "nodig", uren: 4, bron: "Mail Sanne de Vries 2026-11-12", stap: 17, punten: 1, open: 1, omschrijving: "Stap 17 van 28. Wacht op: Setup Microsoft 365\nTaak voor dit project." };
+const AT_TAAK = (id, title, extra = {}) => ({ id, title, status: 1, description: "", estimatedHours: 8, ...extra });
 
 function nepAtTaken() {
   const at = nepAt();
   at.postProjectTask = async (p, b) => { at.calls.push(["taak", p, b]); return { itemId: 900 }; };
   at.postTaskNote = async (b) => { at.calls.push(["taaknotitie", b]); return { itemId: 901 }; };
+  at.patchTask = async (p, b) => { at.calls.push(["patch", p, b]); return { itemId: b.id }; };
   return at;
 }
+const bestaand = (taken, extra = {}) => ({ fases: FASES, taken, ...extra });
 
-test("taak: nieuw in een bestaande fase, voorvertoning zonder POST met de omschrijving", async () => {
+test("sjabloontaak met lege omschrijving: voorvertoning 'omschrijving vullen', daarna PATCH met id en description", async () => {
   const at = nepAtTaken();
-  const plan = planSchrijfacties(9001, { taken: TAKEN }, { fases: FASES, taken: [] });
-  assert.deepEqual(plan.taken.map((t) => [t.actie, t.phaseID]), [["nieuw", 502], ["nieuw", 502]]);
-  const r = await voerUit(at, plan, { toepassen: false, lees });
+  const plan = planSchrijfacties(9001, { taken: [SJ("Setup Microsoft 365")] }, bestaand([AT_TAAK(71, "Setup Microsoft 365", { description: "  " })]));
+  assert.equal(plan.taken[0].actie, "omschrijving");
+  const voor = await voerUit(at, plan, { toepassen: false, lees });
   assert.equal(at.calls.length, 0);
-  assert.equal(r.fouten, 0);
-  assert.match(r.uitvoer, /Taak "Testwerkplek inrichten" in Realisatie- en uitvoeringsfase, 4 uur: nieuw/);
-  assert.match(r.uitvoer, /Taak "Proefmigratie uitvoeren" in Realisatie- en uitvoeringsfase, 0 uur \(uren nog te bepalen\): nieuw/);
-  assert.match(r.uitvoer, /Werkplek inrichten\./);
+  assert.match(voor.uitvoer, /Taak "Setup Microsoft 365" \(stap 10\): omschrijving vullen \(8 punten, 7 open\):\nStap 10 van 28/);
+  const r = await voerUit(at, plan, { toepassen: true, lees });
+  assert.deepEqual(at.calls, [["patch", 9001, { id: 71, description: TEKST }]]);
+  assert.equal(r.taakAanpassingen, 1);
+  assert.match(r.uitvoer, /omschrijving gevuld/);
 });
 
-test("taak: met toepassen POST met projectID, phaseID, taskType 1, status 1, uren of 0, zonder resource", async () => {
-  const at = nepAtTaken();
-  const r = await voerUit(at, planSchrijfacties(9001, { taken: TAKEN }, { fases: FASES, taken: [] }), { toepassen: true, lees });
-  const posts = at.calls.filter((c) => c[0] === "taak");
-  assert.equal(posts.length, 2);
-  assert.equal(posts[0][1], 9001);
-  assert.deepEqual(posts[0][2], { projectID: 9001, phaseID: 502, title: "Testwerkplek inrichten", description: TAKEN[0].omschrijving, taskType: 1, status: 1, estimatedHours: 4 });
-  assert.equal(posts[1][2].estimatedHours, 0);
-  for (const [, , b] of posts) for (const v of ["assignedResourceID", "departmentID", "billingCodeID"]) assert.ok(!(v in b));
-  assert.equal(r.taken, 2);
-  assert.match(r.uitvoer, /2 taken/);
+test("sjabloontaak: titel op schrijfwijze van Autotask (spaties, hoofdletters) gevonden", () => {
+  const plan = planSchrijfacties(9001, { taken: [SJ("Licentieplan maken", { autotaskTitel: "Licentie plan maken" }), SJ("setup  intune")] },
+    bestaand([AT_TAAK(72, "Licentie plan maken"), AT_TAAK(73, "Setup Intune")]));
+  assert.deepEqual(plan.taken.map((t) => [t.actie, t.taskId]), [["omschrijving", 72], ["omschrijving", 73]]);
 });
 
-test("taak: onbekende fase is een foutregel, wordt niet aangemaakt en niet geraden", async () => {
+test("sjabloontaak met gevulde omschrijving: nooit overschrijven, notitie 'Projectstart: subtaken' (en niet dubbel)", async () => {
   const at = nepAtTaken();
-  const plan = planSchrijfacties(9001, { taken: [{ ...TAKEN[0], fase: "Uitvoering" }] }, { fases: FASES, taken: [] });
-  assert.equal(plan.taken[0].actie, "faseOnbekend");
+  const er = AT_TAAK(71, "Setup Microsoft 365", { description: "Door de projectleider ingevuld." });
+  const plan = planSchrijfacties(9001, { taken: [SJ("Setup Microsoft 365")] }, bestaand([er]));
+  assert.equal(plan.taken[0].actie, "notitie");
+  const voor = await voerUit(at, plan, { toepassen: false, lees });
+  assert.match(voor.uitvoer, /Taak "Setup Microsoft 365" \(stap 10\): omschrijving staat er al; notitie "Projectstart: subtaken" toevoegen:\nStap 10/);
+  const r = await voerUit(at, plan, { toepassen: true, lees });
+  assert.equal(at.calls.length, 1);
+  assert.deepEqual(at.calls[0], ["taaknotitie", { taskID: 71, title: "Projectstart: subtaken", description: TEKST, noteType: 3, publish: 2 }]);
+  assert.match(r.uitvoer, /omschrijving staat er al; notitie toegevoegd/);
+  const nogEens = planSchrijfacties(9001, { taken: [SJ("Setup Microsoft 365")] }, bestaand([er], { taakNotities: [{ taskID: 71, title: "Projectstart: subtaken", description: ` ${TEKST} ` }] }));
+  assert.equal(nogEens.taken[0].actie, "notitieStaatEr");
+  const at2 = nepAtTaken();
+  await voerUit(at2, nogEens, { toepassen: true, lees });
+  assert.equal(at2.calls.length, 0);
+});
+
+test("sjabloontaak waar de omschrijving al precies zo staat: overslaan", () => {
+  const plan = planSchrijfacties(9001, { taken: [SJ("Setup Microsoft 365")] }, bestaand([AT_TAAK(71, "Setup Microsoft 365", { description: TEKST })]));
+  assert.equal(plan.taken[0].actie, "overslaan");
+});
+
+test("sjabloontaak n.v.t.: eerst notitie met reden, dan PATCH status 5 en 0 uur; voorvertoning schrijft niets", async () => {
+  const at = nepAtTaken();
+  const plan = planSchrijfacties(9001, { taken: [SJ("Setup telefonie", { status: "nvt", reden: "Telefonie valt buiten de offerte", stap: null })] }, bestaand([AT_TAAK(74, "Setup telefonie")]));
+  assert.equal(plan.taken[0].actie, "nvt");
+  const voor = await voerUit(at, plan, { toepassen: false, lees });
+  assert.equal(at.calls.length, 0);
+  assert.match(voor.uitvoer, /Taak "Setup telefonie": n\.v\.t\., sluiten met reden \(status Complete, 0 uur\), notitie "Projectstart: niet van toepassing": Niet van toepassing: Telefonie valt buiten de offerte/);
+  const r = await voerUit(at, plan, { toepassen: true, lees });
+  assert.deepEqual(at.calls, [
+    ["taaknotitie", { taskID: 74, title: "Projectstart: niet van toepassing", description: "Niet van toepassing: Telefonie valt buiten de offerte", noteType: 3, publish: 2 }],
+    ["patch", 9001, { id: 74, status: 5, estimatedHours: 0 }],
+  ]);
+  assert.match(r.uitvoer, /n\.v\.t\., gesloten met reden/);
+});
+
+test("sjabloontaak n.v.t.: faalt de notitie, dan blijft de taak open (geen PATCH)", async () => {
+  const at = nepAtTaken();
+  at.postTaskNote = async () => { throw new Error("400"); };
+  const plan = planSchrijfacties(9001, { taken: [SJ("Setup telefonie", { status: "nvt", reden: "x" })] }, bestaand([AT_TAAK(74, "Setup telefonie")]));
+  const r = await voerUit(at, plan, { toepassen: true, lees });
+  assert.equal(r.fouten, 1);
+  assert.equal(at.calls.filter((c) => c[0] === "patch").length, 0);
+});
+
+test("afgeronde taak (status 5) wordt nooit aangeraakt, ook niet bij n.v.t.", async () => {
+  const at = nepAtTaken();
+  const taken = [SJ("Setup Microsoft 365"), SJ("Setup telefonie", { status: "nvt", reden: "x" })];
+  const plan = planSchrijfacties(9001, { taken }, bestaand([AT_TAAK(71, "Setup Microsoft 365", { status: 5 }), AT_TAAK(74, "Setup telefonie", { status: 5, description: "" })]));
+  assert.deepEqual(plan.taken.map((t) => t.actie), ["afgerond", "afgerond"]);
+  const r = await voerUit(at, plan, { toepassen: true, lees });
+  assert.equal(at.calls.length, 0);
+  assert.match(r.uitvoer, /staat op Complete in Autotask; niet aangepast/);
+});
+
+test("sjabloontaak die niet in het project staat: gemeld, niet aangemaakt, geen fout", async () => {
+  const at = nepAtTaken();
+  const plan = planSchrijfacties(9001, { taken: [SJ("Setup netwerk")] }, bestaand([]));
+  assert.equal(plan.taken[0].actie, "ontbreekt");
   for (const toepassen of [false, true]) {
     const r = await voerUit(at, plan, { toepassen, lees });
-    assert.equal(r.fouten, 1);
-    assert.match(r.uitvoer, /fase "Uitvoering" niet gevonden; niet aangemaakt/);
+    assert.equal(r.fouten, 0);
+    assert.equal(r.ontbreekt, 1);
+    assert.match(r.uitvoer, /Taak "Setup netwerk" \(stap 10\): sjabloontaak ontbreekt in project; niet aangemaakt/);
   }
   assert.equal(at.calls.length, 0);
 });
 
-test("taak: bestaande taak met dezelfde titel wordt overgeslagen, ook bij een dubbele titel in het plan", async () => {
+test("omschrijving langer dan 8000 tekens: ingekort in de omschrijving, volledig als notitie", async () => {
+  const lang = "Stap 1 van 2. Wacht op: geen andere taak\n" + Array.from({ length: 500 }, (_, i) => `${i + 1}. [ ] Punt ${i + 1} met wat uitleg`).join("\n");
   const at = nepAtTaken();
-  const bestaand = { fases: FASES, taken: [{ id: 77, title: "testwerkplek  INRICHTEN", estimatedHours: 4, description: "Werkplek inrichten.\n\nBron: Offerte 2026-11-02" }] };
-  const plan = planSchrijfacties(9001, { taken: [TAKEN[0], TAKEN[1], { ...TAKEN[1] }] }, bestaand);
-  assert.deepEqual(plan.taken.map((t) => t.actie), ["overslaan", "nieuw", "overslaan"]);
-  const r = await voerUit(at, plan, { toepassen: true, lees });
-  assert.equal(at.calls.filter((c) => c[0] === "taak").length, 1);
-  assert.match(r.uitvoer, /Taak "Testwerkplek inrichten" in Realisatie- en uitvoeringsfase, 4 uur: staat er al; overgeslagen/);
+  const plan = planSchrijfacties(9001, { taken: [SJ("Setup Microsoft 365", { omschrijving: lang })] }, bestaand([AT_TAAK(71, "Setup Microsoft 365")]));
+  const voor = await voerUit(at, plan, { toepassen: false, lees });
+  assert.match(voor.uitvoer, /langer dan 8000 tekens en komt als notitie "Projectstart: subtaken"/);
+  await voerUit(at, plan, { toepassen: true, lees });
+  const patch = at.calls.find((c) => c[0] === "patch")[2];
+  assert.ok(patch.description.length <= 8000);
+  assert.match(patch.description, /zie notitie Projectstart: subtaken/);
+  const notitie = at.calls.find((c) => c[0] === "taaknotitie")[1];
+  assert.equal(notitie.description, lang);
 });
 
-test("taak: bestaande taak met andere uren of omschrijving krijgt een notitie, nooit een patch", async () => {
+test("taak buiten het sjabloon: voorvertoning 'nieuwe taak in <fase>', daarna POST met fase, taskType 1, status 1, uren", async () => {
   const at = nepAtTaken();
-  at.patchTask = async () => { throw new Error("mag niet patchen"); };
-  const bestaand = { fases: FASES, taken: [{ id: 77, title: "Testwerkplek inrichten", estimatedHours: 2, description: "Door de engineer aangepast." }] };
-  const plan = planSchrijfacties(9001, { taken: [TAKEN[0]] }, bestaand);
-  assert.equal(plan.taken[0].actie, "notitie");
+  const plan = planSchrijfacties(9001, { taken: [EIGEN, { ...EIGEN, titel: "Zonder uren", uren: null }] }, bestaand([]));
+  assert.deepEqual(plan.taken.map((t) => [t.actie, t.phaseID]), [["nieuw", 502], ["nieuw", 502]]);
   const voor = await voerUit(at, plan, { toepassen: false, lees });
   assert.equal(at.calls.length, 0);
-  assert.match(voor.uitvoer, /notitie bij bestaande taak/);
-  assert.match(voor.uitvoer, /Uren volgens de offerte: 4 uur \(nu in de taak: 2 uur\)/);
-  assert.match(voor.uitvoer, /Werkplek inrichten\./);
+  assert.match(voor.uitvoer, /Taak "Proefmigratie uitvoeren" \(stap 17\): nieuwe taak in Realisatie- en uitvoeringsfase, 4 uur, omschrijving:\nStap 17/);
   const r = await voerUit(at, plan, { toepassen: true, lees });
-  assert.equal(at.calls.length, 1);
-  const [, body] = at.calls[0];
-  assert.deepEqual(Object.keys(body).sort(), ["description", "noteType", "publish", "taskID", "title"]);
-  assert.equal(body.taskID, 77);
-  assert.equal(body.title, "Projectstart: aanvulling");
-  assert.equal(body.noteType, 3);
-  assert.equal(body.publish, 2);
-  assert.equal(r.taakNotities, 1);
+  const posts = at.calls.filter((c) => c[0] === "taak");
+  assert.deepEqual(posts[0][2], { projectID: 9001, phaseID: 502, title: "Proefmigratie uitvoeren", description: EIGEN.omschrijving, taskType: 1, status: 1, estimatedHours: 4 });
+  assert.equal(posts[1][2].estimatedHours, 0);
+  for (const [, , b] of posts) for (const v of ["assignedResourceID", "departmentID", "billingCodeID"]) assert.ok(!(v in b));
+  assert.equal(r.taken, 2);
+  assert.match(r.uitvoer, /aangemaakt in Realisatie- en uitvoeringsfase/);
 });
 
-test("taak: uren null in het dossier is geen verschil; gelijke omschrijving dan overslaan", () => {
-  const bestaand = { fases: FASES, taken: [{ id: 78, title: "Proefmigratie uitvoeren", estimatedHours: 6, description: ` ${TAKEN[1].omschrijving} ` }] };
-  assert.equal(planSchrijfacties(9001, { taken: [TAKEN[1]] }, bestaand).taken[0].actie, "overslaan");
-});
-
-test("taak: dezelfde aanvulling staat er al als notitie, dan niet nog eens", async () => {
+test("taak buiten het sjabloon: onbekende fase is een fout; n.v.t. wordt niet aangemaakt; bestaande krijgt een aanvulling", async () => {
   const at = nepAtTaken();
-  const bestaand = { fases: FASES, taken: [{ id: 77, title: "Testwerkplek inrichten", estimatedHours: 2, description: "" }] };
-  const eerst = planSchrijfacties(9001, { taken: [TAKEN[0]] }, bestaand);
-  const notities = [{ taskID: 77, title: "Projectstart: aanvulling", description: eerst.taken[0].notitie.tekst }];
-  const plan = planSchrijfacties(9001, { taken: [TAKEN[0]] }, { ...bestaand, taakNotities: notities });
-  assert.equal(plan.taken[0].actie, "overslaan");
+  const plan = planSchrijfacties(9001, { taken: [{ ...EIGEN, fase: "Uitvoering" }, { ...EIGEN, titel: "Weg", status: "nvt", reden: "Vervallen" }, { ...EIGEN, titel: "Bestaat al" }] },
+    bestaand([AT_TAAK(80, "Bestaat al", { description: "Anders", estimatedHours: 2 })]));
+  assert.deepEqual(plan.taken.map((t) => t.actie), ["faseOnbekend", "nvtNietAangemaakt", "notitie"]);
+  const r = await voerUit(at, plan, { toepassen: true, lees });
+  assert.equal(r.fouten, 1);
+  assert.match(r.uitvoer, /fase "Uitvoering" niet gevonden; niet aangemaakt/);
+  assert.match(r.uitvoer, /n\.v\.t\. \(Vervallen\); niet aangemaakt/);
+  assert.deepEqual(at.calls.map((c) => c[0]), ["taaknotitie"]);
+  assert.equal(at.calls[0][1].title, "Projectstart: aanvulling");
+  assert.match(at.calls[0][1].description, /Uren volgens de offerte: 4 uur \(nu in de taak: 2 uur\)/);
+});
+
+test("dubbele titel in het plan wordt maar een keer behandeld", () => {
+  const plan = planSchrijfacties(9001, { taken: [SJ("Setup Intune"), SJ("SETUP INTUNE")] }, bestaand([AT_TAAK(73, "Setup Intune")]));
+  assert.deepEqual(plan.taken.map((t) => t.actie), ["omschrijving", "dubbel"]);
+});
+
+test("tekst met een wachtwoord gaat niet naar een taak", async () => {
+  const at = nepAtTaken();
+  const plan = planSchrijfacties(9001, { taken: [SJ("Setup Intune", { omschrijving: "wachtwoord: Geheim123!" })] }, bestaand([AT_TAAK(73, "Setup Intune")]));
   const r = await voerUit(at, plan, { toepassen: true, lees });
   assert.equal(at.calls.length, 0);
-  assert.match(r.uitvoer, /staat er al; overgeslagen/);
+  assert.equal(r.fouten, 1);
 });
 
 test("CLI met taken: leest fases, taken en taaknotities, schrijft zonder --toepassen niets", async () => {
@@ -276,15 +338,17 @@ test("CLI met taken: leest fases, taken en taaknotities, schrijft zonder --toepa
     async queryProjectNotes() { return []; },
     async get() { return { items: [] }; },
     async getProjectPhases(p) { gelezen.push(["fases", p]); return FASES; },
-    async getProjectTasks(p) { gelezen.push(["taken", p]); return [{ id: 77, title: "Testwerkplek inrichten", estimatedHours: 2, description: "" }]; },
+    async getProjectTasks(p) { gelezen.push(["taken", p]); return [AT_TAAK(71, "Setup Microsoft 365", { description: "Al ingevuld" }), AT_TAAK(74, "Setup telefonie")]; },
     async query(entity, filter) { gelezen.push([entity, filter[0].value]); return []; },
   };
-  const r = await hoofd(["--project", "9001", "--plan", "plan.json"], { at, lees: () => JSON.stringify({ taken: TAKEN }) });
+  const invoer = { taken: [SJ("Setup Microsoft 365"), SJ("Setup telefonie", { status: "nvt", reden: "x" }), EIGEN] };
+  const r = await hoofd(["--project", "9001", "--plan", "plan.json"], { at, lees: () => JSON.stringify(invoer) });
   assert.equal(r.code, 0, r.uitvoer);
-  assert.deepEqual(gelezen, [["fases", 9001], ["taken", 9001], ["TaskNotes", 77]]);
+  assert.deepEqual(gelezen, [["fases", 9001], ["taken", 9001], ["TaskNotes", 71], ["TaskNotes", 74]]);
   assert.equal(at.calls.length, 0);
-  assert.match(r.uitvoer, /notitie bij bestaande taak/);
-  assert.match(r.uitvoer, /Proefmigratie uitvoeren.*nieuw/);
+  assert.match(r.uitvoer, /omschrijving staat er al; notitie/);
+  assert.match(r.uitvoer, /n\.v\.t\., sluiten met reden/);
+  assert.match(r.uitvoer, /nieuwe taak in Realisatie- en uitvoeringsfase/);
 });
 
 test("CLI zonder taken in het plan leest geen fases of taken", async () => {
@@ -292,4 +356,20 @@ test("CLI zonder taken in het plan leest geen fases of taken", async () => {
     async getProjectPhases() { throw new Error("niet nodig"); }, async getProjectTasks() { throw new Error("niet nodig"); } };
   const r = await hoofd(["--project", "9001", "--plan", "plan.json"], { at, lees: () => JSON.stringify(INVOER) });
   assert.equal(r.code, 0, r.uitvoer);
+});
+
+test("plan uit taken.mjs voor het voorbeelddossier: elke taak een herkenbare actie, voorvertoning in volgorde", async () => {
+  const { takenVoorPlan } = await import("./taken.mjs");
+  const { readFileSync } = await import("node:fs");
+  const d = JSON.parse(readFileSync(new URL("../voorbeeld/dossier.voorbeeld.json", import.meta.url), "utf8"));
+  const taken = takenVoorPlan(d);
+  const projectTaken = taken.filter((t) => t.sjabloon).map((t, i) => AT_TAAK(100 + i, t.titel));
+  const plan = planSchrijfacties(9001, { taken }, bestaand(projectTaken));
+  const acties = plan.taken.map((t) => t.actie);
+  assert.equal(acties.filter((a) => a === "omschrijving").length, 27);
+  assert.equal(acties.filter((a) => a === "nvt").length, 2);
+  assert.equal(acties.filter((a) => a === "nieuw").length, 1);
+  const r = await voerUit(nepAtTaken(), plan, { toepassen: false, lees });
+  assert.equal(r.fouten, 0, r.uitvoer);
+  assert.ok(r.uitvoer.indexOf('Taak "Setup Microsoft 365"') < r.uitvoer.indexOf('Taak "Project afsluitingsgesprek"'), "voorvertoning in logische volgorde");
 });

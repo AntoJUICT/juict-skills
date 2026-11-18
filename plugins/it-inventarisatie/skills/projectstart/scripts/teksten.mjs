@@ -3,7 +3,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { isBedrag } from "./dossier.mjs";
-import { urenTekst } from "./taken.mjs";
+import { puntenPerRol, takenInVolgorde, urenTekst } from "./taken.mjs";
+import { ROLLEN } from "./draaiboek.mjs";
 import { findSecretText } from "../../it-inventarisatie/scripts/geheimen.mjs";
 
 const p2 = (n) => String(n).padStart(2, "0");
@@ -41,7 +42,14 @@ function aanleverRegel(a) {
   return delen.length ? `${a.wat} (${delen.join(", ")})` : `${a.wat} (nog open: wie en wanneer)`;
 }
 
-const taakRegel = (t) => `${t.titel} (${t.fase}, ${urenTekst(t.uren)})`;
+// Per rol hoeveel punten nog open staan, bijvoorbeeld "Engineer 3 open, Projectmanager 1 open".
+const openPerRol = (t) => {
+  const r = puntenPerRol(t);
+  return ROLLEN.filter((x) => r[x].open).map((x) => `${x} ${r[x].open} open`).join(", ");
+};
+const taakRegel = (t) => (t.status === "nvt"
+  ? `${t.titel} (${t.fase}, niet van toepassing: ${t.reden})`
+  : `${t.titel} (${t.fase}${typeof t.uren === "number" ? `, ${urenTekst(t.uren)}` : ""}${openPerRol(t) ? `, ${openPerRol(t)}` : ""})`);
 
 // --- Briefing (intern) ---
 
@@ -76,8 +84,18 @@ export function briefing(d, { presentatie, rapport } = {}) {
   l.push("Scope, buiten:");
   for (const s of d.scope.buiten) l.push(`- ${s}`);
   if (d.taken?.length) {
-    l.push("", "Technische taken in Autotask:");
-    for (const t of d.taken) l.push(`- ${taakRegel(t)}`);
+    // Alleen taken met open punten, in de volgorde van het draaiboek; daarna wat niet van toepassing is.
+    const lijst = takenInVolgorde(d.taken);
+    const open = lijst.filter((x) => x.stap && openPerRol(x.taak));
+    if (open.length) {
+      l.push("", "Taken in Autotask met open punten (Easywork Basic, in volgorde):");
+      for (const x of open) l.push(`${x.stap}. ${taakRegel(x.taak)}${x.taak.sjabloon === false ? ", buiten het sjabloon" : ""}`);
+    }
+    const nvt = lijst.filter((x) => !x.stap);
+    if (nvt.length) {
+      l.push("", "Niet van toepassing:");
+      for (const x of nvt) l.push(`- ${x.taak.titel}: ${x.taak.reden}`);
+    }
   }
   if (d.meerwerk?.length) {
     l.push("", "Meerwerk, nog afstemmen (geen taak):");
@@ -118,7 +136,7 @@ const LIJSTEN = [
   ["Scope buiten", (d) => d.scope?.buiten, (s) => s],
   ["Extra onderwerpen", (d) => d.extraOnderwerpen, (o) => `${o.soort}: geregeld ${o.geregeld.join("; ") || "-"}; controleren ${o.controleren.join("; ") || "-"}; later ${o.later.join("; ") || "-"}`],
   ["Externe partijen", (d) => d.externePartijen, (e) => `${e.naam}, ${e.rol}${e.aangestuurdDoor ? `, aangestuurd door ${e.aangestuurdDoor}` : ""}`],
-  ["Technische taken", (d) => d.taken, (t) => `${taakRegel(t)}, bron ${t.bron}`],
+  ["Technische taken", (d) => d.taken, (t) => `${taakRegel(t)}${t.sjabloon === false ? `, bron ${t.bron}` : ""}`],
   ["Meerwerk", (d) => d.meerwerk, (m) => `${m.wat} (${m.bron})`],
 ];
 

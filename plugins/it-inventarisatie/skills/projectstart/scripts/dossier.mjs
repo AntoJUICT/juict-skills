@@ -6,6 +6,7 @@ import { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 import { haalCredentials, maakAt, normaliseerTitel } from "../../it-inventarisatie/scripts/autotask-project.mjs";
 import { scrubSecrets, findSecretText, isSecretKey } from "../../it-inventarisatie/scripts/geheimen.mjs";
+import { ROLLEN, autotaskTitel, draaiboek, draaiboekPunten, puntSleutel, sjabloonTaak, titelSleutel, volgorde } from "./draaiboek.mjs";
 
 const GEBRUIK = [
   "Gebruik:",
@@ -117,24 +118,77 @@ function controleerVorm(d, f) {
 
 const isUren = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0;
 
-// Technische taken voor de engineers: elk met een bron, uren alleen uit de offerte en per fase nooit meer dan daar staat.
+const TAAK_STATUS = ["nodig", "nvt"];
+const PUNT_STATUS = ["open", "gedaan", "nvt", "extra"];
+
+// Technische taken op basis van het Easywork-draaiboek. Per sjabloontaak staan alle punten uit het draaiboek erin
+// (open, gedaan of nvt met reden): de skill laat geen punt stilletjes weg. Extra punten en eigen taken hebben een bron.
+// Uren alleen uit de offerte en per fase nooit meer dan daar staat.
 function controleerTaken(d, f, rij) {
   const codes = new Set((isLijst(d.fases) ? d.fases : []).map((x) => x?.code));
   rij("taken", d.taken, [
     ["titel", isTekst, "verplicht"], ["fase", isTekst, "verplicht (titel van de fase in Autotask)"],
-    ["omschrijving", isTekst, "verplicht"], ["bron", isTekst, "verplicht (offerte of mail met datum)"],
-    ["uren", (v) => v === null || isUren(v), "getal vanaf 0 of null verplicht"],
-    ["resultaat", (v) => v === undefined || isTekstOfNull(v), "tekst of null verplicht"],
+    ["sjabloon", (v) => typeof v === "boolean", "true of false verplicht"],
+    ["status", (v) => TAAK_STATUS.includes(v), 'moet "nodig" of "nvt" zijn'],
+    ["reden", (v) => v === undefined || isTekstOfNull(v), "tekst of null verplicht"],
+    ["bron", (v) => v === undefined || isTekstOfNull(v), "tekst of null verplicht"],
+    ["uren", (v) => v === undefined || v === null || isUren(v), "getal vanaf 0 of null verplicht (alleen uit de offerte)"],
     ["projectFase", (v) => v === undefined || v === null || codes.has(v), "moet een code uit fases zijn"],
+    ["punten", isLijst, "lijst verplicht"],
   ]);
   if (!isLijst(d.taken)) return;
+  const db = draaiboek();
   const gezien = new Map();
   d.taken.forEach((t, i) => {
-    if (!isTekst(t?.titel)) return;
-    const sleutel = normaliseerTitel(t.titel);
-    if (gezien.has(sleutel)) f.push(`taken[${i}].titel: dubbel, zelfde titel als taken[${gezien.get(sleutel)}]`);
+    if (!t || typeof t !== "object" || !isTekst(t.titel)) return;
+    const pad = `taken[${i}]`;
+    const sjabloon = sjabloonTaak(t.titel, db);
+    // Dubbel: zelfde titel, of twee schrijfwijzen van dezelfde sjabloontaak.
+    const sleutel = sjabloon ? `sjabloon:${sjabloon.wbs}` : titelSleutel(t.titel);
+    if (gezien.has(sleutel)) f.push(`${pad}.titel: dubbel, zelfde titel als taken[${gezien.get(sleutel)}]`);
     else gezien.set(sleutel, i);
+    if (t.status === "nvt" && !isTekst(t.reden)) f.push(`${pad}.reden: verplicht als de taak niet van toepassing is`);
+    if (t.sjabloon === true) {
+      if (!sjabloon) return f.push(`${pad}.titel: "${t.titel}" is geen taak uit het sjabloon Easywork Basic; gebruik sjabloon: false met een bron`);
+      if (isTekst(t.fase) && titelSleutel(t.fase) !== titelSleutel(sjabloon.fase)) f.push(`${pad}.fase: hoort "${sjabloon.fase}" te zijn (draaiboek)`);
+    } else if (t.sjabloon === false) {
+      if (sjabloon) f.push(`${pad}.titel: "${t.titel}" is al een sjabloontaak; zet de punten bij die taak (sjabloon: true)`);
+      if (!isTekst(t.bron)) f.push(`${pad}.bron: verplicht voor een taak buiten het sjabloon (offerte, mail of document met datum)`);
+      if (t.wachtOp !== undefined && t.wachtOp !== null && !(isLijst(t.wachtOp) && t.wachtOp.every(isTekst))) f.push(`${pad}.wachtOp: lijst met taaktitels of null verplicht`);
+    }
+    if (!isLijst(t.punten)) return;
+    const punten = new Set();
+    t.punten.forEach((p, j) => {
+      const pp = `${pad}.punten[${j}]`;
+      if (!p || typeof p !== "object") return f.push(`${pp}: object verplicht`);
+      if (!isTekst(p.tekst)) f.push(`${pp}.tekst: verplicht`);
+      if (!PUNT_STATUS.includes(p.status)) f.push(`${pp}.status: moet "open", "gedaan", "nvt" of "extra" zijn`);
+      if (p.status === "nvt" && !isTekst(p.reden)) f.push(`${pp}.reden: verplicht als het punt niet van toepassing is`);
+      if (p.status === "extra" && !isTekst(p.bron)) f.push(`${pp}.bron: verplicht voor een extra punt (offerte, mail, document of taaknotitie)`);
+      for (const veld of ["reden", "bron", "onder"]) if (p[veld] !== undefined && !isTekstOfNull(p[veld])) f.push(`${pp}.${veld}: tekst of null verplicht`);
+      if (p.rol !== undefined && p.rol !== null && !ROLLEN.includes(p.rol)) f.push(`${pp}.rol: moet ${ROLLEN.join(", ")} of null zijn`);
+      if (p.status !== "extra") punten.add(puntSleutel(p));
+    });
+    if (t.sjabloon !== true || !sjabloon) return;
+    const bekend = new Set(draaiboekPunten(sjabloon).map(puntSleutel));
+    t.punten.forEach((p, j) => {
+      if (p && p.status !== "extra" && isTekst(p.tekst) && !bekend.has(puntSleutel(p))) {
+        f.push(`${pad}.punten[${j}]: "${p.tekst}" staat niet in het draaiboek; maak er een extra punt van met een bron`);
+      }
+    });
+    if (t.status !== "nodig") return;
+    for (const p of draaiboekPunten(sjabloon)) {
+      if (!punten.has(puntSleutel(p))) f.push(`${pad}.punten: punt "${p.onder ? `${p.onder} > ` : ""}${p.tekst}" uit het draaiboek ontbreekt; zet het op open, gedaan of nvt met reden`);
+    }
   });
+  // Volgorde over de fases heen: geen onbekende verwijzing en niet rond.
+  f.push(...volgorde(d.taken, db).fouten);
+  // Staat er één sjabloontaak in, dan alle: een taak die niet nodig is krijgt status "nvt" met een reden.
+  if (d.taken.some((t) => t?.sjabloon === true)) {
+    for (const s of db.taken) {
+      if (!d.taken.some((t) => t?.sjabloon === true && sjabloonTaak(t.titel, db) === s)) f.push(`taken: sjabloontaak "${autotaskTitel(s)}" ontbreekt; zet hem erin (status "nvt" met reden als hij niet nodig is)`);
+    }
+  }
   for (const fase of isLijst(d.fases) ? d.fases : []) {
     if (!isUren(fase?.uren)) continue;
     const som = d.taken.filter((t) => t?.projectFase === fase.code && isUren(t.uren)).reduce((s, t) => s + t.uren, 0);
@@ -178,7 +232,8 @@ export function valideerDossier(d) {
     if (/\bBC\b|\bM365\b/.test(tekst)) f.push(`${pad}: verboden afkorting (BC of M365)`);
     if (/\bMFA\b/.test(tekst) && !/multifactor/i.test(tekst)) f.push(`${pad}: MFA zonder dat het voluit staat`);
     const m = INTERN_TEKST.exec(pad);
-    const intern = m && d.afspraken?.[Number(m[1])]?.intern === true;
+    // Taken zijn intern (Autotask, PVA, briefing): het draaiboek noemt zelf een bedrag bij de deelfacturatie.
+    const intern = (m && d.afspraken?.[Number(m[1])]?.intern === true) || /^taken\[/.test(pad);
     if (!intern && isBedrag(tekst)) f.push(`${pad}: bedrag in klantgerichte tekst`);
   }
   f.push(...geheimeSleutels(d));

@@ -16,6 +16,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { valideerDossier } from "../dossier.mjs";
+import { puntenPerRol, takenInVolgorde } from "../taken.mjs";
 import { datumTekst, maandTekst, SUPPORT_MAIL, SUPPORT_PORTAAL, NOODNUMMER } from "../presentatie/slides.mjs";
 import { findSecretText } from "../../../it-inventarisatie/scripts/geheimen.mjs";
 
@@ -80,7 +81,14 @@ export function openPunten(d) {
     punt(zin(a.tekst), `Staat alleen in ${a.bron}. Controleren tegen de offerte; tot dan geen afspraak.`);
   }
   for (const t of d.taken ?? []) {
-    if (t.uren === null) punt(`Taak: ${t.titel}`, "Uren nog te bepalen: de offerte noemt geen uren voor deze taak. In Autotask staat hij op 0 uur.");
+    if (t.status === "nvt") continue;
+    if (t.sjabloon === false && (t.uren === null || t.uren === undefined)) {
+      punt(`Taak: ${t.titel}`, "Uren nog te bepalen: de offerte noemt geen uren voor deze taak buiten het sjabloon. In Autotask staat hij op 0 uur.");
+    }
+    // Een tegenstrijdigheid tussen een oudere taakomschrijving en een nieuwere bron is een extra punt "controleren: ...".
+    for (const x of (t.punten ?? []).filter((x) => x.status === "extra" && /^controleren\b/i.test(x.tekst))) {
+      punt(`Taak ${t.titel}: ${x.tekst.replace(/^controleren\s*:?\s*/i, "")}`, `Controleren (bron: ${x.bron}). De taak in Autotask is niet aangepast.`);
+    }
   }
   for (const m of d.meerwerk ?? []) {
     punt(`Meerwerk: ${m.wat}`, `Staat in ${m.bron}, niet in de offerte. Meerwerk, afstemmen met de klant voordat het een taak wordt.`);
@@ -219,19 +227,29 @@ function afspraken(d) {
 
 const uren = (u) => String(u).replace(".", ",");
 
-// De technische taken zoals ze in Autotask komen, met de bron per taak en het totaal aan uren uit de offerte.
+// De taken uit het Easywork-draaiboek in logische volgorde: per taak hoeveel punten voor de engineer nog open
+// staan, de taken die niet van toepassing zijn met de reden, en de taken buiten het sjabloon met hun bron.
 function technischeTaken(d) {
-  const taken = d.taken ?? [];
-  const t = tabel(["Taak", "Fase", "Uren", "Bron"],
-    taken.map((x) => [`<b>${esc(x.titel)}</b>`, esc(x.fase), esc(x.uren === null ? OPEN : uren(x.uren)), klein(x.bron)]), { breedtes: [40, 24, 12, 24] });
+  const lijst = takenInVolgorde(d.taken);
+  const nodig = lijst.filter((x) => x.stap);
+  const t = tabel(["Stap", "Taak", "Fase", "Open voor engineer", "Uren"],
+    nodig.map(({ taak, stap }) => {
+      const e = puntenPerRol(taak).Engineer;
+      return [esc(String(stap)), `<b>${esc(taak.titel)}</b>${taak.sjabloon === false ? ` ${klein("buiten het sjabloon")}` : ""}`, esc(taak.fase),
+        esc(e.totaal ? `${e.open} van ${e.totaal}` : "geen"), esc(typeof taak.uren === "number" ? uren(taak.uren) : "")];
+    }), { breedtes: [8, 40, 26, 14, 12] });
   if (!t) return "";
-  const totaal = taken.filter((x) => x.uren !== null).reduce((s, x) => s + x.uren, 0);
-  const open = taken.filter((x) => x.uren === null).length;
-  const rest = open ? `, zonder ${open} ${open === 1 ? "taak waarvan de uren" : "taken waarvan de uren"} nog te bepalen zijn` : "";
-  return `<h2>Technische taken</h2>
-<p>Deze taken staan in Autotask voor de engineers. Elke taak komt uit de offerte of een mail; de uren komen uit de offerte. Het inplannen gebeurt via het planbord.</p>
-${t}
-<p><b>Totaal: ${esc(uren(totaal))} uur${esc(rest)}.</b></p>`;
+  const nvt = tabel(["Taak", "Reden"], lijst.filter((x) => !x.stap).map(({ taak }) => [esc(taak.titel), esc(taak.reden)]), { breedtes: [40, 60] });
+  const extra = tabel(["Taak", "Fase", "Bron"], nodig.filter((x) => x.taak.sjabloon === false).map(({ taak }) => [esc(taak.titel), esc(taak.fase), klein(taak.bron)]), { breedtes: [45, 30, 25] });
+  const totaal = nodig.filter((x) => typeof x.taak.uren === "number").reduce((som, x) => som + x.taak.uren, 0);
+  return [
+    `<h2>Technische taken</h2>
+<p>Het project komt uit het sjabloon Easywork Basic. Per taak staan de subtaken uit het Easywork-draaiboek in Autotask, aangevuld met wat de offerte, de mails en de documenten noemen. De volgorde volgt uit het draaiboek; het inplannen gebeurt via het planbord.</p>
+${t}`,
+    totaal ? `<p><b>Uren uit de offerte: ${esc(uren(totaal))} uur.</b></p>` : "",
+    nvt && `<h2>Niet van toepassing</h2>\n${nvt}`,
+    extra && `<h2>Taken buiten het sjabloon</h2>\n${extra}`,
+  ].filter(Boolean).join("\n");
 }
 
 function uitvoering(d) {

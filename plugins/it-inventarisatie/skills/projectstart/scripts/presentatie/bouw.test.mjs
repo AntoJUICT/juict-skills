@@ -300,6 +300,14 @@ test("em-dash of bedrag in dossiertekst haalt de presentatie nooit", () => {
     for (const pad of vrijeTekst) {
       assert.throws(() => bouwPresentatie(zet(voorbeeld(), pad, "a — b"), uit), /em-dash/, pad.join("."));
       const d = zet(voorbeeld(), pad, "kost € 5");
+      // Taken zijn intern (Autotask, PVA, briefing): het draaiboek noemt zelf een bedrag bij de deelfacturatie.
+      // Een andere titel of punttekst maakt het dossier om andere redenen ongeldig; een bedrag is daar nooit de reden.
+      if (pad[0] === "taken") {
+        let fout = "";
+        try { bouwPresentatie(d, uit); } catch (e) { fout = e.message; }
+        assert.doesNotMatch(fout, /bedrag/, pad.join("."));
+        continue;
+      }
       const intern = pad[0] === "afspraken" && pad.at(-1) === "tekst" && d.afspraken[pad[1]].intern;
       if (intern) assert.doesNotMatch(readFileSync(bouwPresentatie(d, uit).bestand, "utf8"), /€/);
       else assert.throws(() => bouwPresentatie(d, uit), /bedrag/, pad.join("."));

@@ -43,14 +43,15 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
 8. **Geen sjabloontekst en geen lege tabellen.** Geen instructies als "Voer een impactanalyse uit" of "Beschrijf hoe"
    in een document, en geen tabel zonder rijen. `pva.mjs` weigert zulke uitvoer. Een onbekende datum is "nog te
    plannen" (nooit "n.t.b.") en staat ook bij Open punten.
-9. **Technische taken alleen uit offerte en mail.** De projectleider maakt het project uit het sjabloon en zet zelf de
-   projectmanagement-, administratie- en salestaken klaar; de skill maakt alleen de technische taken, als concrete
-   stappen voor een engineer met het werkwoord voorop. Elke taak heeft een `bron` (de offerte of een mail met datum).
-   Uren komen alleen uit de offerte, nooit verzonnen, en per fase nooit meer dan de offerte noemt. Geen uren bekend:
-   `uren: null` (de taak krijgt 0 uur en staat bij Open punten). Wat buiten de scope valt wordt nooit een taak. Een
-   afspraak in een mail die werk toevoegt dat niet in de offerte staat, is geen taak maar meerwerk (`meerwerk[]`, Open
-   punt "meerwerk, afstemmen"). Taken worden niet aan engineers toegewezen: dat doet de planner via het planbord. Een
-   bestaande taak wordt nooit overschreven.
+9. **Taken volgen het Easywork-draaiboek.** Het project komt altijd uit het sjabloon Easywork Basic (29 taken, 7
+   fases). De subtaken staan in `<skill>/assets/easywork-draaiboek.json`. Laat nooit een punt uit het draaiboek
+   stilletjes weg: elk punt is `open`, `gedaan` of `nvt` met een `reden`, en een taak die niet nodig is krijgt
+   status `nvt` met een reden. Wat de offerte, documenten of mails extra noemen, wordt een punt `extra` met een
+   `bron`. Uren komen alleen uit de offerte, nooit verzonnen, en per fase nooit meer dan de offerte noemt. Wat buiten
+   de scope valt wordt nooit een taak. Werk uit een mail dat niet in de offerte staat is meerwerk (`meerwerk[]`, Open
+   punt "meerwerk, afstemmen"). Taken worden niet toegewezen: dat doet de planner via het planbord. Een ingevulde
+   omschrijving wordt nooit overschreven (dan een notitie), een afgeronde taak nooit aangeraakt. Fases en datums in
+   Autotask past de skill niet aan.
 
 ## Starten (nog geen dossier op het project)
 
@@ -67,16 +68,28 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
      partijen) en wie het dagelijkse aanspreekpunt is;
    - wie van JUICT in het projectteam zit (`team`). Neem de accountmanager niet vanzelf op.
 3. **Controleren.** `node <skill>/scripts/dossier.mjs controleer <werkmap>/dossier.json`, net zo lang tot het geldig is.
-4. **Technische taken.** Zet in het dossier `taken[]`: per stap uit de offerte en de mails een concrete stap voor een
-   engineer, met het werkwoord voorop ("Testwerkplekken voor Business Central inrichten"), de fase zoals die in het
-   Autotask-project heet (`fase`, bijvoorbeeld "Realisatie- en uitvoeringsfase"), wat er daarna is (`resultaat`) en de
-   `bron`. Zet de uren per fase uit de offerte in `fases[].uren` en koppel elke taak met `projectFase` aan zijn fase:
-   `controleer` weigert dan een som boven de offerte. Werk uit een mail dat niet in de offerte staat gaat naar
-   `meerwerk[]`, niet naar `taken`. Laat de lijst bevestigen en draai `controleer` opnieuw. Daarna
-   `node <skill>/scripts/taken.mjs --dossier <werkmap>/dossier.json --plan <werkmap>/plan.json`: de taken komen in het
-   plan en gaan in stap 8 met de rest naar Autotask. De voorvertoning toont per taak "nieuw", "staat er al;
-   overgeslagen", "fase niet gevonden; niet aangemaakt" (pas dan de fasenaam aan, nooit gokken) of "notitie bij
-   bestaande taak" (het dossier wijkt af van een taak die er al staat: de taak blijft zoals hij is).
+4. **Technische taken.** Het project is gemaakt uit het sjabloon Easywork Basic.
+   - `node <skill>/scripts/taken.mjs zaai --dossier <werkmap>/dossier.json` zet alle 29 sjabloontaken met alle punten
+     uit het draaiboek in `taken[]`, alles `open`. Je past daarna alleen statussen aan en voegt punten toe.
+   - Lees ook de taken van het project zelf, met hun omschrijving, taaknotities en tijdregels, alleen lezend via de
+     autotask-api skill (zie REFERENCE.md, "Autotask"), en de notities op het project uit `bronnen.json`. Zet per punt `gedaan` als een bron laat zien dat het gedaan is, of `nvt`
+     met een `reden` ("telefonie valt buiten de offerte"). Een hele taak die niet nodig is: status `nvt` met `reden`.
+   - Voeg punten `extra` toe met een `bron` uit de offerte, documenten (ook afbeeldingen in Word-bestanden), mails en
+     bestaande taakomschrijvingen of taaknotities, bij de taak waar ze horen. Zet `rol` als het punt niet voor de
+     engineer is.
+   - Spreekt een oudere taakomschrijving een nieuwere bron tegen, overschrijf dan niets: voeg een punt `extra` toe
+     "controleren: <tegenstrijdigheid> (bron ...)" met als `bron` de nieuwere bron. Het komt in het PVA bij Open punten.
+   - Werk dat in geen enkele sjabloontaak past, wordt een eigen taak (`sjabloon: false`) met `bron`, de fase uit
+     Autotask en eventueel `wachtOp` (titels van taken waar hij op wacht; standaard aan het eind van zijn fase).
+   - Zet uren uit de offerte op de taak (`uren`, anders `null`) en koppel met `projectFase` aan `fases[].uren`.
+   Draai `controleer` tot het dossier geldig is (een weggelaten punt, `nvt` zonder reden, `extra` zonder bron, een
+   dubbele titel of een volgorde die rond loopt geeft een fout) en laat de lijst bevestigen. Daarna
+   `node <skill>/scripts/taken.mjs plan --dossier <werkmap>/dossier.json --plan <werkmap>/plan.json`: de taken komen in
+   logische volgorde in het plan (uit "Wacht op" van het draaiboek) en gaan in stap 8 met de rest naar Autotask. Elke
+   omschrijving begint met "Stap n van m. Wacht op: ...", daarna de punten per rol. De voorvertoning toont per taak
+   "omschrijving vullen (N punten, X open)", "omschrijving staat er al; notitie toevoegen", "n.v.t., sluiten met
+   reden", "nieuwe taak in <fase>" of "sjabloontaak ontbreekt in project" (dan is het project niet uit het sjabloon
+   gemaakt: meld het, de skill maakt de taak niet aan).
 5. **Rapport.** `node <it>/scripts/dns-lookup.mjs <domein>...` op de domeinen uit de bronnen. Dan
    `node <it>/scripts/werkbestand.mjs van-dossier <werkmap>/dossier.json` en verder volgens it-inventarisatie stap 5
    en 6 (`rapport.json`, `bouw.mjs`, publiceren in Claude Design), met `--uit <scratch>/rapport`. Controleer daarna
@@ -139,8 +152,10 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    Meldt het "Geen wijzigingen", dan is de inhoud van het dossier gelijk gebleven: geen nieuw rapport en geen nieuwe
    PVA-versie, ga door naar stap 6.
 5. Wel wijzigingen: bouw het rapport opnieuw en publiceer het naar dezelfde url, draai `samenhang.mjs`, maak een
-   nieuw Word-rapport (Word-bijlage in stap 5 van Starten, nieuwe versie, met ook de nieuwe PDF via `-Pdf`) en een nieuwe PVA-versie (stap 7 van Starten) en zet beide in het plan. Zijn de taken veranderd, draai dan ook `taken.mjs --plan`:
-   alleen nieuwe taken worden aangemaakt, een afwijking bij een bestaande taak wordt een notitie bij die taak. Daarna `autotask-schrijf.mjs` met voorvertoning en
+   nieuw Word-rapport (Word-bijlage in stap 5 van Starten, nieuwe versie, met ook de nieuwe PDF via `-Pdf`) en een nieuwe PVA-versie (stap 7 van Starten) en zet beide in het plan. Zijn de taken veranderd, draai dan ook `taken.mjs plan`:
+   een omschrijving die er al staat wordt nooit overschreven (de nieuwe stand komt als notitie "Projectstart: subtaken"),
+   alleen nieuwe eigen taken worden aangemaakt. Is het draaiboek bijgewerkt, dan vult `taken.mjs zaai` de ontbrekende
+   taken en punten aan zonder iets te wissen. Daarna `autotask-schrijf.mjs` met voorvertoning en
    `--toepassen`. **De presentatie nooit opnieuw:** die maakt alleen de eerste run, daarna past de projectleider hem
    met de hand aan.
 6. `dossier.mjs bewaar`, voorvertoning en daarna `--toepassen`. De nieuwe ids in `verwerkt` maken een nieuwe versie.

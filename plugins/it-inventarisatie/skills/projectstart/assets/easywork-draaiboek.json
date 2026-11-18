@@ -1,0 +1,1085 @@
+{
+  "bron": "Easywork_Draaiboek.xlsx, tabblad Easywork Basic",
+  "sjabloon": "Easywork Basic",
+  "datum": "2026-09-17",
+  "taken": [
+    {
+      "wbs": "1.1",
+      "fase": "Initiatie- en overdracht fase",
+      "titel": "Administratieve opstart project",
+      "rol": "Verkoop/Administratie",
+      "wachtOp": null,
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Inrichten Autotask",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Aanmaken Nacalculatie contract",
+              "rol": "Verkoop/Administratie",
+              "toelichting": null
+            },
+            {
+              "tekst": "Aanmaken Easywork contract",
+              "rol": "Verkoop/Administratie",
+              "toelichting": null
+            },
+            {
+              "tekst": "Aanmaken Managed services contract",
+              "rol": "Verkoop/Administratie",
+              "toelichting": null
+            },
+            {
+              "tekst": "Aanmaken optionele contracten (indien nodig)",
+              "rol": "Verkoop/Administratie",
+              "toelichting": null
+            },
+            {
+              "tekst": "Activeren facturatie per mail",
+              "rol": "Verkoop/Administratie",
+              "toelichting": null
+            },
+            {
+              "tekst": "Herinneringsmail instellen",
+              "rol": "Verkoop/Administratie",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Inrichting IT Glue",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Verwerken documenten",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Getekende offerte in project bijlage",
+              "rol": "Verkoop/Administratie",
+              "toelichting": null
+            },
+            {
+              "tekst": "Automatisch incasso overeenkomst in IT Glue en Exact Online",
+              "rol": "Verkoop/Administratie",
+              "toelichting": null
+            },
+            {
+              "tekst": "MCA agreement verwerken in IT Glue",
+              "rol": "Verkoop/Administratie",
+              "toelichting": null
+            },
+            {
+              "tekst": "Azure calculaties in IT Glue",
+              "rol": "Verkoop/Administratie",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Microsoft registraties",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "CPOR registratie aanvragen (boven de 10 users)",
+              "rol": "Engineer",
+              "toelichting": "Belangrijk! moet gedaan worden voor er Azure kosten gemaakt worden dus voor we iets gaan doen moet dit geregeld zijn"
+            },
+            {
+              "tekst": "PAL registratie (moet via engineer)",
+              "rol": "Engineer",
+              "toelichting": "Moet door engineer worden gedaan wellicht verplaatsen naar andere fase?"
+            },
+            {
+              "tekst": "Azure accelerate fund aanvragen",
+              "rol": "Engineer",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Deel facturatie (50% bij € 4.000,- of hoger eenmalige kosten) na bericht projectmanager",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "2.1",
+      "fase": "Projectmanagement",
+      "titel": "Projectafstemming met verkoop",
+      "rol": "Verkoop/Administratie",
+      "wachtOp": null,
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Doornemen offerte",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Bespreken geoffreerde configuratie",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Doornemen bijzonderheden",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "2.2",
+      "fase": "Projectmanagement",
+      "titel": "Project opstart",
+      "rol": "Projectmanager",
+      "wachtOp": "2.1 Projectafstemming met verkoop",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Versturen Welkom bij JUICT Mail",
+          "rol": "Projectmanager",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Communicatie naar latende ICT-dienstverlener verstuurd door klant",
+              "rol": "Projectmanager",
+              "toelichting": null
+            },
+            {
+              "tekst": "Overzicht diensten en einddatum contracten oude dienstverlener.",
+              "rol": "Projectmanager",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Afspraak plannen Kick-off meeting",
+          "rol": "Projectmanager",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Technische inventarisatie plannen",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Eisen en wensen bepalen",
+              "rol": "Engineer",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Terugkoppeling naar stakeholders",
+          "rol": "Projectmanager",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "2.3",
+      "fase": "Projectmanagement",
+      "titel": "Diverse projectwerkzaamheden",
+      "rol": "Projectmanager",
+      "wachtOp": null,
+      "toelichting": null,
+      "punten": []
+    },
+    {
+      "wbs": "2.4",
+      "fase": "Projectmanagement",
+      "titel": "Tussentijds voortgangsgesprek",
+      "rol": "Projectmanager",
+      "wachtOp": "2.2 Project opstart",
+      "toelichting": null,
+      "punten": []
+    },
+    {
+      "wbs": "2.5",
+      "fase": "Projectmanagement",
+      "titel": "Project afsluitingsgesprek",
+      "rol": "Projectmanager",
+      "wachtOp": "Hele fase 5: Opleveringsfase",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Plannen",
+          "rol": "Projectmanager",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Presentje regelen",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Terugkoppelen",
+          "rol": "Projectmanager",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Periodieke voortgangsmeeting plannen",
+          "rol": "Projectmanager",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Definitieve opzegging oude dienstverlener",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "3.1",
+      "fase": "Voorbereidings- en planningsfase",
+      "titel": "Maken Plan van Aanpak",
+      "rol": "Projectmanager",
+      "wachtOp": "2.2 Project opstart",
+      "toelichting": null,
+      "punten": []
+    },
+    {
+      "wbs": "3.2",
+      "fase": "Voorbereidings- en planningsfase",
+      "titel": "Aanschaf benodigde hardware en/of software",
+      "rol": "Verkoop/Administratie",
+      "wachtOp": "2.2 Project opstart",
+      "toelichting": null,
+      "punten": []
+    },
+    {
+      "wbs": "3.3",
+      "fase": "Voorbereidings- en planningsfase",
+      "titel": "Huidige documentatie ontvangen",
+      "rol": "Projectmanager",
+      "wachtOp": "2.2 Project opstart",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Microsoft 365 omgeving",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Netwerkapparatuur",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Einddatum lopende contracten (NCE, Internet, Telefonie)",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Overdracht documentatie",
+          "rol": "Projectmanager",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Ontvangen documentatie en verwerken in IT Glue!",
+              "rol": "Engineer",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Toegang inrichten op huidige infrastructuur",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Controle belangrijkste wachtwoorden",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Aanpassen wachtwoorden & verwerken in IT Glue",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Uitrol DattoRMM op servers (zonder patching)",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "GDAP relatie opzetten",
+              "rol": "Engineer",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Afstemming inrichting Microsoft 365 licenties",
+          "rol": "Projectmanager",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "3.4",
+      "fase": "Voorbereidings- en planningsfase",
+      "titel": "Licentieplan maken",
+      "autotaskTitel": "Licentie plan maken",
+      "rol": "Engineer",
+      "wachtOp": "2.2 Project opstart",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Licentieplan maken en laten accorderen door projectmanager",
+          "rol": "Projectmanager",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "4.1",
+      "fase": "Realisatie- en uitvoeringsfase",
+      "titel": "Setup Microsoft 365",
+      "rol": "Engineer",
+      "wachtOp": "Hele fase 3: Voorbereidings- en planningsfase",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Microsoft 365 tenant aanmaken (indien nieuwe tenant)",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Setup Conditional Access",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Koppelen domein(en)",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "DKIM & DMARC aanzetten",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Aanmaken / aanpassen / omzetten gebruikersaccount(s)",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Aanmaken / aanpassen / omzetten gedeelde postvak(ken)",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Microsoft 365 optimalisatie uitvoeren",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "4.2",
+      "fase": "Realisatie- en uitvoeringsfase",
+      "titel": "Setup standaard applicaties",
+      "rol": "Engineer",
+      "wachtOp": "4.1 Setup Microsoft 365",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Setup Printix",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Setup DattoRMM",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Setup SharePoint. Eventueel aanpassen SharePoint (incl. goed zetten rechten)",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Setup Sophos",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Setup Huntress ITDR & SAT",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Setup Rewst",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Setup Nerdio",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Setup klantportaal",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Setup Microsoft 365 back-up",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "4.3",
+      "fase": "Realisatie- en uitvoeringsfase",
+      "titel": "Setup Intune",
+      "rol": "Engineer",
+      "wachtOp": "4.1 Setup Microsoft 365",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Baseline uitrollen",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Applicaties toevoegen",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Laptops koppelen aan Autopilot",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "4.4",
+      "fase": "Realisatie- en uitvoeringsfase",
+      "titel": "RBAC Opmaken",
+      "rol": "Engineer",
+      "wachtOp": "Hele fase 3: Voorbereidings- en planningsfase",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Eerste versie opmaken",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Akkoord vragen aan primaire contactpersoon",
+          "rol": "Projectmanager",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Definitieve versie verwerken in IT Glue",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "4.5",
+      "fase": "Realisatie- en uitvoeringsfase",
+      "titel": "Initiële datamigratie",
+      "rol": "Engineer",
+      "wachtOp": "4.1 Setup Microsoft 365",
+      "toelichting": null,
+      "punten": []
+    },
+    {
+      "wbs": "4.6",
+      "fase": "Realisatie- en uitvoeringsfase",
+      "titel": "Mailmigratie Microsoft 365",
+      "rol": "Engineer",
+      "wachtOp": "4.1 Setup Microsoft 365",
+      "toelichting": null,
+      "punten": []
+    },
+    {
+      "wbs": "4.7",
+      "fase": "Realisatie- en uitvoeringsfase",
+      "titel": "Setup netwerk",
+      "rol": "Engineer",
+      "wachtOp": "Hele fase 3: Voorbereidings- en planningsfase",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Voorconfiguratie firewall",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Koppelen aan Sophos Central",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Firewall licentie koppelen",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "ACL rule toevoegen JUICT IP",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "LAN netwerken aanmaken + DHCP",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Overige netwerkapparatuur static zetten in DHCP",
+              "rol": "Engineer",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Voorconfiguratie UniFi",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Site aanmaken",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "AP & SW koppelen aan site",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Naamconventie hanteren",
+              "rol": "Engineer",
+              "toelichting": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "wbs": "4.8",
+      "fase": "Realisatie- en uitvoeringsfase",
+      "titel": "Setup telefonie",
+      "rol": "Engineer",
+      "wachtOp": "Hele fase 3: Voorbereidings- en planningsfase",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Voorbereiding",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Klant aanmaken via het Speakup-portaal",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Nieuwe dienst toevoegen met klantnaam",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Portering van telefoonnummer(s) of blokken aanvragen",
+              "rol": "Verkoop/Administratie",
+              "toelichting": null
+            },
+            {
+              "tekst": "Goedkeuring van portering",
+              "rol": "Verkoop/Administratie",
+              "toelichting": null
+            },
+            {
+              "tekst": "Verkoop vragen om de benodigde apparatuur te bestellen",
+              "rol": "Verkoop/Administratie",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Afstemming met de klant",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Afspraak maken met verantwoordelijke",
+              "rol": "Projectmanager",
+              "toelichting": null
+            },
+            {
+              "tekst": "Inventariseren van gebruikers, belplan en interne/directe nummers",
+              "rol": "Engineer",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Belplan uitvragen",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Openingstijden",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Geluidsfragmenten/bandjes",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Keuzemenu (inclusief tijdsinstellingen)",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Wachtrijen en gespreksrotatie met tijden",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Voicemail instellingen",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Wie krijgt gewenste telefoons? (softphone/hardphone)",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Firmware-update nodig bij bestaande hardphones?",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Wie mag de aansluiting(en) beheren",
+              "rol": "Engineer",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Randzaken bespreken",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Rapportage/dashboard",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "WhatsApp-koppeling",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Adresboek",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "CloudCTI-koppeling",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Uitbellen met andere nummers",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Wachtmuziek in wachtrij of wachtstand",
+              "rol": "Engineer",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Na de inventarisatie",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Visio-overzicht maken van het belplan en ter goedkeuring sturen naar verantwoordelijke",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Eindklant software laten installeren of via Intune pushen",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Firewall aanpassingen mailen of laten uitvoeren als wij het beheer hebben",
+              "rol": "Engineer",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Uitvoering",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Aanmaken nieuwe Xelion-omgeving + telefoonnummer(s) door Speakup",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Azure gebruikers koppelen",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Hardphones voorzien van nieuwste firmware en provisionen",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Update IT Glue",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Xelion omgeving klaarmaken en testen",
+              "rol": "Engineer",
+              "toelichting": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "wbs": "5.1",
+      "fase": "Opleveringsfase",
+      "titel": "Distribueren welkomsbrief",
+      "rol": "Projectmanager",
+      "wachtOp": null,
+      "toelichting": null,
+      "punten": []
+    },
+    {
+      "wbs": "5.2",
+      "fase": "Opleveringsfase",
+      "titel": "Definitieve datamigratie",
+      "rol": "Engineer",
+      "wachtOp": null,
+      "toelichting": null,
+      "punten": []
+    },
+    {
+      "wbs": "5.3",
+      "fase": "Opleveringsfase",
+      "titel": "ICT oplevering op locatie",
+      "rol": "Engineer",
+      "wachtOp": "5.1 Distribueren welkomsbrief; 5.2 Definitieve datamigratie; Hele fase 4: Realisatie- en uitvoeringsfase",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Plaatsen / omzetten apparatuur (bekijk offerte)",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Plaatsen / omzetten netwerk (bekijk offerte)",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Gebruikers in Conditional Access voegen",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Scan to Mail printer instellen",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Toevoegen mail aan telefoon etc.",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "5.4",
+      "fase": "Opleveringsfase",
+      "titel": "Telefonie oplevering op locatie",
+      "rol": "Engineer",
+      "wachtOp": "4.7 Setup netwerk; 4.8 Setup telefonie",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Portering doorvoeren",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Hardphones aansluiten/inloggen op softphone",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Gebruikersinstructies geven voor software/telefoons",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Nazorg verlenen",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "5.5",
+      "fase": "Opleveringsfase",
+      "titel": "Controle licenties en back-up",
+      "rol": "Engineer",
+      "wachtOp": "5.3 ICT oplevering op locatie",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Laatste controle van opzegging van alle licenties en back-up",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Officiële opzegging van licenties controleren bij oude dienstverlener",
+          "rol": "Projectmanager",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "5.6",
+      "fase": "Opleveringsfase",
+      "titel": "Nazorg project oplevering",
+      "rol": "Projectmanager",
+      "wachtOp": "5.3 ICT oplevering op locatie; 5.4 Telefonie oplevering op locatie",
+      "toelichting": null,
+      "punten": []
+    },
+    {
+      "wbs": "5.7",
+      "fase": "Opleveringsfase",
+      "titel": "IT Glue updaten",
+      "rol": "Engineer",
+      "wachtOp": "5.3 ICT oplevering op locatie",
+      "toelichting": null,
+      "punten": []
+    },
+    {
+      "wbs": "6.1",
+      "fase": "After sales en administratiefase",
+      "titel": "Administratieve oplevering",
+      "rol": "Verkoop/Administratie",
+      "wachtOp": "Hele fase 5: Opleveringsfase",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Bepalen meer/minder hardware/software",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Verwerken Azure-consumptie aanloopfase project",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Controle Microsoft 365 licenties (NCE)",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Controle contracten",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "CPOR aanvraag indienen",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Controle Azure",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "Vastzetten Azure instances",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Windows server licenties aanschaffen (HAB)",
+              "rol": "Verkoop/Administratie",
+              "toelichting": null
+            },
+            {
+              "tekst": "SQL Hybrid benefit aanzetten",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Instellen budget alerts",
+              "rol": "Engineer",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Microsoft registraties afronden",
+          "rol": "Engineer",
+          "toelichting": null,
+          "kinderen": [
+            {
+              "tekst": "CPOR afronden",
+              "rol": "Engineer",
+              "toelichting": null
+            },
+            {
+              "tekst": "Azure accelerate afronden",
+              "rol": "Engineer",
+              "toelichting": null
+            }
+          ]
+        },
+        {
+          "tekst": "Eindfacturatie",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "6.2",
+      "fase": "After sales en administratiefase",
+      "titel": "After sales",
+      "rol": "Projectmanager",
+      "wachtOp": "6.1 Administratieve oplevering",
+      "toelichting": null,
+      "punten": [
+        {
+          "tekst": "Plannen afspraak traktatie en koffie",
+          "rol": "Projectmanager",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Informeren over kwartaalmeeting project en operations coördinator",
+          "rol": "Projectmanager",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Jaarlijkse account review plannen",
+          "rol": "Projectmanager",
+          "toelichting": null,
+          "kinderen": []
+        },
+        {
+          "tekst": "Referentie en case vragen",
+          "rol": "Verkoop/Administratie",
+          "toelichting": null,
+          "kinderen": []
+        }
+      ]
+    },
+    {
+      "wbs": "7.1",
+      "fase": "NACALC (Werkzaamheden buiten scope)",
+      "titel": "NACALC (Werkzaamheden buiten scope)",
+      "rol": "Projectmanager",
+      "wachtOp": null,
+      "toelichting": null,
+      "punten": []
+    },
+    {
+      "wbs": "7.2",
+      "fase": "NACALC (Werkzaamheden buiten scope)",
+      "titel": "Ondersteuning bedrijfsapplicaties",
+      "rol": "Projectmanager",
+      "wachtOp": null,
+      "toelichting": null,
+      "punten": []
+    }
+  ]
+}

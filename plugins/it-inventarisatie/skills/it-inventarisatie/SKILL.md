@@ -80,9 +80,10 @@ de plugin onder `~/.claude/plugins/cache/...` staat). Hieronder staat die map al
    Toon de voorvertoning. Na akkoord:
    `node <skill>/scripts/autotask-project.mjs toepassen --plan <werkmap>/plan.json --toepassen`
    Zonder `--toepassen` schrijft geen enkel commando naar Autotask.
-   **Projecten die met projectstart zijn gestart** hebben geen technische sjabloontaken: de technische taken komen
-   daar uit de offerte en mails via projectstart (`taken.mjs`). `plan` meldt een taak uit de taakkoppeling die er niet
-   is als "geen sjabloontaak, overgeslagen"; dat is geen fout. Maak die taken hier niet alsnog aan.
+   **Projecten die met projectstart zijn gestart** komen ook uit het sjabloon Easywork Basic; projectstart vult de
+   omschrijving van de taken met de subtaken uit het Easywork-draaiboek (`taken.mjs`). `plan` meldt een taak uit de
+   taakkoppeling die er niet is als "geen sjabloontaak, overgeslagen"; dat is geen fout. Maak die taken hier niet
+   alsnog aan.
 
 **Antwoordrondes.** Antwoorden komen in losse mails, vaak tussen de geciteerde vragen ("AB-> ...") en in elke map
 van de mailbox, ook in zelfgemaakte mappen als "Af te handelen". Zoek daarom op afzender en onderwerp zonder

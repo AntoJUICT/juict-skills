@@ -2,21 +2,58 @@
   "schema": 1,
   "projectId": 9001,
   "companyId": 8001,
-  "klant": { "autotask": "Voorbeeld Techniek B.V.", "weergave": "Voorbeeld Techniek" },
+  "klant": {
+    "autotask": "Voorbeeld Techniek B.V.",
+    "weergave": "Voorbeeld Techniek"
+  },
   "projectNaam": "Overstap naar een nieuwe cloudomgeving",
   "kickoffDatum": "2026-11-24",
   "contacten": [
-    { "naam": "Sanne de Vries", "rol": "Directeur", "organisatie": "Voorbeeld Techniek", "beslisser": true, "aanspreekpunt": false, "mail": "sanne.devries@voorbeeldtechniek.example" },
-    { "naam": "Joost Bakker", "rol": "Office manager", "organisatie": "Voorbeeld Techniek", "beslisser": false, "aanspreekpunt": true, "mail": "joost.bakker@voorbeeldtechniek.example" },
-    { "naam": "Femke Jansen", "rol": "Beheerder applicatie", "organisatie": "Voorbeeld Software", "beslisser": false, "aanspreekpunt": false }
+    {
+      "naam": "Sanne de Vries",
+      "rol": "Directeur",
+      "organisatie": "Voorbeeld Techniek",
+      "beslisser": true,
+      "aanspreekpunt": false,
+      "mail": "sanne.devries@voorbeeldtechniek.example"
+    },
+    {
+      "naam": "Joost Bakker",
+      "rol": "Office manager",
+      "organisatie": "Voorbeeld Techniek",
+      "beslisser": false,
+      "aanspreekpunt": true,
+      "mail": "joost.bakker@voorbeeldtechniek.example"
+    },
+    {
+      "naam": "Femke Jansen",
+      "rol": "Beheerder applicatie",
+      "organisatie": "Voorbeeld Software",
+      "beslisser": false,
+      "aanspreekpunt": false
+    }
   ],
   "team": [
-    { "naam": "Pim Verhoeven", "rol": "Projectleider" },
-    { "naam": "Lotte Smit", "rol": "Engineer" }
+    {
+      "naam": "Pim Verhoeven",
+      "rol": "Projectleider"
+    },
+    {
+      "naam": "Lotte Smit",
+      "rol": "Engineer"
+    }
   ],
   "externePartijen": [
-    { "naam": "Voorbeeld Software", "rol": "Leverancier van de planningssoftware", "aangestuurdDoor": "Pim Verhoeven" },
-    { "naam": "Voorbeeld Telecom", "rol": "Leverancier van de telefooncentrale", "aangestuurdDoor": null }
+    {
+      "naam": "Voorbeeld Software",
+      "rol": "Leverancier van de planningssoftware",
+      "aangestuurdDoor": "Pim Verhoeven"
+    },
+    {
+      "naam": "Voorbeeld Telecom",
+      "rol": "Leverancier van de telefooncentrale",
+      "aangestuurdDoor": null
+    }
   ],
   "doel": "Alle medewerkers van Voorbeeld Techniek werken veilig en stabiel vanaf een nieuwe cloudomgeving, zonder onderbreking van de productie.",
   "doelBron": "Offerte 2026-11-02",
@@ -37,47 +74,1031 @@
     ]
   },
   "fases": [
-    { "code": "F1", "naam": "Voorbereiding en inrichting", "route": "01", "start": "2026-12", "eind": "2027-01", "uren": 24 },
-    { "code": "F2", "naam": "Migratie en oplevering", "route": "02", "start": "2027-01", "eind": "2027-03", "uren": 40 }
+    {
+      "code": "F1",
+      "naam": "Voorbereiding en inrichting",
+      "route": "01",
+      "start": "2026-12",
+      "eind": "2027-01",
+      "uren": 24
+    },
+    {
+      "code": "F2",
+      "naam": "Migratie en oplevering",
+      "route": "02",
+      "start": "2027-01",
+      "eind": "2027-03",
+      "uren": 40
+    }
   ],
-  "migratieplan": { "datum": "2027-01-15" },
+  "migratieplan": {
+    "datum": "2027-01-15"
+  },
   "vervolgOfferte": "Na akkoord op het migratieplan volgt een aparte offerte voor de koppeling met de planningssoftware.",
   "gebruikersimpact": "Geen impact voor medewerkers in deze fase.",
   "overgangBeheer": "Tot de overstap blijft jullie huidige IT-ondersteuning werken; JUICT neemt het beheer pas over als we volledige toegang hebben.",
   "besluiten": [
-    { "vraag": "Welke gebruikers krijgen toegang tot de gedeelde planningsmap?", "beslisser": "Sanne de Vries", "uiterlijk": "2026-12-15", "alsNiet": "Alleen het managementteam krijgt toegang tot de map.", "besluit": "Alle medewerkers krijgen leestoegang tot de gedeelde planningsmap.", "bron": "Mail Sanne de Vries 2026-11-12" },
-    { "vraag": "Blijft de oude telefooncentrale in gebruik tot na de migratie?", "beslisser": null, "uiterlijk": null, "alsNiet": "We laten de centrale ongewijzigd en plannen dit later in." }
+    {
+      "vraag": "Welke gebruikers krijgen toegang tot de gedeelde planningsmap?",
+      "beslisser": "Sanne de Vries",
+      "uiterlijk": "2026-12-15",
+      "alsNiet": "Alleen het managementteam krijgt toegang tot de map.",
+      "besluit": "Alle medewerkers krijgen leestoegang tot de gedeelde planningsmap.",
+      "bron": "Mail Sanne de Vries 2026-11-12"
+    },
+    {
+      "vraag": "Blijft de oude telefooncentrale in gebruik tot na de migratie?",
+      "beslisser": null,
+      "uiterlijk": null,
+      "alsNiet": "We laten de centrale ongewijzigd en plannen dit later in."
+    }
   ],
   "aanleveren": [
-    { "wat": "Lijst met alle gebruikers en hun functie", "wie": "Joost Bakker", "datum": "2026-12-01", "tijd": "2 uur" },
-    { "wat": "Overzicht van gedeelde mailboxen en distributielijsten", "wie": null, "datum": null, "tijd": null }
+    {
+      "wat": "Lijst met alle gebruikers en hun functie",
+      "wie": "Joost Bakker",
+      "datum": "2026-12-01",
+      "tijd": "2 uur"
+    },
+    {
+      "wat": "Overzicht van gedeelde mailboxen en distributielijsten",
+      "wie": null,
+      "datum": null,
+      "tijd": null
+    }
   ],
   "afspraken": [
-    { "tekst": "Het gesprek over de planning vindt plaats op de laatste dinsdag van de maand.", "intern": false, "bron": "Kickoff-notitie 2026-11-10" },
-    { "tekst": "Extra werkzaamheden buiten scope worden berekend tegen € 100 per uur.", "intern": true, "financieel": true, "bron": "Offerte 2026-11-02" },
-    { "tekst": "De bestaande beheerovereenkomst wordt met 12 maanden verlengd.", "intern": true, "financieel": true, "bron": "Offerte 2026-11-02" },
-    { "tekst": "10 procent korting op de werkelijk bestede uren.", "intern": true, "financieel": true, "controleren": true, "bron": "Mail Sanne de Vries 2026-11-12" }
+    {
+      "tekst": "Het gesprek over de planning vindt plaats op de laatste dinsdag van de maand.",
+      "intern": false,
+      "bron": "Kickoff-notitie 2026-11-10"
+    },
+    {
+      "tekst": "Extra werkzaamheden buiten scope worden berekend tegen € 100 per uur.",
+      "intern": true,
+      "financieel": true,
+      "bron": "Offerte 2026-11-02"
+    },
+    {
+      "tekst": "De bestaande beheerovereenkomst wordt met 12 maanden verlengd.",
+      "intern": true,
+      "financieel": true,
+      "bron": "Offerte 2026-11-02"
+    },
+    {
+      "tekst": "10 procent korting op de werkelijk bestede uren.",
+      "intern": true,
+      "financieel": true,
+      "controleren": true,
+      "bron": "Mail Sanne de Vries 2026-11-12"
+    }
   ],
   "technischeVragen": [
-    { "vraag": "Welke versie draait de planningssoftware en is die compatibel met de nieuwe omgeving?", "aan": "Femke Jansen", "bron": "Intake 2026-11-10" }
+    {
+      "vraag": "Welke versie draait de planningssoftware en is die compatibel met de nieuwe omgeving?",
+      "aan": "Femke Jansen",
+      "bron": "Intake 2026-11-10"
+    }
   ],
   "extraOnderwerpen": [
     {
       "soort": "beveiliging",
-      "geregeld": ["Multifactor-authenticatie is ingesteld voor beheerders"],
-      "controleren": ["Of alle gebruikers een tweede inlogstap gebruiken"],
-      "later": ["Beveiligingstraining voor medewerkers"]
+      "geregeld": [
+        "Multifactor-authenticatie is ingesteld voor beheerders"
+      ],
+      "controleren": [
+        "Of alle gebruikers een tweede inlogstap gebruiken"
+      ],
+      "later": [
+        "Beveiligingstraining voor medewerkers"
+      ]
     }
   ],
   "taken": [
-    { "titel": "Beheertoegang en uitgangssituatie vastleggen", "fase": "Voorbereidings- en planningsfase", "projectFase": "F1", "uren": 4, "omschrijving": "Beheertoegang tot de huidige omgeving regelen en de uitgangssituatie vastleggen: gebruikers, mailboxen, gedeelde mappen en apparaten.", "resultaat": "Een overzicht van de huidige omgeving en werkende beheertoegang.", "bron": "Offerte 2026-11-02" },
-    { "titel": "Nieuwe cloudomgeving en beveiligde toegang inrichten", "fase": "Realisatie- en uitvoeringsfase", "projectFase": "F1", "uren": 16, "omschrijving": "De nieuwe omgeving inrichten met accounts voor alle 25 gebruikers, multifactor-authenticatie en voorwaardelijke toegang.", "resultaat": "Een ingerichte omgeving waarin elke gebruiker veilig kan inloggen.", "bron": "Offerte 2026-11-02" },
-    { "titel": "Proefmigratie met twee gebruikers uitvoeren", "fase": "Realisatie- en uitvoeringsfase", "projectFase": "F1", "uren": null, "omschrijving": "Mailbox en bestanden van twee gebruikers uit het managementteam als eerste overzetten en met hen testen voordat de rest volgt.", "resultaat": "Twee gebruikers werken op de nieuwe omgeving; de aanpak voor de rest is getest.", "bron": "Mail Sanne de Vries 2026-11-12" },
-    { "titel": "Mailboxen en bestanden migreren", "fase": "Realisatie- en uitvoeringsfase", "projectFase": "F2", "uren": 28, "omschrijving": "Alle mailboxen, gedeelde mailboxen en bestanden volgens het migratieplan overzetten naar de nieuwe omgeving.", "resultaat": "Alle mail en bestanden staan in de nieuwe omgeving.", "bron": "Offerte 2026-11-02" },
-    { "titel": "Beheer overdragen en documentatie in IT Glue bijwerken", "fase": "Opleveringsfase", "projectFase": "F2", "uren": 8, "omschrijving": "De nieuwe situatie documenteren in IT Glue en het beheer overdragen aan de servicedesk.", "resultaat": "Actuele documentatie in IT Glue en een overdracht aan de servicedesk.", "bron": "Offerte 2026-11-02" }
+    {
+      "titel": "Administratieve opstart project",
+      "sjabloon": true,
+      "fase": "Initiatie- en overdracht fase",
+      "status": "nodig",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Inrichten Autotask",
+          "status": "open"
+        },
+        {
+          "tekst": "Aanmaken Nacalculatie contract",
+          "onder": "Inrichten Autotask",
+          "status": "open"
+        },
+        {
+          "tekst": "Aanmaken Easywork contract",
+          "onder": "Inrichten Autotask",
+          "status": "open"
+        },
+        {
+          "tekst": "Aanmaken Managed services contract",
+          "onder": "Inrichten Autotask",
+          "status": "open"
+        },
+        {
+          "tekst": "Aanmaken optionele contracten (indien nodig)",
+          "onder": "Inrichten Autotask",
+          "status": "open"
+        },
+        {
+          "tekst": "Activeren facturatie per mail",
+          "onder": "Inrichten Autotask",
+          "status": "open"
+        },
+        {
+          "tekst": "Herinneringsmail instellen",
+          "onder": "Inrichten Autotask",
+          "status": "open"
+        },
+        {
+          "tekst": "Inrichting IT Glue",
+          "status": "open"
+        },
+        {
+          "tekst": "Verwerken documenten",
+          "status": "open"
+        },
+        {
+          "tekst": "Getekende offerte in project bijlage",
+          "onder": "Verwerken documenten",
+          "status": "open"
+        },
+        {
+          "tekst": "Automatisch incasso overeenkomst in IT Glue en Exact Online",
+          "onder": "Verwerken documenten",
+          "status": "open"
+        },
+        {
+          "tekst": "MCA agreement verwerken in IT Glue",
+          "onder": "Verwerken documenten",
+          "status": "open"
+        },
+        {
+          "tekst": "Azure calculaties in IT Glue",
+          "onder": "Verwerken documenten",
+          "status": "open"
+        },
+        {
+          "tekst": "Microsoft registraties",
+          "status": "open"
+        },
+        {
+          "tekst": "CPOR registratie aanvragen (boven de 10 users)",
+          "onder": "Microsoft registraties",
+          "status": "open"
+        },
+        {
+          "tekst": "PAL registratie (moet via engineer)",
+          "onder": "Microsoft registraties",
+          "status": "open"
+        },
+        {
+          "tekst": "Azure accelerate fund aanvragen",
+          "onder": "Microsoft registraties",
+          "status": "open"
+        },
+        {
+          "tekst": "Deel facturatie (50% bij € 4.000,- of hoger eenmalige kosten) na bericht projectmanager",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "titel": "Projectafstemming met verkoop",
+      "sjabloon": true,
+      "fase": "Projectmanagement",
+      "status": "nodig",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Doornemen offerte",
+          "status": "open"
+        },
+        {
+          "tekst": "Bespreken geoffreerde configuratie",
+          "status": "open"
+        },
+        {
+          "tekst": "Doornemen bijzonderheden",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "titel": "Project opstart",
+      "sjabloon": true,
+      "fase": "Projectmanagement",
+      "status": "nodig",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Versturen Welkom bij JUICT Mail",
+          "status": "open"
+        },
+        {
+          "tekst": "Communicatie naar latende ICT-dienstverlener verstuurd door klant",
+          "onder": "Versturen Welkom bij JUICT Mail",
+          "status": "open"
+        },
+        {
+          "tekst": "Overzicht diensten en einddatum contracten oude dienstverlener.",
+          "onder": "Versturen Welkom bij JUICT Mail",
+          "status": "open"
+        },
+        {
+          "tekst": "Afspraak plannen Kick-off meeting",
+          "status": "open"
+        },
+        {
+          "tekst": "Technische inventarisatie plannen",
+          "status": "open"
+        },
+        {
+          "tekst": "Eisen en wensen bepalen",
+          "onder": "Technische inventarisatie plannen",
+          "status": "open"
+        },
+        {
+          "tekst": "Terugkoppeling naar stakeholders",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "titel": "Diverse projectwerkzaamheden",
+      "sjabloon": true,
+      "fase": "Projectmanagement",
+      "status": "nodig",
+      "uren": null,
+      "punten": []
+    },
+    {
+      "titel": "Tussentijds voortgangsgesprek",
+      "sjabloon": true,
+      "fase": "Projectmanagement",
+      "status": "nodig",
+      "uren": null,
+      "punten": []
+    },
+    {
+      "titel": "Project afsluitingsgesprek",
+      "sjabloon": true,
+      "fase": "Projectmanagement",
+      "status": "nodig",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Plannen",
+          "status": "open"
+        },
+        {
+          "tekst": "Presentje regelen",
+          "status": "open"
+        },
+        {
+          "tekst": "Terugkoppelen",
+          "status": "open"
+        },
+        {
+          "tekst": "Periodieke voortgangsmeeting plannen",
+          "status": "open"
+        },
+        {
+          "tekst": "Definitieve opzegging oude dienstverlener",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "titel": "Maken Plan van Aanpak",
+      "sjabloon": true,
+      "fase": "Voorbereidings- en planningsfase",
+      "status": "nodig",
+      "uren": null,
+      "punten": []
+    },
+    {
+      "titel": "Aanschaf benodigde hardware en/of software",
+      "sjabloon": true,
+      "fase": "Voorbereidings- en planningsfase",
+      "status": "nodig",
+      "uren": null,
+      "punten": []
+    },
+    {
+      "titel": "Huidige documentatie ontvangen",
+      "sjabloon": true,
+      "fase": "Voorbereidings- en planningsfase",
+      "status": "nodig",
+      "uren": 4,
+      "punten": [
+        {
+          "tekst": "Microsoft 365 omgeving",
+          "status": "open"
+        },
+        {
+          "tekst": "Netwerkapparatuur",
+          "status": "open"
+        },
+        {
+          "tekst": "Einddatum lopende contracten (NCE, Internet, Telefonie)",
+          "status": "open"
+        },
+        {
+          "tekst": "Overdracht documentatie",
+          "status": "open"
+        },
+        {
+          "tekst": "Ontvangen documentatie en verwerken in IT Glue!",
+          "onder": "Overdracht documentatie",
+          "status": "open"
+        },
+        {
+          "tekst": "Toegang inrichten op huidige infrastructuur",
+          "status": "open"
+        },
+        {
+          "tekst": "Controle belangrijkste wachtwoorden",
+          "onder": "Toegang inrichten op huidige infrastructuur",
+          "status": "open"
+        },
+        {
+          "tekst": "Aanpassen wachtwoorden & verwerken in IT Glue",
+          "onder": "Toegang inrichten op huidige infrastructuur",
+          "status": "open"
+        },
+        {
+          "tekst": "Uitrol DattoRMM op servers (zonder patching)",
+          "onder": "Toegang inrichten op huidige infrastructuur",
+          "status": "open"
+        },
+        {
+          "tekst": "GDAP relatie opzetten",
+          "onder": "Toegang inrichten op huidige infrastructuur",
+          "status": "gedaan"
+        },
+        {
+          "tekst": "Afstemming inrichting Microsoft 365 licenties",
+          "status": "open"
+        }
+      ],
+      "projectFase": "F1"
+    },
+    {
+      "titel": "Licentie plan maken",
+      "sjabloon": true,
+      "fase": "Voorbereidings- en planningsfase",
+      "status": "nodig",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Licentieplan maken en laten accorderen door projectmanager",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "titel": "Setup Microsoft 365",
+      "sjabloon": true,
+      "fase": "Realisatie- en uitvoeringsfase",
+      "status": "nodig",
+      "uren": 16,
+      "punten": [
+        {
+          "tekst": "Microsoft 365 tenant aanmaken (indien nieuwe tenant)",
+          "status": "nvt",
+          "reden": "De klant heeft al een tenant (Offerte 2026-11-02)"
+        },
+        {
+          "tekst": "Setup Conditional Access",
+          "status": "open"
+        },
+        {
+          "tekst": "Koppelen domein(en)",
+          "status": "open"
+        },
+        {
+          "tekst": "DKIM & DMARC aanzetten",
+          "status": "open"
+        },
+        {
+          "tekst": "Aanmaken / aanpassen / omzetten gebruikersaccount(s)",
+          "status": "open"
+        },
+        {
+          "tekst": "Aanmaken / aanpassen / omzetten gedeelde postvak(ken)",
+          "status": "open"
+        },
+        {
+          "tekst": "Microsoft 365 optimalisatie uitvoeren",
+          "status": "open"
+        },
+        {
+          "tekst": "Multifactor-authenticatie en voorwaardelijke toegang voor alle 25 gebruikers",
+          "status": "extra",
+          "bron": "Offerte 2026-11-02"
+        }
+      ],
+      "projectFase": "F1"
+    },
+    {
+      "titel": "Setup standaard applicaties",
+      "sjabloon": true,
+      "fase": "Realisatie- en uitvoeringsfase",
+      "status": "nodig",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Setup Printix",
+          "status": "open"
+        },
+        {
+          "tekst": "Setup DattoRMM",
+          "status": "open"
+        },
+        {
+          "tekst": "Setup SharePoint. Eventueel aanpassen SharePoint (incl. goed zetten rechten)",
+          "status": "open"
+        },
+        {
+          "tekst": "Setup Sophos",
+          "status": "open"
+        },
+        {
+          "tekst": "Setup Huntress ITDR & SAT",
+          "status": "open"
+        },
+        {
+          "tekst": "Setup Rewst",
+          "status": "open"
+        },
+        {
+          "tekst": "Setup Nerdio",
+          "status": "open"
+        },
+        {
+          "tekst": "Setup klantportaal",
+          "status": "open"
+        },
+        {
+          "tekst": "Setup Microsoft 365 back-up",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "titel": "Setup Intune",
+      "sjabloon": true,
+      "fase": "Realisatie- en uitvoeringsfase",
+      "status": "nodig",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Baseline uitrollen",
+          "status": "open"
+        },
+        {
+          "tekst": "Applicaties toevoegen",
+          "status": "open"
+        },
+        {
+          "tekst": "Laptops koppelen aan Autopilot",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "titel": "RBAC Opmaken",
+      "sjabloon": true,
+      "fase": "Realisatie- en uitvoeringsfase",
+      "status": "nodig",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Eerste versie opmaken",
+          "status": "open"
+        },
+        {
+          "tekst": "Akkoord vragen aan primaire contactpersoon",
+          "status": "open"
+        },
+        {
+          "tekst": "Definitieve versie verwerken in IT Glue",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "titel": "Initiële datamigratie",
+      "sjabloon": true,
+      "fase": "Realisatie- en uitvoeringsfase",
+      "status": "nodig",
+      "uren": null,
+      "punten": []
+    },
+    {
+      "titel": "Mailmigratie Microsoft 365",
+      "sjabloon": true,
+      "fase": "Realisatie- en uitvoeringsfase",
+      "status": "nodig",
+      "uren": 28,
+      "punten": [
+        {
+          "tekst": "Gedeelde mailboxen meenemen in de migratie",
+          "status": "extra",
+          "bron": "Offerte 2026-11-02"
+        },
+        {
+          "tekst": "controleren: de offerte noemt 25 mailboxen, de mail van 2026-11-12 noemt er 27 (bron: Mail Sanne de Vries 2026-11-12)",
+          "status": "extra",
+          "bron": "Mail Sanne de Vries 2026-11-12"
+        }
+      ],
+      "projectFase": "F2"
+    },
+    {
+      "titel": "Setup netwerk",
+      "sjabloon": true,
+      "fase": "Realisatie- en uitvoeringsfase",
+      "status": "nodig",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Voorconfiguratie firewall",
+          "status": "open"
+        },
+        {
+          "tekst": "Koppelen aan Sophos Central",
+          "onder": "Voorconfiguratie firewall",
+          "status": "open"
+        },
+        {
+          "tekst": "Firewall licentie koppelen",
+          "onder": "Voorconfiguratie firewall",
+          "status": "open"
+        },
+        {
+          "tekst": "ACL rule toevoegen JUICT IP",
+          "onder": "Voorconfiguratie firewall",
+          "status": "open"
+        },
+        {
+          "tekst": "LAN netwerken aanmaken + DHCP",
+          "onder": "Voorconfiguratie firewall",
+          "status": "open"
+        },
+        {
+          "tekst": "Overige netwerkapparatuur static zetten in DHCP",
+          "onder": "Voorconfiguratie firewall",
+          "status": "open"
+        },
+        {
+          "tekst": "Voorconfiguratie UniFi",
+          "status": "open"
+        },
+        {
+          "tekst": "Site aanmaken",
+          "onder": "Voorconfiguratie UniFi",
+          "status": "open"
+        },
+        {
+          "tekst": "AP & SW koppelen aan site",
+          "onder": "Voorconfiguratie UniFi",
+          "status": "open"
+        },
+        {
+          "tekst": "Naamconventie hanteren",
+          "onder": "Voorconfiguratie UniFi",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "titel": "Setup telefonie",
+      "sjabloon": true,
+      "fase": "Realisatie- en uitvoeringsfase",
+      "status": "nvt",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Voorbereiding",
+          "status": "open"
+        },
+        {
+          "tekst": "Klant aanmaken via het Speakup-portaal",
+          "onder": "Voorbereiding",
+          "status": "open"
+        },
+        {
+          "tekst": "Nieuwe dienst toevoegen met klantnaam",
+          "onder": "Voorbereiding",
+          "status": "open"
+        },
+        {
+          "tekst": "Portering van telefoonnummer(s) of blokken aanvragen",
+          "onder": "Voorbereiding",
+          "status": "open"
+        },
+        {
+          "tekst": "Goedkeuring van portering",
+          "onder": "Voorbereiding",
+          "status": "open"
+        },
+        {
+          "tekst": "Verkoop vragen om de benodigde apparatuur te bestellen",
+          "onder": "Voorbereiding",
+          "status": "open"
+        },
+        {
+          "tekst": "Afstemming met de klant",
+          "status": "open"
+        },
+        {
+          "tekst": "Afspraak maken met verantwoordelijke",
+          "onder": "Afstemming met de klant",
+          "status": "open"
+        },
+        {
+          "tekst": "Inventariseren van gebruikers, belplan en interne/directe nummers",
+          "onder": "Afstemming met de klant",
+          "status": "open"
+        },
+        {
+          "tekst": "Belplan uitvragen",
+          "status": "open"
+        },
+        {
+          "tekst": "Openingstijden",
+          "onder": "Belplan uitvragen",
+          "status": "open"
+        },
+        {
+          "tekst": "Geluidsfragmenten/bandjes",
+          "onder": "Belplan uitvragen",
+          "status": "open"
+        },
+        {
+          "tekst": "Keuzemenu (inclusief tijdsinstellingen)",
+          "onder": "Belplan uitvragen",
+          "status": "open"
+        },
+        {
+          "tekst": "Wachtrijen en gespreksrotatie met tijden",
+          "onder": "Belplan uitvragen",
+          "status": "open"
+        },
+        {
+          "tekst": "Voicemail instellingen",
+          "onder": "Belplan uitvragen",
+          "status": "open"
+        },
+        {
+          "tekst": "Wie krijgt gewenste telefoons? (softphone/hardphone)",
+          "onder": "Belplan uitvragen",
+          "status": "open"
+        },
+        {
+          "tekst": "Firmware-update nodig bij bestaande hardphones?",
+          "onder": "Belplan uitvragen",
+          "status": "open"
+        },
+        {
+          "tekst": "Wie mag de aansluiting(en) beheren",
+          "onder": "Belplan uitvragen",
+          "status": "open"
+        },
+        {
+          "tekst": "Randzaken bespreken",
+          "status": "open"
+        },
+        {
+          "tekst": "Rapportage/dashboard",
+          "onder": "Randzaken bespreken",
+          "status": "open"
+        },
+        {
+          "tekst": "WhatsApp-koppeling",
+          "onder": "Randzaken bespreken",
+          "status": "open"
+        },
+        {
+          "tekst": "Adresboek",
+          "onder": "Randzaken bespreken",
+          "status": "open"
+        },
+        {
+          "tekst": "CloudCTI-koppeling",
+          "onder": "Randzaken bespreken",
+          "status": "open"
+        },
+        {
+          "tekst": "Uitbellen met andere nummers",
+          "onder": "Randzaken bespreken",
+          "status": "open"
+        },
+        {
+          "tekst": "Wachtmuziek in wachtrij of wachtstand",
+          "onder": "Randzaken bespreken",
+          "status": "open"
+        },
+        {
+          "tekst": "Na de inventarisatie",
+          "status": "open"
+        },
+        {
+          "tekst": "Visio-overzicht maken van het belplan en ter goedkeuring sturen naar verantwoordelijke",
+          "onder": "Na de inventarisatie",
+          "status": "open"
+        },
+        {
+          "tekst": "Eindklant software laten installeren of via Intune pushen",
+          "onder": "Na de inventarisatie",
+          "status": "open"
+        },
+        {
+          "tekst": "Firewall aanpassingen mailen of laten uitvoeren als wij het beheer hebben",
+          "onder": "Na de inventarisatie",
+          "status": "open"
+        },
+        {
+          "tekst": "Uitvoering",
+          "status": "open"
+        },
+        {
+          "tekst": "Aanmaken nieuwe Xelion-omgeving + telefoonnummer(s) door Speakup",
+          "onder": "Uitvoering",
+          "status": "open"
+        },
+        {
+          "tekst": "Azure gebruikers koppelen",
+          "onder": "Uitvoering",
+          "status": "open"
+        },
+        {
+          "tekst": "Hardphones voorzien van nieuwste firmware en provisionen",
+          "onder": "Uitvoering",
+          "status": "open"
+        },
+        {
+          "tekst": "Update IT Glue",
+          "onder": "Uitvoering",
+          "status": "open"
+        },
+        {
+          "tekst": "Xelion omgeving klaarmaken en testen",
+          "onder": "Uitvoering",
+          "status": "open"
+        }
+      ],
+      "reden": "Telefonie valt buiten de offerte (Offerte 2026-11-02)"
+    },
+    {
+      "titel": "Distribueren welkomsbrief",
+      "sjabloon": true,
+      "fase": "Opleveringsfase",
+      "status": "nodig",
+      "uren": null,
+      "punten": []
+    },
+    {
+      "titel": "Definitieve datamigratie",
+      "sjabloon": true,
+      "fase": "Opleveringsfase",
+      "status": "nodig",
+      "uren": null,
+      "punten": []
+    },
+    {
+      "titel": "ICT oplevering op locatie",
+      "sjabloon": true,
+      "fase": "Opleveringsfase",
+      "status": "nodig",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Plaatsen / omzetten apparatuur (bekijk offerte)",
+          "status": "open"
+        },
+        {
+          "tekst": "Plaatsen / omzetten netwerk (bekijk offerte)",
+          "status": "open"
+        },
+        {
+          "tekst": "Gebruikers in Conditional Access voegen",
+          "status": "open"
+        },
+        {
+          "tekst": "Scan to Mail printer instellen",
+          "status": "open"
+        },
+        {
+          "tekst": "Toevoegen mail aan telefoon etc.",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "titel": "Telefonie oplevering op locatie",
+      "sjabloon": true,
+      "fase": "Opleveringsfase",
+      "status": "nvt",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Portering doorvoeren",
+          "status": "open"
+        },
+        {
+          "tekst": "Hardphones aansluiten/inloggen op softphone",
+          "status": "open"
+        },
+        {
+          "tekst": "Gebruikersinstructies geven voor software/telefoons",
+          "status": "open"
+        },
+        {
+          "tekst": "Nazorg verlenen",
+          "status": "open"
+        }
+      ],
+      "reden": "Telefonie valt buiten de offerte (Offerte 2026-11-02)"
+    },
+    {
+      "titel": "Controle licenties en back-up",
+      "sjabloon": true,
+      "fase": "Opleveringsfase",
+      "status": "nodig",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Laatste controle van opzegging van alle licenties en back-up",
+          "status": "open"
+        },
+        {
+          "tekst": "Officiële opzegging van licenties controleren bij oude dienstverlener",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "titel": "Nazorg project oplevering",
+      "sjabloon": true,
+      "fase": "Opleveringsfase",
+      "status": "nodig",
+      "uren": null,
+      "punten": []
+    },
+    {
+      "titel": "IT Glue updaten",
+      "sjabloon": true,
+      "fase": "Opleveringsfase",
+      "status": "nodig",
+      "uren": 8,
+      "punten": [],
+      "projectFase": "F2"
+    },
+    {
+      "titel": "Administratieve oplevering",
+      "sjabloon": true,
+      "fase": "After sales en administratiefase",
+      "status": "nodig",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Bepalen meer/minder hardware/software",
+          "status": "open"
+        },
+        {
+          "tekst": "Verwerken Azure-consumptie aanloopfase project",
+          "status": "open"
+        },
+        {
+          "tekst": "Controle Microsoft 365 licenties (NCE)",
+          "status": "open"
+        },
+        {
+          "tekst": "Controle contracten",
+          "status": "open"
+        },
+        {
+          "tekst": "CPOR aanvraag indienen",
+          "status": "open"
+        },
+        {
+          "tekst": "Controle Azure",
+          "status": "open"
+        },
+        {
+          "tekst": "Vastzetten Azure instances",
+          "onder": "Controle Azure",
+          "status": "open"
+        },
+        {
+          "tekst": "Windows server licenties aanschaffen (HAB)",
+          "onder": "Controle Azure",
+          "status": "open"
+        },
+        {
+          "tekst": "SQL Hybrid benefit aanzetten",
+          "onder": "Controle Azure",
+          "status": "open"
+        },
+        {
+          "tekst": "Instellen budget alerts",
+          "onder": "Controle Azure",
+          "status": "open"
+        },
+        {
+          "tekst": "Microsoft registraties afronden",
+          "status": "open"
+        },
+        {
+          "tekst": "CPOR afronden",
+          "onder": "Microsoft registraties afronden",
+          "status": "open"
+        },
+        {
+          "tekst": "Azure accelerate afronden",
+          "onder": "Microsoft registraties afronden",
+          "status": "open"
+        },
+        {
+          "tekst": "Eindfacturatie",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "titel": "After sales",
+      "sjabloon": true,
+      "fase": "After sales en administratiefase",
+      "status": "nodig",
+      "uren": null,
+      "punten": [
+        {
+          "tekst": "Plannen afspraak traktatie en koffie",
+          "status": "open"
+        },
+        {
+          "tekst": "Informeren over kwartaalmeeting project en operations coördinator",
+          "status": "open"
+        },
+        {
+          "tekst": "Jaarlijkse account review plannen",
+          "status": "open"
+        },
+        {
+          "tekst": "Referentie en case vragen",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "titel": "NACALC (Werkzaamheden buiten scope)",
+      "sjabloon": true,
+      "fase": "NACALC (Werkzaamheden buiten scope)",
+      "status": "nodig",
+      "uren": null,
+      "punten": []
+    },
+    {
+      "titel": "Ondersteuning bedrijfsapplicaties",
+      "sjabloon": true,
+      "fase": "NACALC (Werkzaamheden buiten scope)",
+      "status": "nodig",
+      "uren": null,
+      "punten": []
+    },
+    {
+      "titel": "Proefmigratie met twee gebruikers uitvoeren",
+      "sjabloon": false,
+      "fase": "Realisatie- en uitvoeringsfase",
+      "status": "nodig",
+      "uren": null,
+      "bron": "Mail Sanne de Vries 2026-11-12",
+      "wachtOp": [
+        "Setup Microsoft 365"
+      ],
+      "punten": [
+        {
+          "tekst": "Mailbox en bestanden van twee gebruikers uit het managementteam overzetten en met hen testen",
+          "status": "extra",
+          "bron": "Mail Sanne de Vries 2026-11-12"
+        }
+      ]
+    }
   ],
   "meerwerk": [
-    { "wat": "Gedeelde agenda voor de werkplaats inrichten", "bron": "Mail Joost Bakker 2026-11-14" }
+    {
+      "wat": "Gedeelde agenda voor de werkplaats inrichten",
+      "bron": "Mail Joost Bakker 2026-11-14"
+    }
   ],
   "overleg": {
     "ritme": "Tweewekelijks een half uur op dinsdag",
@@ -87,7 +1108,13 @@
     "volgende": "2026-12-08",
     "verzoekenControle": "Nieuwe accounts en rechten zetten we pas door na akkoord van Joost Bakker."
   },
-  "artifacts": { "presentatie": null, "rapport": null },
-  "verwerkt": { "bijlagen": [], "notities": [] },
+  "artifacts": {
+    "presentatie": null,
+    "rapport": null
+  },
+  "verwerkt": {
+    "bijlagen": [],
+    "notities": []
+  },
   "versie": 1
 }

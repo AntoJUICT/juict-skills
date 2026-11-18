@@ -195,14 +195,20 @@ test("open punten: kolom heet 'Wie pakt het op', zodat een open aanleverder niet
   assert.ok(html.includes("Wie pakt het op"));
 });
 
-test("technische uitvoering: tabel met taak, fase, uren en bron, plus het totaal", () => {
+test("technische uitvoering: taken in volgorde met open punten voor de engineer, n.v.t. met reden en taken buiten het sjabloon", () => {
   const h = hoofdstuk(html(), "Technische uitvoering en afronding");
   assert.match(h, /<h2>Technische taken<\/h2>/);
-  assert.match(h, /<th[^>]*>Taak<\/th><th[^>]*>Fase<\/th><th[^>]*>Uren<\/th><th[^>]*>Bron<\/th>/);
+  assert.match(h, /<th[^>]*>Stap<\/th><th[^>]*>Taak<\/th><th[^>]*>Fase<\/th><th[^>]*>Open voor engineer<\/th><th[^>]*>Uren<\/th>/);
   const t = tekst(h);
-  assert.ok(t.includes("Mailboxen en bestanden migreren Realisatie- en uitvoeringsfase 28 Offerte 2026-11-02"), t);
-  assert.ok(t.includes("Proefmigratie met twee gebruikers uitvoeren Realisatie- en uitvoeringsfase nog te bepalen Mail Sanne de Vries 2026-11-12"), t);
-  assert.match(t, /Totaal: 56 uur, zonder 1 taak waarvan de uren nog te bepalen zijn\./);
+  assert.ok(t.includes("10 Setup Microsoft 365 Realisatie- en uitvoeringsfase 7 van 8 16"), t);
+  assert.ok(t.includes("2 Projectafstemming met verkoop Projectmanagement geen"), t);
+  assert.ok(t.includes("17 Proefmigratie met twee gebruikers uitvoeren buiten het sjabloon Realisatie- en uitvoeringsfase 1 van 1"), t);
+  assert.ok(t.indexOf("Setup Microsoft 365") < t.indexOf("Project afsluitingsgesprek"));
+  assert.match(t, /Uren uit de offerte: 56 uur\./);
+  assert.match(h, /<h2>Niet van toepassing<\/h2>/);
+  assert.ok(t.includes("Setup telefonie Telefonie valt buiten de offerte (Offerte 2026-11-02)"), t);
+  assert.match(h, /<h2>Taken buiten het sjabloon<\/h2>/);
+  assert.ok(t.includes("Proefmigratie met twee gebruikers uitvoeren Realisatie- en uitvoeringsfase Mail Sanne de Vries 2026-11-12"), t);
 });
 
 test("technische uitvoering: zonder taken geen tabel en geen totaal", () => {
@@ -210,17 +216,21 @@ test("technische uitvoering: zonder taken geen tabel en geen totaal", () => {
   delete d.taken;
   const h = hoofdstuk(html(d), "Technische uitvoering en afronding");
   assert.ok(!h.includes("Technische taken"));
-  assert.ok(!h.includes("Totaal"));
+  assert.ok(!h.includes("Uren uit de offerte"));
 });
 
-test("open punten: taak zonder uren en meerwerk uit een mail", () => {
+test("open punten: eigen taak zonder uren, controleerpunt en meerwerk; sjabloontaken zonder uren niet", () => {
   const p = openPunten(voorbeeld());
   const uren = p.find((x) => x.wat === "Taak: Proefmigratie met twee gebruikers uitvoeren");
   assert.ok(uren, JSON.stringify(p));
   assert.match(uren.waarom, /uren nog te bepalen/i);
+  const controle = p.find((x) => x.wat.startsWith("Taak Mailmigratie Microsoft 365: de offerte noemt 25 mailboxen"));
+  assert.ok(controle, JSON.stringify(p));
+  assert.match(controle.waarom, /Controleren \(bron: Mail Sanne de Vries 2026-11-12\)/);
   const meer = p.find((x) => x.wat === "Meerwerk: Gedeelde agenda voor de werkplaats inrichten");
   assert.ok(meer);
   assert.match(meer.waarom, /Mail Joost Bakker 2026-11-14/);
   assert.match(meer.waarom, /meerwerk, afstemmen/i);
-  assert.ok(!p.some((x) => x.wat === "Taak: Mailboxen en bestanden migreren"));
+  assert.ok(!p.some((x) => x.wat === "Taak: Setup Intune"));
+  assert.ok(!p.some((x) => x.wat === "Taak: Setup telefonie"));
 });

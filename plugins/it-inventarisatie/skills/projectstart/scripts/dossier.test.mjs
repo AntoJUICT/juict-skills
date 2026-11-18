@@ -375,14 +375,17 @@ test("nieuweBronnen: een URL-bijlage komt nooit als nieuwe bron voor (bronnen.mj
   assert.deepEqual(nieuweBronnen(d, m).bijlagen.map((x) => x.id), [2]);
 });
 
-// --- Technische taken ---
+// --- Technische taken (Easywork-draaiboek) ---
 
-const TAAK = { titel: "Testwerkplek inrichten", fase: "Realisatie- en uitvoeringsfase", uren: 4, omschrijving: "Een werkplek inrichten om mee te testen.", resultaat: "Een werkende testwerkplek.", bron: "Offerte 2026-11-02" };
+const taakIn = (d, titel) => d.taken.find((t) => t.titel === titel);
+const EIGEN = { titel: "Printers koppelen", sjabloon: false, fase: "Realisatie- en uitvoeringsfase", status: "nodig", uren: null, bron: "Mail Joost Bakker 2026-11-20", punten: [] };
+const fouten = (d) => valideerDossier(d).join("\n");
 
-test("taken: voorbeeld heeft 4 tot 6 taken, allemaal met bron", () => {
+test("taken: voorbeeld is geldig, met alle 29 sjabloontaken en een eigen taak met bron", () => {
   const d = vers();
-  assert.ok(d.taken.length >= 4 && d.taken.length <= 6, `${d.taken.length} taken`);
-  for (const t of d.taken) assert.ok(t.bron.trim());
+  assert.deepEqual(valideerDossier(d), []);
+  assert.equal(d.taken.filter((t) => t.sjabloon).length, 29);
+  for (const t of d.taken.filter((x) => !x.sjabloon)) assert.ok(t.bron.trim());
 });
 
 test("taken: oud dossier zonder taken en zonder fases[].uren blijft geldig", () => {
@@ -393,54 +396,125 @@ test("taken: oud dossier zonder taken en zonder fases[].uren blijft geldig", () 
   assert.deepEqual(valideerDossier(d), []);
 });
 
-test("taken: titel, fase, omschrijving en bron zijn verplicht", () => {
-  for (const veld of ["titel", "fase", "omschrijving", "bron"]) {
-    const d = vers();
-    d.taken = [{ ...TAAK, [veld]: " " }];
-    assert.ok(valideerDossier(d).some((x) => x.startsWith(`taken[0].${veld}`)), veld);
-  }
+test("taken: een punt uit het draaiboek weglaten bij een taak die nodig is, faalt", () => {
   const d = vers();
-  const { bron, ...zonderBron } = TAAK;
-  d.taken = [zonderBron];
-  assert.ok(valideerDossier(d).some((x) => x.startsWith("taken[0].bron")));
+  taakIn(d, "Setup Intune").punten = taakIn(d, "Setup Intune").punten.filter((p) => p.tekst !== "Baseline uitrollen");
+  assert.match(fouten(d), /taken\[\d+\]\.punten: punt "Baseline uitrollen" uit het draaiboek ontbreekt/);
+  const kind = vers();
+  const opstart = taakIn(kind, "Administratieve opstart project");
+  opstart.punten = opstart.punten.filter((p) => p.tekst !== "PAL registratie (moet via engineer)");
+  assert.match(fouten(kind), /punt "Microsoft registraties > PAL registratie \(moet via engineer\)" uit het draaiboek ontbreekt/);
+});
+
+test("taken: bij een taak die niet nodig is mogen de punten weg, maar de reden is verplicht", () => {
+  const d = vers();
+  Object.assign(taakIn(d, "Setup Intune"), { status: "nvt", reden: "Geen werkplekken in de offerte", punten: [] });
+  assert.deepEqual(valideerDossier(d), []);
+  delete taakIn(d, "Setup Intune").reden;
+  assert.match(fouten(d), /taken\[\d+\]\.reden: verplicht als de taak niet van toepassing is/);
+});
+
+test("taken: een sjabloontaak weglaten faalt; gebruik nvt", () => {
+  const d = vers();
+  d.taken = d.taken.filter((t) => t.titel !== "Setup netwerk");
+  assert.match(fouten(d), /sjabloontaak "Setup netwerk" ontbreekt/);
+});
+
+test("taken: punt nvt zonder reden en extra punt zonder bron falen", () => {
+  const d = vers();
+  Object.assign(taakIn(d, "Setup Intune").punten[0], { status: "nvt" });
+  taakIn(d, "Setup Intune").punten.push({ tekst: "Printerprofiel uitrollen", status: "extra" });
+  const f = fouten(d);
+  assert.match(f, /punten\[0\]\.reden: verplicht als het punt niet van toepassing is/);
+  assert.match(f, /punten\[3\]\.bron: verplicht voor een extra punt/);
+});
+
+test("taken: een eigen punt in een sjabloontaak moet extra zijn; status en rol worden gecontroleerd", () => {
+  const d = vers();
+  taakIn(d, "Setup Intune").punten.push({ tekst: "Iets anders", status: "open" });
+  taakIn(d, "Setup Intune").punten.push({ tekst: "Nog iets", status: "klaar", rol: "Planner", bron: "x" });
+  const f = fouten(d);
+  assert.match(f, /"Iets anders" staat niet in het draaiboek; maak er een extra punt van met een bron/);
+  assert.match(f, /punten\[4\]\.status: moet "open", "gedaan", "nvt" of "extra" zijn/);
+  assert.match(f, /punten\[4\]\.rol: moet Engineer, Projectmanager, Verkoop\/Administratie of null zijn/);
+});
+
+test("taken: dubbele titels, ook twee schrijfwijzen van dezelfde sjabloontaak, falen", () => {
+  const d = vers();
+  d.taken.push({ ...taakIn(d, "Licentie plan maken"), titel: "Licentieplan maken" });
+  assert.match(fouten(d), /titel: dubbel/);
+  const e = vers();
+  e.taken.push({ ...EIGEN }, { ...EIGEN, titel: "  printers   KOPPELEN " });
+  assert.match(fouten(e), /titel: dubbel/);
+});
+
+test("taken: eigen taak heeft een bron nodig en mag geen sjabloontitel hebben; sjabloontaak moet in het sjabloon staan", () => {
+  const d = vers();
+  d.taken.push({ ...EIGEN, bron: null }, { ...EIGEN, titel: "Setup Intune" });
+  const f = fouten(d);
+  assert.match(f, /\.bron: verplicht voor een taak buiten het sjabloon/);
+  assert.match(f, /"Setup Intune" is al een sjabloontaak/);
+  const s = vers();
+  s.taken.push({ ...EIGEN, sjabloon: true });
+  assert.match(fouten(s), /"Printers koppelen" is geen taak uit het sjabloon Easywork Basic/);
+});
+
+test("taken: fase van een sjabloontaak komt uit het draaiboek; status en sjabloon zijn verplicht", () => {
+  const d = vers();
+  taakIn(d, "Setup Intune").fase = "Opleveringsfase";
+  taakIn(d, "Setup netwerk").status = "misschien";
+  delete taakIn(d, "Setup telefonie").sjabloon;
+  const f = fouten(d);
+  assert.match(f, /\.fase: hoort "Realisatie- en uitvoeringsfase" te zijn/);
+  assert.match(f, /\.status: moet "nodig" of "nvt" zijn/);
+  assert.match(f, /\.sjabloon: true of false verplicht/);
+});
+
+test("taken: wachtOp van een eigen taak moet naar een bestaande taak wijzen en mag niet rond lopen", () => {
+  const d = vers();
+  d.taken.push({ ...EIGEN, wachtOp: ["Bestaat niet"] });
+  assert.match(fouten(d), /wachtOp: "Bestaat niet" is geen taak in het dossier/);
+  const r = vers();
+  r.taken.push({ ...EIGEN, titel: "A", wachtOp: ["B"] }, { ...EIGEN, titel: "B", wachtOp: ["A"] });
+  assert.match(fouten(r), /volgorde loopt rond/);
+  const g = vers();
+  g.taken.push({ ...EIGEN, wachtOp: ["Setup netwerk"] });
+  assert.deepEqual(valideerDossier(g), []);
 });
 
 test("taken: uren is null of een getal vanaf 0", () => {
   const d = vers();
-  d.taken = [{ ...TAAK, uren: null }];
-  assert.deepEqual(valideerDossier(d), []);
-  for (const fout of [-1, "4", undefined, Number.NaN]) {
-    d.taken = [{ ...TAAK, uren: fout }];
-    assert.ok(valideerDossier(d).some((x) => x.startsWith("taken[0].uren")), String(fout));
+  for (const fout of [-1, "4", Number.NaN]) {
+    taakIn(d, "Setup Intune").uren = fout;
+    assert.match(fouten(d), /\.uren: getal vanaf 0 of null verplicht/, String(fout));
   }
 });
 
-test("taken: dubbele titel (hoofdletters, spaties, accenten genegeerd) faalt", () => {
+test("taken: het bedrag in het draaiboek (deelfacturatie) mag, de taken zijn intern", () => {
   const d = vers();
-  d.taken = [TAAK, { ...TAAK, titel: "  testwerkplek   INRICHTEN " }];
-  assert.ok(valideerDossier(d).some((x) => /taken\[1\]\.titel: .*dubbel/.test(x)), valideerDossier(d).join("\n"));
+  assert.ok(JSON.stringify(taakIn(d, "Administratieve opstart project")).includes("€"));
+  assert.deepEqual(valideerDossier(d), []);
 });
 
 test("taken: projectFase moet een fasecode uit het dossier zijn", () => {
   const d = vers();
-  d.taken = [{ ...TAAK, projectFase: "F9" }];
-  assert.ok(valideerDossier(d).some((x) => x.startsWith("taken[0].projectFase")));
+  taakIn(d, "Setup Intune").projectFase = "F9";
+  assert.match(fouten(d), /\.projectFase: moet een code uit fases zijn/);
 });
 
 test("taken: som van de uren per fase mag niet boven de uren uit de offerte", () => {
   const d = vers();
   d.fases[0].uren = 10;
-  d.taken = [{ ...TAAK, projectFase: "F1", uren: 6 }, { ...TAAK, titel: "Tweede taak", projectFase: "F1", uren: 5 }, { ...TAAK, titel: "Zonder uren", projectFase: "F1", uren: null }];
   const f = valideerDossier(d);
-  assert.ok(f.some((x) => /F1.*11.*10/.test(x)), f.join("\n"));
-  d.taken[1].uren = 4;
+  assert.ok(f.some((x) => /F1.*20.*10/.test(x)), f.join("\n"));
+  d.fases[0].uren = 20;
   assert.deepEqual(valideerDossier(d), []);
 });
 
 test("taken: zonder uren in de fase geen somcontrole", () => {
   const d = vers();
   delete d.fases[0].uren;
-  d.taken = [{ ...TAAK, projectFase: "F1", uren: 500 }];
+  taakIn(d, "Setup Microsoft 365").uren = 500;
   assert.deepEqual(valideerDossier(d), []);
 });
 
