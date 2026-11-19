@@ -29,6 +29,9 @@ controlefout, 2 is mislukt (Autotask, Word, bestand). Geen enkel script schrijft
 | `scripts/taken.mjs` | `zaai --dossier <pad>` | Zet alle sjabloontaken met alle punten uit het draaiboek (`open`) in `dossier.taken`. Staan er al taken, dan blijven die zoals ze zijn en komen alleen ontbrekende sjabloontaken en punten erbij (na een nieuw draaiboek); ontbreekt niets, dan wordt er niets geschreven. |
 | | `plan --dossier <pad> --plan <pad>` | Zet de taken in logische volgorde als `taken` in het plan (vervangt de taken die er al stonden, notities en bijlagen blijven). Per taak `titel`, `sjabloon`, `fase`, `status`, `reden`, `uren`, `bron` (eigen taak), `stap`, `punten`, `open` en `omschrijving`. Exit 1 bij een ongeldig dossier. Schrijft niet naar Autotask. |
 | | `toon --dossier <pad>` | De volgorde en de volledige tekst per taak, zonder iets te schrijven. |
+| `scripts/controle.mjs` | `vooraf --dossier <pad> [--rapport <pad.md>]` | Controle voor het schrijven: de fouten van `dossier.mjs controleer`, plus elke scope-regel, afspraak, besluit, aan te leveren zaak, technische vraag en meerwerk staat in `dekking` met een bestaande taak of een reden, en geen dekking wijst naar een taak die n.v.t. is. Waarschuwingen: taak nodig met alleen n.v.t.-punten, eigen taak zonder punten, `gedaan` zonder bron. Tegenstrijdigheden: extra punten die met "controleren:" beginnen. Exit 1 bij een fout. `--rapport` schrijft het controlerapport (Markdown): fouten, waarschuwingen, tegenstrijdigheden, de dekkingstabel en per taak elk punt met status en bron of reden. Alleen lezen. |
+| | `achteraf --verwacht <pad> --stand <pad> [--checklists <map>]` | Na het schrijven: `verwacht` is een lijst `{titel, taskId, fase, omschrijving, checklist: [{tekst, gedaan, ingesprongen}]}`, `stand` is `{fases, taken}` uit de API (`Projects/<id>/Phases` en `/Tasks`). Vergelijkt per taak de fase en de omschrijving en, met `--checklists` (map met `<taskId>.html` of `.txt` van de taakpagina), elk checklistpunt met vinkje en inspringing. Exit 1 bij een afwijking. |
+| | `browserscript --verwacht <pad> --uit <pad.js>` | Script voor de ingelogde Autotask-pagina (browser, javascript): haalt per taak `/Mvc/Projects/TaskDetail.mvc?taskId=<id>` op en vergelijkt de checklist (klassen `ChecklistItem`, `Completed`, `Indented`). Geeft `{taken, punten, fouten, waarschuwingen}` terug en schrijft niets. Bij veel taken: start het in de pagina en lees de uitkomst daarna uit (één aanroep heeft een tijdslimiet). |
 | `scripts/draaiboek-naar-json.mjs` | `--xlsx <Easywork_Draaiboek.xlsx> --jszip <pad naar node_modules/jszip> --uit <skill>/assets/easywork-draaiboek.json [--datum jjjj-mm-dd]` | Alleen voor beheerders, zie "Easywork-draaiboek". |
 | `scripts/samenhang.mjs` | `--dossier <pad> --rapport <rapport.json>` | "Dossier en rapport passen bij elkaar." of de afwijkingen (exit 1). |
 | `<it>/scripts/dns-lookup.mjs` | `<domein> [<domein>...]` | MX, NS en tenant-ID per domein. |
@@ -96,6 +99,7 @@ wachtwoordachtige tekst.
 | `afspraken[]` | `tekst`, `bron` (tekst, altijd), `intern` (boolean); `financieel`, `controleren` (boolean, optioneel; `controleren` alleen met `financieel: true`) | ja (lijst) |
 | `taken[]` | `titel`, `fase` (tekst), `sjabloon` (boolean), `status` (`"nodig"` of `"nvt"`), `reden` (verplicht bij `nvt`), `uren` (getal vanaf 0 of `null`, alleen uit de offerte), `projectFase` (een `fases[].code`, optioneel), `bron` (verplicht bij `sjabloon: false`), `wachtOp` (lijst met taaktitels, alleen bij `sjabloon: false`, optioneel), `punten[]`: `tekst`, `status` (`"open"`, `"gedaan"`, `"nvt"`, `"extra"`), `onder` (het sub-punt boven een kindpunt), `reden` (verplicht bij `nvt`), `bron` (verplicht bij `extra`), `rol` (`Engineer`, `Projectmanager`, `Verkoop/Administratie`, optioneel bij `extra`; standaard Engineer) | nee |
 | `meerwerk[]` | `wat`, `bron` (tekst): werk uit een mail dat niet in de offerte staat | nee |
+| `dekking[]` | `bron`, `tekst` (tekst), `taak` (titel van een taak in `taken`, of `null`), `reden` (verplicht bij `taak: null`): per offerteregel en per scope-regel, afspraak, besluit, aan te leveren zaak, technische vraag en meerwerk waar het in het project terugkomt. Intern: bedragen mogen (citaat uit de offerte). | nee (wel voor `controle.mjs vooraf`) |
 | `technischeVragen[]` | `vraag`, `aan`, `bron` (tekst) | ja (lijst) |
 | `extraOnderwerpen[]` | `soort` (`"beveiliging"`), `geregeld[]`, `controleren[]`, `later[]`, `optioneel` (boolean, optioneel) | ja (lijst) |
 | `overleg` | `ritme`, `aanspreekpunt`, `escalatie` (tekst); `kanaal`, `volgende`, `verzoekenControle` (tekst of `null`, optioneel) | ja |
@@ -134,7 +138,12 @@ wachtwoordachtige tekst.
 - PVA, Technische uitvoering: tabel Stap, Taak, Fase, Open voor engineer, Uren in volgorde; Niet van toepassing met
   reden; Taken buiten het sjabloon met bron. Open punten: een eigen taak zonder uren, en elk extra punt dat met
   "controleren" begint. De briefing noemt de taken met open punten per rol, in volgorde, en wat niet van toepassing is.
-- `meerwerk`: komt in het PVA bij Open punten ("meerwerk, afstemmen") en in de briefing, nooit als taak.
+- `meerwerk`: komt in het PVA bij Open punten ("meerwerk, afstemmen") en in de briefing, nooit als taak. In
+  `dekking` wijst meerwerk naar de NACALC-taak of staat het op `taak: null` met reden ("meerwerk, nog af te stemmen").
+- `dekking`: lees de offerte regel voor regel en zet elke regel erin, met de taak waar hij terugkomt. `controle.mjs
+  vooraf` eist daarnaast elke tekst uit `scope.inbegrepen`, `afspraken`, `besluiten` (de vraag), `aanleveren` (wat),
+  `technischeVragen` en `meerwerk` (wat). Een regel die bij een taak met status `nvt` hoort, is een fout: dan klopt
+  de n.v.t. niet of hoort de regel bij een andere taak.
 - Een beveiligingsonderwerp maakt slide 5. Staat beveiliging in het rapport als keuze, zet dan `optioneel: true`.
 - `werkbestand.mjs van-dossier` zet beveiliging in het werkbestand als `antwoorden.beveiliging.bekend` (uit
   `geregeld`) en `antwoorden.beveiliging.nogControleren` (uit `controleren`). `nogControleren` is een eigen sleutel die

@@ -82,8 +82,14 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    - Werk dat in geen enkele sjabloontaak past, wordt een eigen taak (`sjabloon: false`) met `bron`, de fase uit
      Autotask en eventueel `wachtOp` (titels van taken waar hij op wacht; standaard aan het eind van zijn fase).
    - Zet uren uit de offerte op de taak (`uren`, anders `null`) en koppel met `projectFase` aan `fases[].uren`.
+   - Zet in `dekking` per offerteregel (lees de offerte regel voor regel) en per scope-regel, afspraak, besluit, aan
+     te leveren zaak, technische vraag en meerwerk de taak waar het terugkomt, of `taak: null` met een `reden`.
    Draai `controleer` tot het dossier geldig is (een weggelaten punt, `nvt` zonder reden, `extra` zonder bron, een
-   dubbele titel of een volgorde die rond loopt geeft een fout) en laat de lijst bevestigen. Daarna
+   dubbele titel of een volgorde die rond loopt geeft een fout). Draai dan de controle per taak en per punt:
+   `node <skill>/scripts/controle.mjs vooraf --dossier <werkmap>/dossier.json --rapport <werkmap>/controlerapport.md`.
+   Los elke fout op (iets uit offerte of afspraken zonder taak, een bron bij een taak die n.v.t. is) en draai opnieuw
+   tot er 0 fouten zijn. Leg het controlerapport met de waarschuwingen en tegenstrijdigheden voor en schrijf pas na
+   akkoord. Daarna
    `node <skill>/scripts/taken.mjs plan --dossier <werkmap>/dossier.json --plan <werkmap>/plan.json`: de taken komen in
    logische volgorde in het plan (uit "Wacht op" van het draaiboek) en gaan in stap 8 met de rest naar Autotask. Elke
    omschrijving begint met "Stap n van m. Wacht op: ...", daarna de punten per rol. De voorvertoning toont per taak
@@ -131,6 +137,12 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
      Nooit versturen.
    - `node <skill>/scripts/autotask-schrijf.mjs --project <id> --plan <werkmap>/plan.json`: toon de voorvertoning, en
      na akkoord hetzelfde commando met `--toepassen`.
+   - **Controle achteraf.** Haal de taken en fases van het project op (API) en vergelijk met wat er moest staan:
+     `node <skill>/scripts/controle.mjs achteraf --verwacht <werkmap>/verwacht.json --stand <werkmap>/stand.json`
+     (fase en omschrijving per taak). Staan er checklists in de taken, maak dan
+     `node <skill>/scripts/controle.mjs browserscript --verwacht <werkmap>/verwacht.json --uit <werkmap>/controle.js`
+     en draai dat script in de ingelogde Autotask-pagina (browser, javascript). Het leest per taak de taakpagina en
+     vergelijkt elk checklistpunt met vinkje en inspringing; het schrijft niets. Meld elke afwijking per taak.
 9. **Stand bewaren.** `node <skill>/scripts/dossier.mjs bewaar --project <id> --dossier <werkmap>/dossier.json`, na
    akkoord met `--toepassen`.
 

@@ -300,9 +300,10 @@ test("em-dash of bedrag in dossiertekst haalt de presentatie nooit", () => {
     for (const pad of vrijeTekst) {
       assert.throws(() => bouwPresentatie(zet(voorbeeld(), pad, "a — b"), uit), /em-dash/, pad.join("."));
       const d = zet(voorbeeld(), pad, "kost € 5");
-      // Taken zijn intern (Autotask, PVA, briefing): het draaiboek noemt zelf een bedrag bij de deelfacturatie.
-      // Een andere titel of punttekst maakt het dossier om andere redenen ongeldig; een bedrag is daar nooit de reden.
-      if (pad[0] === "taken") {
+      // Taken en dekking zijn intern (Autotask, PVA, briefing, controlerapport): het draaiboek noemt zelf een bedrag
+      // bij de deelfacturatie en de dekking citeert de offerte. Een andere titel of punttekst maakt het dossier om
+      // andere redenen ongeldig; een bedrag is daar nooit de reden.
+      if (pad[0] === "taken" || pad[0] === "dekking") {
         let fout = "";
         try { bouwPresentatie(d, uit); } catch (e) { fout = e.message; }
         assert.doesNotMatch(fout, /bedrag/, pad.join("."));

@@ -1094,6 +1094,79 @@
       ]
     }
   ],
+  "dekking": [
+    {
+      "bron": "Offerte (scope)",
+      "tekst": "Migratie van mailboxen en bestanden naar de nieuwe omgeving",
+      "taak": "Mailmigratie Microsoft 365"
+    },
+    {
+      "bron": "Offerte (scope)",
+      "tekst": "Inrichting van beveiligde toegang voor alle gebruikers",
+      "taak": "Setup Microsoft 365"
+    },
+    {
+      "bron": "Offerte (scope)",
+      "tekst": "Overdracht en documentatie voor beheer",
+      "taak": "IT Glue updaten"
+    },
+    {
+      "bron": "Kickoff-notitie 2026-11-10",
+      "tekst": "Het gesprek over de planning vindt plaats op de laatste dinsdag van de maand.",
+      "taak": "Tussentijds voortgangsgesprek"
+    },
+    {
+      "bron": "Offerte 2026-11-02",
+      "tekst": "Extra werkzaamheden buiten scope worden berekend tegen € 100 per uur.",
+      "taak": "NACALC (Werkzaamheden buiten scope)"
+    },
+    {
+      "bron": "Offerte 2026-11-02",
+      "tekst": "De bestaande beheerovereenkomst wordt met 12 maanden verlengd.",
+      "taak": "Administratieve opstart project"
+    },
+    {
+      "bron": "Mail Sanne de Vries 2026-11-12",
+      "tekst": "10 procent korting op de werkelijk bestede uren.",
+      "taak": "Administratieve oplevering"
+    },
+    {
+      "bron": "Mail Sanne de Vries 2026-11-12",
+      "tekst": "Welke gebruikers krijgen toegang tot de gedeelde planningsmap?",
+      "taak": "RBAC Opmaken"
+    },
+    {
+      "bron": "Kickoff-notitie 2026-11-10",
+      "tekst": "Blijft de oude telefooncentrale in gebruik tot na de migratie?",
+      "taak": null,
+      "reden": "Besluit van de klant; telefonie valt buiten de offerte"
+    },
+    {
+      "bron": "Kickoff-notitie 2026-11-10",
+      "tekst": "Lijst met alle gebruikers en hun functie",
+      "taak": "Setup Microsoft 365"
+    },
+    {
+      "bron": "Kickoff-notitie 2026-11-10",
+      "tekst": "Overzicht van gedeelde mailboxen en distributielijsten",
+      "taak": "Mailmigratie Microsoft 365"
+    },
+    {
+      "bron": "Intake 2026-11-10",
+      "tekst": "Welke versie draait de planningssoftware en is die compatibel met de nieuwe omgeving?",
+      "taak": "Huidige documentatie ontvangen"
+    },
+    {
+      "bron": "Mail Joost Bakker 2026-11-14",
+      "tekst": "Gedeelde agenda voor de werkplaats inrichten",
+      "taak": "NACALC (Werkzaamheden buiten scope)"
+    },
+    {
+      "bron": "Offerte 2026-11-02",
+      "tekst": "Proefmigratie met twee gebruikers",
+      "taak": "Proefmigratie met twee gebruikers uitvoeren"
+    }
+  ],
   "meerwerk": [
     {
       "wat": "Gedeelde agenda voor de werkplaats inrichten",

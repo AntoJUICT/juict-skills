@@ -232,8 +232,9 @@ export function valideerDossier(d) {
     if (/\bBC\b|\bM365\b/.test(tekst)) f.push(`${pad}: verboden afkorting (BC of M365)`);
     if (/\bMFA\b/.test(tekst) && !/multifactor/i.test(tekst)) f.push(`${pad}: MFA zonder dat het voluit staat`);
     const m = INTERN_TEKST.exec(pad);
-    // Taken zijn intern (Autotask, PVA, briefing): het draaiboek noemt zelf een bedrag bij de deelfacturatie.
-    const intern = (m && d.afspraken?.[Number(m[1])]?.intern === true) || /^taken\[/.test(pad);
+    // Taken en dekking zijn intern (Autotask, PVA, briefing, controlerapport): het draaiboek noemt zelf een bedrag bij
+    // de deelfacturatie en de dekking citeert de offerte.
+    const intern = (m && d.afspraken?.[Number(m[1])]?.intern === true) || /^(taken|dekking)\[/.test(pad);
     if (!intern && isBedrag(tekst)) f.push(`${pad}: bedrag in klantgerichte tekst`);
   }
   f.push(...geheimeSleutels(d));
