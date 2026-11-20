@@ -11,6 +11,7 @@ De repo is public zodat de skills op elke werkplek binnenkomen, ook bij collega'
 | `autotask-api` | Werken met de Autotask REST API: geverifieerde endpoints, env vars, data structures en lessons learned. | Key Vault |
 | `autotask-approve-post` | De maandelijkse Approve & Post per klant voorbereiden: nog niet geposte tickets, time entries en charges, met data-issues en conservatieve AI-checks. | Key Vault |
 | `itglue-api` | Werken met de IT Glue REST API: read-only lookup-CLI, kopieerbare client, endpoints met verificatiestatus en valkuilen. Wachtwoordwaarden levert de skill nooit, alleen naam en deeplink. | Key Vault |
+| `itglue-doccheck` | De halfjaarlijkse IT Glue-documentatiecheck uitvoeren: tickets sinds de vorige check naast IT Glue leggen, live verifiëren in Azure en Graph, een voorstel per asset en pas na akkoord bijwerken en het ticket afronden. | Key Vault, az login |
 | `it-inventarisatie` | Vanuit de offerte, bronnen en een interview een IT-inventarisatierapport in Claude Design maken en het Easywork Basic-onboardingproject in Autotask invullen. De projectstart zet na akkoord op de offerte de kick-off-presentatie, het inventarisatierapport, Mini PVA, briefing en opvolgmail klaar ([wat het oplevert](plugins/it-inventarisatie/skills/projectstart/README.md)). | Key Vault, az login |
 | `datto-rmm-api` | Werken met de Datto RMM REST API v2: lookup-CLI voor sites, devices, alerts en audit, kopieerbare client, endpoints met verificatiestatus. Schrijfacties zijn dry-run tenzij je ze bevestigt; resetApiKeys is geblokkeerd. | Key Vault |
 | `tdsynnex` | Rewst-workflows bouwen tegen de TD Synnex StreamOne Ion API v3: subscriptions, seats, catalog en bekende quirks. | nee |
@@ -44,8 +45,8 @@ Updates ophalen: `/plugin marketplace update juict-skills`. Onder de org-uitrol 
 
 De meeste skills draaien standalone. Skills die Autotask of Azure raken hebben runtime-auth nodig:
 
-- **Key Vault** (`autotask-api`, `autotask-approve-post`, `datto-rmm-api`, `itglue-api`, `it-inventarisatie`, `netwerk-diagnose`, `smart-numbers`, `ticket-aanmaken`, `ticket-reactie`): credentials komen uit de shared Azure Key Vault via je `az`-login of managed identity. De skills bevatten alleen de secret-namen, nooit de waarden.
-- **az login** (`azure-saas-devops-deploy`, `it-inventarisatie`): een geldige Azure CLI-sessie met toegang tot de betreffende subscription en Azure DevOps.
+- **Key Vault** (`autotask-api`, `autotask-approve-post`, `datto-rmm-api`, `itglue-api`, `itglue-doccheck`, `it-inventarisatie`, `netwerk-diagnose`, `smart-numbers`, `ticket-aanmaken`, `ticket-reactie`): credentials komen uit de shared Azure Key Vault via je `az`-login of managed identity. De skills bevatten alleen de secret-namen, nooit de waarden.
+- **az login** (`azure-saas-devops-deploy`, `itglue-doccheck`, `it-inventarisatie`): een geldige Azure CLI-sessie met toegang tot de betreffende subscription en Azure DevOps.
 - **Directie-vault** (`smart-numbers`): naast Key Vault ook een lokale clone van de directie-vault, waar de config en de afspraken staan. Zonder die vault stopt de skill zonder cijfers te geven.
 - **Intranet-MCP** (`smart-numbers`): de MCP-server `juict-intranet` met een token van iemand met managementrechten, voor de FTE per rol en de kosten uit Exact. Zonder die server vraagt de skill die uit.
 

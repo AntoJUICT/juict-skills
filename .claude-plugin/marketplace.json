@@ -53,6 +53,11 @@
       "description": "Werken met de IT Glue REST API in JUICT-projecten — Key Vault-auth, read-only lookups, endpoints en valkuilen; wachtwoorden alleen als deeplink."
     },
     {
+      "name": "itglue-doccheck",
+      "source": "./plugins/itglue-doccheck",
+      "description": "Halfjaarlijkse IT Glue-documentatiecheck: tickets als leidraad, live verifiëren, voorstel per asset, bijwerken na akkoord."
+    },
+    {
       "name": "it-inventarisatie",
       "source": "./plugins/it-inventarisatie",
       "description": "IT-inventarisatie van een klantomgeving: offerte, bronnen en interview naar een rapport in Claude Design, plus een ingevuld Easywork Basic-project in Autotask. De projectstart zet na akkoord op de offerte de kick-off-presentatie, Mini PVA, briefing en uitvraag-mail klaar."

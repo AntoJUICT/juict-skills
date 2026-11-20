@@ -1,0 +1,12 @@
+{
+  "name": "itglue-doccheck",
+  "version": "1.0.0",
+  "description": "Halfjaarlijkse IT Glue-documentatiecheck: tickets sinds de vorige check als leidraad, live verifiëren, voorstel per asset en pas na akkoord bijwerken. Met een read-only verzamelscript voor IT Glue en Autotask.",
+  "author": {
+    "name": "AntoJUICT",
+    "email": "anto@juict.nl"
+  },
+  "homepage": "https://github.com/AntoJUICT/juict-skills",
+  "repository": "https://github.com/AntoJUICT/juict-skills",
+  "keywords": ["itglue", "autotask", "documentatie", "doccheck", "juict"]
+}
