@@ -246,3 +246,32 @@ test("uitvraag-mail laat een afspraak weg die nog tegen de offerte gecontroleerd
   assert.match(m.tekst, /elke maand ingepland/);
   assert.doesNotMatch(m.tekst, /Korting/);
 });
+
+// --- GDAP ---
+
+test("briefing noemt de GDAP-stand bij de techniek", () => {
+  const d = vers();
+  d.gdap = { status: "beperkt", gecontroleerd: "2026-11-26", ontbreekt: ["Beheerrollen"] };
+  const t = briefing(d, LINKS).tekst;
+  const techniek = t.slice(t.indexOf("Voor de techniek"));
+  assert.match(techniek, /GDAP: .*Beheerrollen/);
+});
+
+test("uitvraag-mail vraagt om goedkeuring van het toegangsverzoek alleen bij geen toegang", () => {
+  const d = vers();
+  d.gdap = { status: "geen-toegang", gecontroleerd: "2026-11-26" };
+  const m = uitvraagMail(d).tekst;
+  assert.match(m, /\*\*Toegang:\*\*.*verzoek om toegang tot jullie Microsoft 365-omgeving/);
+  assert.ok(!/GDAP/.test(m), "geen vakterm in de klantmail");
+  d.gdap = { status: "actief", gecontroleerd: "2026-11-26" };
+  assert.ok(!/\*\*Toegang:\*\*/.test(uitvraagMail(d).tekst));
+});
+
+test("wijzigingen meldt een andere GDAP-stand", () => {
+  const oud = vers();
+  oud.gdap = { status: "geen-toegang", gecontroleerd: "2026-11-20" };
+  const nieuw = vers();
+  nieuw.gdap = { status: "actief", gecontroleerd: "2026-11-26" };
+  const w = wijzigingen(oud, nieuw, { datum: new Date("2026-11-26T10:00:00Z") });
+  assert.match(w.tekst, /GDAP/);
+});

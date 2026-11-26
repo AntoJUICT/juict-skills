@@ -45,6 +45,10 @@ de plugin onder `~/.claude/plugins/cache/...` staat). Hieronder staat die map al
    Vat het kort samen, laat het bevestigen en zet het in `offerte`.
 2. **Bronnen ophalen**, alleen lezen:
    - DNS en tenant-ID: `node <skill>/scripts/dns-lookup.mjs <domein> [<domein>...]`
+   - **Eerst GDAP:** `node <skill>/scripts/gdap-check.mjs --tenant <guid|domein>`. Meld de `melding` altijd aan de
+     engineer, ook als het `actief` is, en zet de uitkomst in `bronnen.gdap`. Bij `geen-toegang`, `geen-rechten` of
+     `beperkt` vraag je of de engineer eerst de toegang regelt of doorgaat en wat ontbreekt meeneemt in het interview.
+     Betekenis per status: REFERENCE.md, GDAP controleren.
    - Microsoft 365 via GDAP: `node <skill>/scripts/m365-lookup.mjs --tenant <guid|domein> --uit <werkmap>/m365.json`.
      Exit 2 met `ok: false` betekent geen GDAP of az-login: meld het en neem M365 mee in het interview. Wat in
      `nietOpgehaald` staat, plus Intune-apparaten, SharePoint en security defaults, hoort in het interview.

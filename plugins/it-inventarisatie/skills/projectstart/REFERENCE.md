@@ -28,6 +28,7 @@ controlefout, 2 is mislukt (Autotask, Word, bestand). Geen enkel script schrijft
 | `scripts/autotask-schrijf.mjs` | `--project <id> --plan <pad> [--toepassen]` | Voorvertoning of plaatsing van notities, bestandsbijlagen en link-bijlagen. De voorvertoning toont de volledige notitietekst en per bijlage het lokale pad en de grootte in bytes. Wat er al staat wordt overgeslagen. Exit 2 als iets mislukt. |
 | `scripts/samenhang.mjs` | `--dossier <pad> --rapport <rapport.json>` | "Dossier en rapport passen bij elkaar." of de afwijkingen (exit 1). |
 | `<it>/scripts/dns-lookup.mjs` | `<domein> [<domein>...]` | MX, NS en tenant-ID per domein. |
+| `<it>/scripts/gdap-check.mjs` | `--tenant <guid\|domein>` | GDAP-stand voor `gdap` in het dossier. Zie REFERENCE.md van it-inventarisatie, GDAP controleren. |
 | `<it>/scripts/werkbestand.mjs` | `van-dossier <dossierpad>` | Werkbestand van it-inventarisatie uit het dossier. Weigert als het al bestaat. |
 | `<it>/scripts/rapport/word.mjs` | `--rapport <rapport.json> --uit <rapport.html> [--logo <svg>]` | Zet het rapport om in Word-vriendelijke HTML. Exit 2 zonder argumenten, 1 bij een ongeldig rapport. |
 | `<it>/scripts/rapport/naar-word.ps1` | `powershell -NoProfile -ExecutionPolicy Bypass -File <it>/scripts/rapport/naar-word.ps1 -Bron <html> -Doel <docx> [-Pdf <pdf>]` | Word-COM maakt er een A4-`.docx` van met ingebedde afbeeldingen. Zelfde Git Bash- en Word-valkuilen als `naar-pva.ps1`. |
@@ -92,6 +93,7 @@ wachtwoordachtige tekst.
 | `technischeVragen[]` | `vraag`, `aan`, `bron` (tekst) | ja (lijst) |
 | `extraOnderwerpen[]` | `soort` (`"beveiliging"`), `geregeld[]`, `controleren[]`, `later[]`, `optioneel` (boolean, optioneel) | ja (lijst) |
 | `overleg` | `ritme`, `aanspreekpunt`, `escalatie` (tekst); `kanaal`, `volgende`, `verzoekenControle` (tekst of `null`, optioneel) | ja |
+| `gdap` | `status` (`actief`, `beperkt`, `geen-rechten`, `geen-toegang`, `geen-tenant`, `niet-gecontroleerd`), `gecontroleerd` (`jjjj-mm-dd` of `null`); `ontbreekt` (lijst tekst), `domein` (tekst of `null`) optioneel. Uit `<it>/scripts/gdap-check.mjs`. Afwezig is nog niet gecontroleerd | nee |
 | `artifacts` | `presentatie`, `rapport` (url of `null`) | ja |
 | `verwerkt` | `bijlagen[]`, `notities[]` (Autotask-ids) | ja |
 | `versie` | geheel getal, minimaal 1; `bewaar` zet de nieuwe versie | ja |
