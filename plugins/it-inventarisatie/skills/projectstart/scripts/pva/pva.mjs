@@ -15,7 +15,7 @@
 // Gebruik: node pva.mjs --dossier <pad> --uit <html> [--versie N] [--datum jjjj-mm-dd] [--logo <svg>] [--voorblad <png>]
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { valideerDossier } from "../dossier.mjs";
+import { valideerDossier, gdapZin } from "../dossier.mjs";
 import { datumTekst, maandTekst, SUPPORT_MAIL, SUPPORT_PORTAAL, NOODNUMMER } from "../presentatie/slides.mjs";
 import { findSecretText } from "../../../it-inventarisatie/scripts/geheimen.mjs";
 
@@ -86,6 +86,10 @@ export function openPunten(d) {
   if (d.overleg.volgende === null) punt("Volgend overleg", `Datum ${PLANNEN}.`);
   if (d.vervolgOfferte === null) punt("Vervolgofferte", `Of en wanneer er een vervolgofferte komt is ${OPEN}.`);
   if (!d.contacten.some((c) => c.beslisser)) punt("Opdrachtgever voor de goedkeuring", "Er is nog geen beslisser bij de klant bekend.");
+  // Zonder GDAP kan de techniek Microsoft 365 niet uitlezen. Goedkeuren ligt bij de klant, de rest bij JUICT.
+  if (d.gdap?.status !== "actief") {
+    punt("Toegang tot Microsoft 365 (GDAP)", gdapZin(d.gdap), d.gdap?.status === "geen-toegang" ? d.overleg.aanspreekpunt : "JUICT");
+  }
   return p;
 }
 

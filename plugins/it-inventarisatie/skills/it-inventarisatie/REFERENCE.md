@@ -13,6 +13,7 @@ Alle scripts zijn Node 18+ zonder npm-dependencies. Opties met een spatie, niet 
 | `scripts/werkbestand.mjs` | `nieuw "<klant>"`, `toon <slug>`, `stap <slug> <stap>` | Pad van het werkbestand, of de inhoud. Exit 1 bij een fout. |
 | `scripts/dns-lookup.mjs` | `<domein> [<domein>...]` | JSON per domein: `domein`, `mx` (op prioriteit), `ns`, `m365Mail`, `reserveMx`, `verificatieMx`, `tenantId`, eventueel `fout`. |
 | `scripts/m365-lookup.mjs` | `--tenant <guid\|domein> [--uit <pad>]` | Samenvatting als JSON. Met `--uit` staat de samenvatting in het bestand en print het script alleen `aantallen` en `nietOpgehaald`. Exit 1 zonder `--tenant`, exit 2 met `{ ok: false, reden }` bij geen GDAP, geen az-login of onbekend domein. |
+| `scripts/gdap-check.mjs` | `--tenant <guid\|domein>` | JSON met `status` (`actief`, `beperkt`, `geen-rechten`, `geen-toegang`, `geen-tenant`, `niet-gecontroleerd`), `melding`, `gecontroleerd` (jjjj-mm-dd), `ontbreekt` (onderdelen die niet leesbaar zijn), `proeven`, `tenantId` en bij een domein `domein`. Exit 0 na een controle, ook zonder toegang; exit 1 zonder `--tenant`. Alleen lezen. |
 | `scripts/rapport/bouw.mjs` | `--rapport <pad> --uit <map> --logo-pos <url> --logo-dia <url> [--fit]` | Schrijft `<map>/project/Main.dc.html`, `NN-<naam>.dc.html` en `canvas.json`. Oude `*.dc.html` in `<map>/project` gaan eerst weg; wat er de vorige keer wel was en nu niet, meldt het script op stderr. Exit 1 bij een ongeldig rapport of een te volle pagina; dan is er niets geschreven. |
 | `scripts/autotask-project.mjs` | `zoek --company <id>` | Open klantprojecten (`projectType` 5, status niet 5): id, naam, status. |
 | | `plan --project <id> --werkbestand <pad> [--uit plan.json] [--engineer <naam>] [--datum dd-mm-jjjj]` | Voorvertoning per taak, en met `--uit` het plan als JSON. |
@@ -236,6 +237,24 @@ az-token niet:
 
 `m365-lookup` vraagt deze drie niet op; vraag ze in het interview. Geen eigen app-registratie. Lukt GDAP helemaal
 niet, dan gaat het hele Microsoft 365-deel via het interview.
+
+### GDAP controleren (`gdap-check.mjs`)
+
+De GDAP-relaties zelf (status, rollen, einddatum) zijn met de az-token niet te lezen: Graph geeft een lege lijst. De
+controle is daarom een toegangsproef met hetzelfde token als `m365-lookup`, op organisatie, gebruikers, licenties,
+multifactor-registratie, Conditional Access en beheerrollen. De uitkomst geldt voor het account dat de controle draait.
+
+| Status | Betekenis | Wie pakt het op |
+|---|---|---|
+| `actief` | Alle proeven lukken | |
+| `beperkt` | Een deel lukt; `ontbreekt` noemt wat niet. Rollen in de relatie aanvullen | JUICT |
+| `geen-rechten` | Er komt een token voor de tenant (er is dus een relatie), maar niets is leesbaar. Zit het account in de juiste GDAP-groep, en geeft de relatie leesrollen? | JUICT |
+| `geen-toegang` | Geen token voor de tenant: het verzoek is nog niet goedgekeurd of nog niet verstuurd | klant (goedkeuren), JUICT (verstuurd?) |
+| `geen-tenant` | Het domein heeft geen Microsoft 365-tenant | JUICT, zodra de omgeving er is |
+| `niet-gecontroleerd` | Geen az-login | engineer: `az login`, dan opnieuw |
+
+Gaat de klant over naar een nieuwe tenant, dan zegt de controle op het huidige domein iets over de oude omgeving.
+Draai hem op de nieuwe tenant-ID zodra die er is.
 
 ## Autotask
 

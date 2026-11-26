@@ -77,6 +77,7 @@
     "volgende": "2026-12-08",
     "verzoekenControle": "Nieuwe accounts en rechten zetten we pas door na akkoord van Joost Bakker."
   },
+  "gdap": { "status": "actief", "gecontroleerd": "2026-11-17", "domein": "voorbeeldtechniek.nl" },
   "artifacts": { "presentatie": null, "rapport": null },
   "verwerkt": { "bijlagen": [], "notities": [] },
   "versie": 1

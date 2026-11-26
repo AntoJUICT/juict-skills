@@ -194,3 +194,31 @@ test("open punten: kolom heet 'Wie pakt het op', zodat een open aanleverder niet
   const html = pvaHtml(d, {});
   assert.ok(html.includes("Wie pakt het op"));
 });
+
+// --- GDAP ---
+
+const gdapPunt = (d) => openPunten(d).find((p) => /GDAP/.test(p.wat));
+
+test("open punt GDAP: actief geeft geen punt", () => {
+  const d = voorbeeld();
+  d.gdap = { status: "actief", gecontroleerd: "2026-11-26" };
+  assert.equal(gdapPunt(d), undefined);
+});
+
+test("open punt GDAP: geen toegang ligt bij het aanspreekpunt van de klant", () => {
+  const d = voorbeeld();
+  d.gdap = { status: "geen-toegang", gecontroleerd: "2026-11-26" };
+  const p = gdapPunt(d);
+  assert.equal(p.wat, "Toegang tot Microsoft 365 (GDAP)");
+  assert.equal(p.wie, d.overleg.aanspreekpunt);
+  assert.match(p.waarom, /goedkeuren/);
+});
+
+test("open punt GDAP: beperkt noemt de onderdelen en ligt bij JUICT; zonder controle ook een punt", () => {
+  const d = voorbeeld();
+  d.gdap = { status: "beperkt", gecontroleerd: "2026-11-26", ontbreekt: ["Conditional Access"] };
+  assert.equal(gdapPunt(d).wie, "JUICT");
+  assert.match(gdapPunt(d).waarom, /Conditional Access/);
+  delete d.gdap;
+  assert.match(gdapPunt(d).waarom, /nog niet gecontroleerd/i);
+});

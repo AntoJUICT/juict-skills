@@ -2,7 +2,7 @@
 // Alleen de uitvraag-mail gaat naar de klant: daar staan geen bedragen en geen interne afspraken in.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { isBedrag } from "./dossier.mjs";
+import { isBedrag, gdapZin } from "./dossier.mjs";
 import { findSecretText } from "../../it-inventarisatie/scripts/geheimen.mjs";
 
 const p2 = (n) => String(n).padStart(2, "0");
@@ -77,6 +77,7 @@ export function briefing(d, { presentatie, rapport } = {}) {
     for (const e of d.externePartijen) l.push(`- ${e.naam}, ${e.rol}${e.aangestuurdDoor ? `, aangestuurd door ${e.aangestuurdDoor}` : ""}`);
   }
   if (d.overgangBeheer) l.push("", `Overgang beheer: ${d.overgangBeheer}`);
+  l.push("", `GDAP: ${gdapZin(d.gdap)}`);
   for (const o of d.extraOnderwerpen ?? []) {
     l.push("", `Extra onderwerp ${o.soort}:`);
     for (const x of o.geregeld) l.push(`- Geregeld: ${x}`);
@@ -124,6 +125,7 @@ const ENKEL = [
   ["Volgend overleg", (d) => d.overleg?.volgende && nlDatum(d.overleg.volgende)],
   ["Verzoeken en controle", (d) => d.overleg?.verzoekenControle],
   ["Fases", (d) => d.fases?.map((f) => `${f.code} ${f.naam} (${f.start} tot ${f.eind})`).join("; ")],
+  ["GDAP", (d) => d.gdap && gdapZin(d.gdap)],
 ];
 
 export function wijzigingen(oud, nieuw, { datum = new Date() } = {}) {
@@ -180,6 +182,8 @@ export function uitvraagMail(d, { bijlage = true } = {}) {
   if (open.length) punten.push(`- **Besluiten:** ${open.join(" ")}`);
   if (aanleveren.length) punten.push(`- **Aanleveren:** ${eindig(aanleveren.join("; "))}`);
   if (vragen.length) punten.push(`- **Technische vragen:** ${vragen.join(" ")}`);
+  // Alleen als de controle zegt dat er nog geen toegang is; de klant kent het woord GDAP niet.
+  if (d.gdap?.status === "geen-toegang") punten.push("- **Toegang:** Wil je ons verzoek om toegang tot jullie Microsoft 365-omgeving goedkeuren? Zonder die toegang kunnen we de omgeving niet uitlezen.");
   if (afspraken.length) punten.push(`- **Afspraken:** ${afspraken.join(" ")}`);
   if (punten.length) l.push("Kort de belangrijkste punten:", ...punten, "");
 

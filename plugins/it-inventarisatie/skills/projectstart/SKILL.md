@@ -58,7 +58,13 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    - welke mensen van de klant bij de kick-off zijn (alleen zij staan in `contacten`, plus contacten van externe
      partijen) en wie het dagelijkse aanspreekpunt is;
    - wie van JUICT in het projectteam zit (`team`). Neem de accountmanager niet vanzelf op.
-3. **Controleren.** `node <skill>/scripts/dossier.mjs controleer <werkmap>/dossier.json`, net zo lang tot het geldig is.
+3. **GDAP en controleren.** `node <it>/scripts/gdap-check.mjs --tenant <domein>` op het hoofddomein van de klant (of
+   de tenant-ID als die in de bronnen staat). Zet `status`, `gecontroleerd`, `ontbreekt` en `domein` in `gdap` van het
+   dossier en meld de `melding` in de chat, ook als het `actief` is. Is het niet `actief`, dan komt het vanzelf bij de
+   Open punten van het PVA en in de briefing, en bij `geen-toegang` als verzoek om goedkeuring in de opvolgmail. Gaat
+   de klant naar een nieuwe tenant, zeg dan dat de controle over de huidige omgeving gaat. Betekenis per status:
+   REFERENCE.md van it-inventarisatie, GDAP controleren.
+   Daarna `node <skill>/scripts/dossier.mjs controleer <werkmap>/dossier.json`, net zo lang tot het geldig is.
 4. **Rapport.** `node <it>/scripts/dns-lookup.mjs <domein>...` op de domeinen uit de bronnen. Dan
    `node <it>/scripts/werkbestand.mjs van-dossier <werkmap>/dossier.json` en verder volgens it-inventarisatie stap 5
    en 6 (`rapport.json`, `bouw.mjs`, publiceren in Claude Design), met `--uit <scratch>/rapport`. Controleer daarna
@@ -109,8 +115,10 @@ tegenspreken. De kick-off is de eerste meeting na akkoord en meteen ook de techn
    opnieuw en daarna `node <skill>/scripts/dossier.mjs nieuw --dossier <werkmap>/dossier.json --bronnen <werkmap>/bronnen.json`.
    `nieuw` laat de eigen uitvoer van de skill al weg: dossierbijlagen, `Mini PVA <klant> v<N>.docx`,
    `IT-inventarisatie <klant> v<N>.docx` en notities die met "Projectstart:" beginnen.
-2. **Niets nieuw** (`aantal` is 0): stop en zeg dat er niets nieuws op het project staat. Geen nieuwe dossierversie,
-   geen PVA, geen notitie.
+   Draai ook `gdap-check.mjs` opnieuw (zie stap 3 van Starten) en werk `gdap` in het dossier bij.
+2. **Niets nieuw** (`aantal` is 0 en `gdap.status` is gelijk gebleven): stop en zeg dat er niets nieuws op het
+   project staat. Geen nieuwe dossierversie, geen PVA, geen notitie. Is alleen de GDAP-stand veranderd, ga dan door
+   naar stap 4.
 3. Lees alleen de nieuwe bronnen, zet hun ids in `verwerkt`, werk het dossier bij en draai `controleer`.
    **Na de kick-off:** zet het verslag of de uitkomsten als notitie op het project en draai de skill opnieuw. Verwerk
    besluiten (`besluit`, `beslisser`, `bron` "kick-off <datum>"), nieuwe datums (`uiterlijk`, `datum`, start en eind

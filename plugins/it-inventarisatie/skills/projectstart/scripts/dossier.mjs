@@ -27,6 +27,26 @@ const isTekst = (v) => typeof v === "string" && v.trim() !== "";
 const isTekstOfNull = (v) => v === null || isTekst(v);
 const isLijst = (v) => Array.isArray(v);
 const JJJJ_MM = /^\d{4}-(0[1-9]|1[0-2])$/;
+const JJJJ_MM_DD = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+// --- GDAP: de stand uit `it-inventarisatie/scripts/gdap-check.mjs` ---
+
+export const GDAP_STATUSSEN = ["actief", "beperkt", "geen-rechten", "geen-toegang", "geen-tenant", "niet-gecontroleerd"];
+
+const gdapDatum = (g) => (g?.gecontroleerd ? ` (gecontroleerd ${g.gecontroleerd.split("-").reverse().join("-")})` : "");
+
+// Eén zin over de toegang tot Microsoft 365, voor de briefing en de Open punten. Afwezig is nog niet gecontroleerd.
+export function gdapZin(g) {
+  const ontbreekt = (g?.ontbreekt ?? []).join(", ");
+  switch (g?.status) {
+    case "actief": return `Toegang werkt${gdapDatum(g)}.`;
+    case "beperkt": return `Toegang werkt, maar niet voor: ${ontbreekt}${gdapDatum(g)}. Rollen in de GDAP-relatie aanvullen.`;
+    case "geen-rechten": return `Er is een relatie, maar het account dat controleerde kan niets uitlezen${gdapDatum(g)}. GDAP-groep en rollen controleren.`;
+    case "geen-toegang": return `Nog geen toegang${gdapDatum(g)}. Het verzoek moet een beheerder van de klant nog goedkeuren; controleer in Partner Center of het verstuurd is.`;
+    case "geen-tenant": return `Nog geen Microsoft 365-omgeving gevonden${gdapDatum(g)}. Toegang regelen zodra de omgeving er is.`;
+    default: return "Nog niet gecontroleerd. Draai de GDAP-controle (gdap-check.mjs).";
+  }
+}
 
 function controleerVorm(d, f) {
   const eis = (pad, ok, tekst) => { if (!ok) f.push(`${pad}: ${tekst}`); };
@@ -104,6 +124,16 @@ function controleerVorm(d, f) {
   optioneel("overleg.kanaal", d.overleg?.kanaal, isTekstOfNull, "tekst of null verplicht");
   optioneel("gebruikersimpact", d.gebruikersimpact, isTekstOfNull, "tekst of null verplicht");
   optioneel("overgangBeheer", d.overgangBeheer, isTekstOfNull, "tekst of null verplicht");
+  if (d.gdap !== undefined) {
+    const g = d.gdap;
+    if (!g || typeof g !== "object" || Array.isArray(g)) f.push("gdap: object met status verplicht");
+    else {
+      eis("gdap.status", GDAP_STATUSSEN.includes(g.status), `moet een van ${GDAP_STATUSSEN.join(", ")} zijn`);
+      eis("gdap.gecontroleerd", g.gecontroleerd === null || (typeof g.gecontroleerd === "string" && JJJJ_MM_DD.test(g.gecontroleerd)), "formaat jjjj-mm-dd of null verplicht");
+      optioneel("gdap.ontbreekt", g.ontbreekt, (v) => isLijst(v) && v.every(isTekst), "lijst met tekst verplicht");
+      optioneel("gdap.domein", g.domein, isTekstOfNull, "tekst of null verplicht");
+    }
+  }
   eis("artifacts.presentatie", isTekstOfNull(d.artifacts?.presentatie), "url of null verplicht");
   eis("artifacts.rapport", isTekstOfNull(d.artifacts?.rapport), "url of null verplicht");
   eis("verwerkt.bijlagen", isLijst(d.verwerkt?.bijlagen), "lijst verplicht");

@@ -1,6 +1,6 @@
 {
   "name": "it-inventarisatie",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "IT-inventarisatie van een klantomgeving: offerte, bronnen (mail, Microsoft 365, IT Glue, Autotask, DNS) en interview naar een rapport in Claude Design, plus een ingevuld Easywork Basic-project in Autotask. De projectstart zet na akkoord op de offerte de kick-off-presentatie, Mini PVA, briefing en uitvraag-mail klaar.",
   "author": {
     "name": "AntoJUICT",

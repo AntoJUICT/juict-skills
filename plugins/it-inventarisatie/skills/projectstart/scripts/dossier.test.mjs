@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { valideerDossier, nieuweBronnen, laadStand, bewaarStand } from "./dossier.mjs";
+import { valideerDossier, nieuweBronnen, laadStand, bewaarStand, gdapZin, GDAP_STATUSSEN } from "./dossier.mjs";
 
 const vers = () => JSON.parse(readFileSync(new URL("../voorbeeld/dossier.voorbeeld.json", import.meta.url), "utf8"));
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64");
@@ -373,4 +373,35 @@ test("nieuweBronnen: een URL-bijlage komt nooit als nieuwe bron voor (bronnen.mj
   d.verwerkt = { bijlagen: [], notities: [] };
   const m = { bijlagen: [{ id: 2, titel: "Offerte.pdf" }], overgeslagen: [{ id: 3, titel: "Kick-off presentatie X", reden: "geen bestandsbijlage" }], notities: [] };
   assert.deepEqual(nieuweBronnen(d, m).bijlagen.map((x) => x.id), [2]);
+});
+
+// --- GDAP ---
+
+test("gdap: optioneel, met geldige status en datum", () => {
+  const d = vers();
+  delete d.gdap;
+  assert.deepEqual(valideerDossier(d), []);
+  d.gdap = { status: "beperkt", gecontroleerd: "2026-11-26", ontbreekt: ["Conditional Access"], domein: "voorbeeld.nl" };
+  assert.deepEqual(valideerDossier(d), []);
+  d.gdap = { status: "geen-toegang", gecontroleerd: null };
+  assert.deepEqual(valideerDossier(d), []);
+});
+
+test("gdap: onbekende status, verkeerde datum of geen lijst geeft fouten", () => {
+  const d = vers();
+  d.gdap = { status: "misschien", gecontroleerd: "26-11-2026", ontbreekt: "Licenties" };
+  const f = valideerDossier(d);
+  assert.ok(f.some((x) => x.startsWith("gdap.status")));
+  assert.ok(f.some((x) => x.startsWith("gdap.gecontroleerd")));
+  assert.ok(f.some((x) => x.startsWith("gdap.ontbreekt")));
+});
+
+test("gdapZin: een zin per status, zonder verboden afkortingen", () => {
+  for (const status of GDAP_STATUSSEN) {
+    const z = gdapZin({ status, gecontroleerd: "2026-11-26", ontbreekt: ["Licenties"] });
+    assert.ok(z.length > 20, status);
+    assert.ok(!/\bM365\b|\bMFA\b|—/.test(z), status);
+  }
+  assert.match(gdapZin({ status: "beperkt", gecontroleerd: "2026-11-26", ontbreekt: ["Licenties", "Beheerrollen"] }), /Licenties, Beheerrollen/);
+  assert.match(gdapZin(undefined), /nog niet gecontroleerd/i);
 });
